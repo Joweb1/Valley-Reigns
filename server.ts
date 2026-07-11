@@ -30,9 +30,13 @@ const db = getFirestore(firebaseApp, firebaseConfig.firestoreDatabaseId);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// API health endpoint
+// API health endpoints for uptime pingers
 app.get("/api/health", (req, res) => {
-  res.json({ status: "ok" });
+  res.status(200).json({ status: "ok" });
+});
+
+app.get("/ping", (req, res) => {
+  res.status(200).send("OK");
 });
 
 // Meta WhatsApp Webhook GET Verification
