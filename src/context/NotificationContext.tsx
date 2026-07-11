@@ -120,6 +120,24 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     }, 6000);
   };
 
+  // Trigger a toast notification when the Service Worker is registered and active
+  useEffect(() => {
+    if (typeof window === "undefined" || !("serviceWorker" in navigator)) return;
+
+    navigator.serviceWorker.ready.then((registration) => {
+      const alreadyToasted = sessionStorage.getItem("sw_registered_toast_shown");
+      if (!alreadyToasted) {
+        addToast(
+          "Service Worker Registered",
+          "Background synchronization active! Push notifications can now be received even if this tab is closed or minimized."
+        );
+        sessionStorage.setItem("sw_registered_toast_shown", "true");
+      }
+    }).catch((err) => {
+      console.warn("[Web Push] Service Worker ready check failed:", err);
+    });
+  }, []);
+
   const handleSetPushNotificationsEnabled = (enabled: boolean) => {
     setPushNotificationsEnabled(enabled);
     if (typeof window !== "undefined") {
@@ -400,6 +418,48 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
       if (unsubscribeNotifs) unsubscribeNotifs();
     };
   }, [currentUser]);
+
+  // Automatically clear active browser push notifications and in-app toasts when the tab/window is focused or becomes visible
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const clearAllActiveNotifications = async () => {
+      // 1. Clear simulated in-app toasts
+      setToasts([]);
+
+      // 2. Clear native browser push notifications via ServiceWorker registration
+      if ("serviceWorker" in navigator) {
+        try {
+          const registration = await navigator.serviceWorker.ready;
+          const notifications = await registration.getNotifications();
+          notifications.forEach((notification) => {
+            notification.close();
+          });
+          console.log("[Web Push] Successfully cleared active system tray notifications on focus.");
+        } catch (err) {
+          console.warn("Failed to clear service worker notifications on focus:", err);
+        }
+      }
+    };
+
+    // Clear notifications on initial load
+    clearAllActiveNotifications();
+
+    // Listen to window focus and visibility changes
+    window.addEventListener("focus", clearAllActiveNotifications);
+    
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        clearAllActiveNotifications();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener("focus", clearAllActiveNotifications);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, []);
 
   return (
     <NotificationContext.Provider
