@@ -806,6 +806,106 @@ function AppContent() {
     }
   }, [currentUser, loading, isHomePage, isStandaloneOrFs, navigate]);
 
+  // Dynamic high-quality SEO meta updates per-route
+  useEffect(() => {
+    let title = "Valley Reigns | High-Fidelity Tech Recruitment & Communication Routing";
+    let desc = "Valley Reigns is a premier high-fidelity recruitment routing platform bridging exceptional tech talent with top-tier companies through interactive, real-time communication channels.";
+    let keywords = "Valley Reigns, tech recruitment, developer jobs, recruitment routing, real-time communication routing, hire engineers, elite tech talent, interactive hiring platform";
+
+    switch (location.pathname) {
+      case "/":
+        title = "Valley Reigns | High-Fidelity Tech Recruitment & Communication Routing";
+        desc = "Valley Reigns is a premier high-fidelity recruitment routing platform bridging exceptional tech talent with top-tier companies through interactive, real-time communication channels.";
+        break;
+      case "/seeker":
+        title = "My Job Search Dashboard | Valley Reigns Recruitment";
+        desc = "Manage your job search, check application routing pipelines, view response SLA counters, and explore premium tech jobs on Valley Reigns.";
+        break;
+      case "/seeker/messages":
+        title = "My Chat & Communications | Valley Reigns Routing";
+        desc = "Chat in real-time with hiring managers and recruiters. Experience instantaneous communication routing and status tracking on Valley Reigns.";
+        break;
+      case "/staff":
+        title = "Live Recruiter Routing Inbox | Valley Reigns Staff";
+        desc = "Monitor active candidate chat logs, check SLAs, post new roles, and coordinate candidate communication streams.";
+        break;
+      case "/admin":
+        title = "System Administration | Valley Reigns Control Console";
+        desc = "Configure global communication settings, manage job postings, supervise staff and active candidate chat channels.";
+        break;
+      case "/admin/notifications":
+        title = "System Alerts & Status | Valley Reigns Admin";
+        desc = "Track high-priority system alerts, background worker logs, and communication health updates.";
+        break;
+      case "/admin/post-jobs":
+        title = "Publish Tech Jobs & Careers | Valley Reigns";
+        desc = "Create and publish fresh technology openings, configure automatic communication routing pipelines for candidates.";
+        break;
+      case "/admin/whatsapp-config":
+        title = "WhatsApp Webhook Integration Console | Valley Reigns";
+        desc = "Supervise and link live WhatsApp Webhooks, verify verification tokens, and configure Meta Business WhatsApp APIs.";
+        break;
+      case "/admin/diagnostics":
+        title = "Engineering Diagnostics Center | Valley Reigns Admin";
+        desc = "Verify live database status, test communications routing pipelines, and audit API health.";
+        break;
+      case "/admin/manage-jobs":
+      case "/staff/manage-jobs":
+        title = "Job Postings & Active Roles | Valley Reigns Management";
+        desc = "Track active tech listings, update job requirements, and supervise candidate communication channels.";
+        break;
+      case "/auth/staff-portal-invite":
+        title = "Enroll as Valley Reigns Recruiter | Candidate Routing";
+        desc = "Sign up and register for our recruiter dashboard to start communicating with top-tier technical applicants.";
+        break;
+      default:
+        break;
+    }
+
+    // Set document title
+    document.title = title;
+
+    // Set or create Meta Description
+    let metaDesc = document.querySelector('meta[name="description"]');
+    if (!metaDesc) {
+      metaDesc = document.createElement("meta");
+      metaDesc.setAttribute("name", "description");
+      document.head.appendChild(metaDesc);
+    }
+    metaDesc.setAttribute("content", desc);
+
+    // Set or create Meta Keywords
+    let metaKeywords = document.querySelector('meta[name="keywords"]');
+    if (!metaKeywords) {
+      metaKeywords = document.createElement("meta");
+      metaKeywords.setAttribute("name", "keywords");
+      document.head.appendChild(metaKeywords);
+    }
+    metaKeywords.setAttribute("content", keywords);
+
+    // Update Open Graph Metadata elements
+    const ogTitle = document.querySelector('meta[property="og:title"]');
+    if (ogTitle) ogTitle.setAttribute("content", title);
+    const ogDesc = document.querySelector('meta[property="og:description"]');
+    if (ogDesc) ogDesc.setAttribute("content", desc);
+    
+    // Update Twitter Metadata elements
+    const twitterTitle = document.querySelector('meta[name="twitter:title"]');
+    if (twitterTitle) twitterTitle.setAttribute("content", title);
+    const twitterDesc = document.querySelector('meta[name="twitter:description"]');
+    if (twitterDesc) twitterDesc.setAttribute("content", desc);
+
+    // Update Canonical URL
+    let canonical = document.querySelector('link[rel="canonical"]');
+    if (!canonical) {
+      canonical = document.createElement("link");
+      canonical.setAttribute("rel", "canonical");
+      document.head.appendChild(canonical);
+    }
+    canonical.setAttribute("href", window.location.href);
+
+  }, [location.pathname]);
+
   useEffect(() => {
     // Run SLA check on initial load
     checkAndEnforceSLAs().catch(err => console.warn("SLA check failed:", err));
