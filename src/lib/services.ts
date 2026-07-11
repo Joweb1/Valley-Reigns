@@ -166,7 +166,7 @@ class MemoryStorage {
       displayName: "Valley Reigns Admin",
       role: "admin",
       canPostJobs: true,
-      password: "password123",
+      password: "Password123",
       authProvider: "email"
     },
     "staff-1-seed": {
@@ -175,7 +175,7 @@ class MemoryStorage {
       displayName: "Marcus Vance",
       role: "staff",
       canPostJobs: true,
-      password: "password123",
+      password: "Password123",
       authProvider: "email"
     },
     "staff-2-seed": {
@@ -184,7 +184,7 @@ class MemoryStorage {
       displayName: "Jessica Carter",
       role: "staff",
       canPostJobs: true,
-      password: "password123",
+      password: "Password123",
       authProvider: "email"
     },
     "admin-demo": {
@@ -193,7 +193,7 @@ class MemoryStorage {
       displayName: "Jessica Carter",
       role: "admin",
       canPostJobs: true,
-      password: "password123",
+      password: "Password123",
       authProvider: "email"
     },
     "staff-demo": {
@@ -202,7 +202,7 @@ class MemoryStorage {
       displayName: "Marcus Vance",
       role: "staff",
       canPostJobs: true,
-      password: "password123",
+      password: "Password123",
       authProvider: "email"
     },
     "seeker-demo": {
@@ -211,7 +211,7 @@ class MemoryStorage {
       displayName: "Alex Rivera",
       role: "seeker",
       canPostJobs: false,
-      password: "password123",
+      password: "Password123",
       authProvider: "email"
     }
   };
@@ -272,44 +272,44 @@ export async function initializeDatabaseSeed(): Promise<void> {
   try {
     const adminRef = doc(db, "users", "admin-seed");
     const adminSnap = await getDoc(adminRef);
-    if (!adminSnap.exists()) {
+    if (!adminSnap.exists() || !adminSnap.data()?.password || adminSnap.data()?.password !== "Password123") {
       await setDoc(adminRef, {
         uid: "admin-seed",
         email: "admin@valleyreigns.com",
         displayName: "Valley Reigns Admin",
         role: "admin",
         canPostJobs: true,
-        password: "password123",
+        password: "Password123",
         authProvider: "email"
-      });
+      }, { merge: true });
     }
 
     const staff1Ref = doc(db, "users", "staff-1-seed");
     const staff1Snap = await getDoc(staff1Ref);
-    if (!staff1Snap.exists()) {
+    if (!staff1Snap.exists() || !staff1Snap.data()?.password || staff1Snap.data()?.password !== "Password123") {
       await setDoc(staff1Ref, {
         uid: "staff-1-seed",
         email: "staff1@valleyreigns.com",
         displayName: "Marcus Vance",
         role: "staff",
         canPostJobs: true,
-        password: "password123",
+        password: "Password123",
         authProvider: "email"
-      });
+      }, { merge: true });
     }
 
     const staff2Ref = doc(db, "users", "staff-2-seed");
     const staff2Snap = await getDoc(staff2Ref);
-    if (!staff2Snap.exists()) {
+    if (!staff2Snap.exists() || !staff2Snap.data()?.password || staff2Snap.data()?.password !== "Password123") {
       await setDoc(staff2Ref, {
         uid: "staff-2-seed",
         email: "staff2@valleyreigns.com",
         displayName: "Jessica Carter",
         role: "staff",
         canPostJobs: true,
-        password: "password123",
+        password: "Password123",
         authProvider: "email"
-      });
+      }, { merge: true });
     }
 
     // Seed staff online statuses in Firestore
@@ -1432,6 +1432,27 @@ export async function getSystemNotifications(): Promise<SystemNotification[]> {
     memoryStore.systemNotifications = [];
   }
   return [...memoryStore.systemNotifications].sort((a, b) => b.timestamp - a.timestamp);
+}
+
+// Real-time subscription for system notifications
+export function subscribeToSystemNotifications(callback: (notifications: SystemNotification[]) => void) {
+  try {
+    const collRef = collection(db, "system_notifications");
+    const q = query(collRef, orderBy("timestamp", "desc"));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const list = snapshot.docs.map(doc => doc.data() as SystemNotification);
+      callback(list);
+    }, (error) => {
+      console.warn("Firestore subscribeToSystemNotifications failed, falling back to local memory:", error);
+      callback(memoryStore.systemNotifications || []);
+    });
+    return unsubscribe;
+  } catch (error) {
+    console.warn("Firestore subscribeToSystemNotifications failed to initialize, using memory subscription:", error);
+    return memoryStore.subscribe(() => {
+      callback(memoryStore.systemNotifications || []);
+    });
+  }
 }
 
 export async function markNotificationAsRead(id: string): Promise<void> {

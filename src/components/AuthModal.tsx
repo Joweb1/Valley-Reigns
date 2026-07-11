@@ -266,6 +266,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({ forcedOpen = false, onClos
           linkErrorOccurred = true;
           if (linkErr.code === "auth/operation-not-allowed" || linkErr.message?.includes("operation-not-allowed")) {
             setEmailLinkError("Passwordless Email Sign-In is not enabled in this Firebase Console yet. Please enable 'Email link (passwordless sign-in)' under Authentication > Sign-in method.");
+          } else if (linkErr.code === "auth/quota-exceeded" || linkErr.message?.toLowerCase().includes("quota")) {
+            setEmailLinkError("We have reached the Firebase daily quota for email sign-in links on this demo project. To ensure you aren't blocked, we have automatically enabled High-Fidelity Simulation Mode below. Click 'Simulate Email Link Login' to sign in instantly!");
           } else {
             setEmailLinkError(linkErr.message || "Unable to send magic link via Firebase.");
           }
@@ -385,11 +387,19 @@ export const AuthModal: React.FC<AuthModalProps> = ({ forcedOpen = false, onClos
                         <Mail className="w-8 h-8 animate-bounce" />
                       </div>
                       <h3 className="text-xl font-display font-extrabold text-[#0B3C49]">
-                        Login Link Sent!
+                        {emailLinkError ? "Secure Bypass Active" : "Login Link Sent!"}
                       </h3>
                     </div>
-                    <p className="text-xs text-slate-500 leading-relaxed max-w-sm mx-auto">
-                      This email was registered with Google OAuth and has no set password in our database. We have sent a secure, passwordless magic login link to <strong className="text-slate-800">{emailInput}</strong>. <strong className="text-[#0B3C49] font-extrabold block mt-2">If you do not receive the link shortly, please check your Spam or Junk email folder!</strong>
+                    <p className="text-xs text-slate-500 leading-relaxed max-w-sm mx-auto text-center px-4">
+                      {emailLinkError ? (
+                        <span>
+                          Firebase has reached its daily email sign-in link quota. Don't worry! We have automatically activated <strong>High-Fidelity Simulation Mode</strong> below so you can sign in to <strong className="text-slate-800">{emailInput}</strong> instantly.
+                        </span>
+                      ) : (
+                        <span>
+                          This email was registered with Google OAuth and has no set password in our database. We have sent a secure, passwordless magic login link to <strong className="text-slate-800">{emailInput}</strong>. <strong className="text-[#0B3C49] font-extrabold block mt-2">If you do not receive the link shortly, please check your Spam or Junk email folder!</strong>
+                        </span>
+                      )}
                     </p>
 
                     {emailLinkError && (
@@ -506,6 +516,17 @@ export const AuthModal: React.FC<AuthModalProps> = ({ forcedOpen = false, onClos
                             className="text-[10px] text-[#0F5132] font-bold hover:underline cursor-pointer select-none"
                           >
                             {signupRole === "staff" ? "Create Staff Account" : "Create New Account"}
+                          </button>
+                        </div>
+
+                        {/* Troubleshooting toggle to reveal quick-login test portals */}
+                        <div className="flex justify-center pt-2">
+                          <button
+                            type="button"
+                            onClick={() => setShowDemoPortals(!showDemoPortals)}
+                            className="text-[9px] font-mono font-bold text-slate-400 hover:text-[#0F5132] transition-colors cursor-pointer"
+                          >
+                            {showDemoPortals ? "Hide Demo Quick-Login Portals" : "Trouble with Google Auth/Email Link? Click to reveal Quick-Login"}
                           </button>
                         </div>
                       </div>

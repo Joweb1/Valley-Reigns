@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { Wifi, WifiOff, AlertTriangle, X } from "lucide-react";
 
-type NetworkStatus = "online" | "unstable" | "offline";
+type NetworkStatus = "online" | "unstable" | "offline" | "rtdb-offline";
 
 export const NetworkStatusMonitor: React.FC = () => {
   const [status, setStatus] = useState<NetworkStatus>(() => {
@@ -50,6 +50,25 @@ export const NetworkStatusMonitor: React.FC = () => {
       }
     };
 
+    const handleRtdbConnection = (e: Event) => {
+      const customEvent = e as CustomEvent<{ connected: boolean }>;
+      const isConnected = customEvent.detail.connected;
+      
+      let newStatus: NetworkStatus = isConnected ? "online" : "rtdb-offline";
+      
+      if (!navigator.onLine) {
+        newStatus = "offline";
+      }
+
+      if (previousStatus.current !== newStatus) {
+        setStatus(newStatus);
+        previousStatus.current = newStatus;
+        if (!isInitialMount.current) {
+          setIsVisible(true);
+        }
+      }
+    };
+
     const handleConnectionChange = () => {
       const conn = (navigator as any).connection;
       if (!navigator.onLine) {
@@ -73,6 +92,7 @@ export const NetworkStatusMonitor: React.FC = () => {
 
     window.addEventListener("online", handleOnline);
     window.addEventListener("offline", handleOffline);
+    window.addEventListener("rtdb-connection-changed", handleRtdbConnection);
 
     const conn = (navigator as any).connection;
     if (conn) {
@@ -87,6 +107,7 @@ export const NetworkStatusMonitor: React.FC = () => {
     return () => {
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
+      window.removeEventListener("rtdb-connection-changed", handleRtdbConnection);
       if (conn) {
         conn.removeEventListener("change", handleConnectionChange);
       }
@@ -113,6 +134,14 @@ export const NetworkStatusMonitor: React.FC = () => {
           icon: <WifiOff className="w-4 h-4 text-rose-600" />,
           title: "Connection Lost",
           desc: "You are currently offline.",
+        };
+      case "rtdb-offline":
+        return {
+          bg: "bg-rose-50 border-rose-200/80",
+          text: "text-rose-800",
+          icon: <WifiOff className="w-4 h-4 text-rose-600" />,
+          title: "Presence Offline",
+          desc: "You went offline due to connection issues.",
         };
       case "unstable":
         return {

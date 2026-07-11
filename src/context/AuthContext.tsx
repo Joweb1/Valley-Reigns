@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { onAuthStateChanged, User, signOut } from "firebase/auth";
-import { auth, getUserProfile, saveUserProfile, memoryStore, getUserProfileByEmail } from "../lib/services";
+import { auth, getUserProfile, saveUserProfile, memoryStore, getUserProfileByEmail, rtdb, setStaffOnlineStatus } from "../lib/services";
 import { UserProfile } from "../types";
+import { ref, onValue, onDisconnect } from "firebase/database";
 
 interface AuthContextType {
   currentUser: UserProfile | null;
@@ -578,6 +579,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = async () => {
     setLoading(true);
+    if (currentUser && (currentUser.role === "staff" || currentUser.role === "admin")) {
+      try {
+        await setStaffOnlineStatus(currentUser.uid, false);
+      } catch (e) {
+        console.warn("Could not set staff status to offline during logout:", e);
+      }
+    }
     sessionStorage.removeItem("vr_virtual_user");
     try {
       await signOut(auth);
@@ -628,6 +636,118 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await sendSignInLinkToEmail(auth, normEmail, actionCodeSettings);
     window.localStorage.setItem("emailForSignIn", normEmail);
   };
+
+  // Staff real-time presence heartbeat and onDisconnect registration
+  useEffect(() => {
+    if (!currentUser || (currentUser.role !== "staff" && currentUser.role !== "admin")) {
+      return;
+    }
+
+    const uid = currentUser.uid;
+    let presenceWorker: Worker | null = null;
+    let connectedUnsubscribe: any = null;
+    let disconnectRef: any = null;
+
+    // Heartbeat to update lastActive in Firestore & RTDB every 1 minute
+    const sendHeartbeat = async () => {
+      try {
+        await setStaffOnlineStatus(uid, true);
+      } catch (e) {
+        console.warn("[Presence] Failed sending online heartbeat:", e);
+      }
+    };
+
+    // Send immediate heartbeat on login/mount
+    sendHeartbeat();
+
+    // Set up Web Worker for non-throttled background heartbeat interval (1 minute)
+    try {
+      const workerCode = `
+        let intervalId = null;
+        self.onmessage = function(e) {
+          if (e.data.action === 'start') {
+            if (intervalId) clearInterval(intervalId);
+            intervalId = setInterval(() => {
+              self.postMessage('tick');
+            }, e.data.interval || 60000);
+          } else if (e.data.action === 'stop') {
+            if (intervalId) clearInterval(intervalId);
+            intervalId = null;
+          }
+        };
+      `;
+      const blob = new Blob([workerCode], { type: "application/javascript" });
+      const workerUrl = URL.createObjectURL(blob);
+      presenceWorker = new Worker(workerUrl);
+      
+      presenceWorker.onmessage = (e) => {
+        if (e.data === "tick") {
+          sendHeartbeat();
+        }
+      };
+      
+      presenceWorker.postMessage({ action: "start", interval: 60000 }); // 1 minute interval
+    } catch (err) {
+      console.warn("[Presence] Web Worker not supported or failed to initialize, falling back to standard interval:", err);
+      // Fallback to standard interval
+      const fallbackInterval = setInterval(sendHeartbeat, 60000);
+      (presenceWorker as any) = {
+        terminate: () => clearInterval(fallbackInterval)
+      };
+    }
+
+    // Set up Realtime Database onDisconnect trigger
+    if (rtdb) {
+      try {
+        const connectedRef = ref(rtdb, ".info/connected");
+        connectedUnsubscribe = onValue(connectedRef, async (snap) => {
+          const isConnected = snap.val() === true;
+          
+          window.dispatchEvent(new CustomEvent("rtdb-connection-changed", {
+            detail: { connected: isConnected }
+          }));
+
+          if (isConnected) {
+            console.log("[Presence] Connected to Firebase RTDB. Configuring onDisconnect handler.");
+            // Re-assert online status when reconnected
+            await setStaffOnlineStatus(uid, true);
+
+            const statusRef = ref(rtdb, `staff_statuses/${uid}`);
+            disconnectRef = onDisconnect(statusRef);
+            await disconnectRef.set({
+              status: "offline",
+              lastActive: Date.now()
+            });
+          }
+        });
+      } catch (e) {
+        console.warn("[Presence] Could not set up RTDB disconnect handler:", e);
+      }
+    }
+
+    return () => {
+      if (presenceWorker) {
+        try {
+          if (typeof presenceWorker.postMessage === "function") {
+            presenceWorker.postMessage({ action: "stop" });
+          }
+          presenceWorker.terminate();
+        } catch (e) {
+          console.warn("[Presence] Failed to terminate worker:", e);
+        }
+      }
+      if (connectedUnsubscribe) {
+        connectedUnsubscribe();
+      }
+      if (disconnectRef) {
+        try {
+          disconnectRef.cancel();
+        } catch (e) {
+          console.warn("[Presence] Failed to cancel RTDB onDisconnect hook:", e);
+        }
+      }
+    };
+  }, [currentUser]);
 
   return (
     <AuthContext.Provider value={{ currentUser, firebaseUser, loading, loginDemo, signupUser, loginWithEmail, loginWithGoogle, logout, updateUserPermission, updateUserPreference, sendPasswordlessLink }}>

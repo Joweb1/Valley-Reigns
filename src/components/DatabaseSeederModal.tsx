@@ -205,10 +205,10 @@ export const DatabaseSeederModal: React.FC<{ inline?: boolean }> = ({ inline = f
     if (!skipAuth) {
       updateStepStatus("auth", "running");
       const testAccounts = [
-        { email: "admin@valleyreigns.com", password: "password123", name: "Valley Reigns Admin", role: "admin" },
-        { email: "staff1@valleyreigns.com", password: "password123", name: "Marcus Vance", role: "staff" },
-        { email: "staff2@valleyreigns.com", password: "password123", name: "Jessica Carter", role: "staff" },
-        { email: "genesisjosephoghene+seeker@gmail.com", password: "password123", name: "Alex Rivera", role: "seeker" }
+        { email: "admin@valleyreigns.com", password: "Password123", name: "Valley Reigns Admin", role: "admin" },
+        { email: "staff1@valleyreigns.com", password: "Password123", name: "Marcus Vance", role: "staff" },
+        { email: "staff2@valleyreigns.com", password: "Password123", name: "Jessica Carter", role: "staff" },
+        { email: "genesisjosephoghene+seeker@gmail.com", password: "Password123", name: "Alex Rivera", role: "seeker" }
       ];
 
       try {
@@ -255,28 +255,36 @@ export const DatabaseSeederModal: React.FC<{ inline?: boolean }> = ({ inline = f
           email: "admin@valleyreigns.com",
           displayName: "Valley Reigns Admin",
           role: "admin",
-          canPostJobs: true
+          canPostJobs: true,
+          password: "Password123",
+          authProvider: "email"
         },
         [staff1Uid]: {
           uid: staff1Uid,
           email: "staff1@valleyreigns.com",
           displayName: "Marcus Vance",
           role: "staff",
-          canPostJobs: true
+          canPostJobs: true,
+          password: "Password123",
+          authProvider: "email"
         },
         [staff2Uid]: {
           uid: staff2Uid,
           email: "staff2@valleyreigns.com",
           displayName: "Jessica Carter",
           role: "staff",
-          canPostJobs: true
+          canPostJobs: true,
+          password: "Password123",
+          authProvider: "email"
         },
         [seekerUid]: {
           uid: seekerUid,
           email: "genesisjosephoghene+seeker@gmail.com",
           displayName: "Alex Rivera",
           role: "seeker",
-          canPostJobs: false
+          canPostJobs: false,
+          password: "Password123",
+          authProvider: "email"
         }
       };
 

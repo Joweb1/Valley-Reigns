@@ -1,6 +1,7 @@
 import express from "express";
 import { initializeApp } from "firebase/app";
-import { getFirestore, doc, getDoc, updateDoc, setDoc } from "firebase/firestore";
+import { getFirestore, doc, getDoc, updateDoc, setDoc, collection, getDocs } from "firebase/firestore";
+import { getDatabase, ref, set } from "firebase/database";
 
 const app = express();
 
@@ -23,6 +24,55 @@ const firebaseConfig = {
 const firebaseApp = initializeApp(firebaseConfig);
 const db = getFirestore(firebaseApp, firebaseConfig.firestoreDatabaseId);
 
+// Active Presence Sync checking for offline staff members based on heartbeat timeouts
+async function checkAndCleanStaffStatuses() {
+  try {
+    const statusesCol = collection(db, "staff_statuses");
+    const snap = await getDocs(statusesCol);
+    const now = Date.now();
+    const threshold = 3 * 60 * 1000; // 3 minutes (3x the 1 minute heartbeat window)
+    
+    // Initialize Realtime Database
+    let rtdbInstance: any = null;
+    try {
+      rtdbInstance = getDatabase(firebaseApp);
+    } catch (e) {
+      console.warn("[Presence Sync] Could not load Realtime Database:", e);
+    }
+
+    for (const d of snap.docs) {
+      const data = d.data();
+      if (data.status === "online" && data.lastActive) {
+        const timeDiff = now - data.lastActive;
+        if (timeDiff > threshold) {
+          console.log(`[Presence Sync] Staff/Admin ${d.id} is marked online but has been inactive for ${Math.round(timeDiff / 1000)}s. Force-marking offline.`);
+          
+          // 1. Mark offline in Firestore
+          await setDoc(doc(db, "staff_statuses", d.id), {
+            status: "offline",
+            lastActive: data.lastActive
+          }, { merge: true });
+
+          // 2. Mark offline in RTDB
+          if (rtdbInstance) {
+            try {
+              const rtdbRef = ref(rtdbInstance, `staff_statuses/${d.id}`);
+              await set(rtdbRef, {
+                status: "offline",
+                lastActive: data.lastActive
+              });
+            } catch (err) {
+              console.warn(`[Presence Sync] Failed to update RTDB for ${d.id}:`, err);
+            }
+          }
+        }
+      }
+    }
+  } catch (error) {
+    console.error("[Presence Sync] Error checking and cleaning staff statuses:", error);
+  }
+}
+
 // Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -30,10 +80,12 @@ app.use(express.urlencoded({ extended: true }));
 // API health endpoints for uptime pingers
 app.get("/api/health", (req, res) => {
   res.status(200).json({ status: "ok" });
+  checkAndCleanStaffStatuses().catch(err => console.error("Error in checkAndCleanStaffStatuses:", err));
 });
 
 app.get("/ping", (req, res) => {
   res.status(200).send("OK");
+  checkAndCleanStaffStatuses().catch(err => console.error("Error in checkAndCleanStaffStatuses:", err));
 });
 
 // Meta WhatsApp Webhook GET Verification
