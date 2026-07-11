@@ -187,7 +187,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
 
         const google = (window as any).google;
-        const clientId = "926249999164-fkqln5tu3922ovbtbi8a4fnsbnu4r151.apps.googleusercontent.com";
+        const env = (import.meta as any).env || {};
+        const clientId = env.VITE_FIREBASE_CLIENT_ID || "926249999164-fkqln5tu3922ovbtbi8a4fnsbnu4r151.apps.googleusercontent.com";
 
         if (google && google.accounts && google.accounts.id) {
           google.accounts.id.initialize({

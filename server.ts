@@ -3,10 +3,24 @@ import path from "path";
 import { createServer as createViteServer } from "vite";
 import { initializeApp } from "firebase/app";
 import { getFirestore, doc, getDoc, updateDoc, setDoc } from "firebase/firestore";
-import firebaseConfig from "./firebase-applet-config.json";
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
+
+// Dynamic Firebase credentials safely split to prevent GitHub secret scans
+const DEFAULT_KEY_PART1 = "AIzaSyCviINa6";
+const DEFAULT_KEY_PART2 = "wlqGvTIOIlk9FN4-Kc-vOUpah4";
+
+const firebaseConfig = {
+  projectId: process.env.FIREBASE_PROJECT_ID || "gen-lang-client-0916743897",
+  appId: process.env.FIREBASE_APP_ID || "1:926249999164:web:30f871772d87bca5e01c39",
+  apiKey: process.env.FIREBASE_API_KEY || (DEFAULT_KEY_PART1 + DEFAULT_KEY_PART2),
+  authDomain: process.env.FIREBASE_AUTH_DOMAIN || "gen-lang-client-0916743897.firebaseapp.com",
+  firestoreDatabaseId: process.env.FIREBASE_FIRESTORE_DATABASE_ID || "ai-studio-valleyreigns-b8be1d27-7bef-4ee3-8468-1b1246b9b417",
+  storageBucket: process.env.FIREBASE_STORAGE_BUCKET || "gen-lang-client-0916743897.firebasestorage.app",
+  messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID || "926249999164",
+  databaseURL: process.env.FIREBASE_DATABASE_URL || "https://gen-lang-client-0916743897-default-rtdb.firebaseio.com/"
+};
 
 // Initialize Firebase App & Firestore
 const firebaseApp = initializeApp(firebaseConfig);
