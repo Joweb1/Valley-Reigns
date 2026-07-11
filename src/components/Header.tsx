@@ -30,6 +30,51 @@ export const Header: React.FC = () => {
   const [showNotificationsModal, setShowNotificationsModal] = useState(false);
   const [showAboutModal, setShowAboutModal] = useState(false);
 
+  // Push notifications configuration state
+  const [pushNotificationsEnabled, setPushNotificationsEnabled] = useState(() => {
+    if (typeof window === "undefined" || !("Notification" in window)) return false;
+    return Notification.permission === "granted" && localStorage.getItem("push_notifications_enabled") === "true";
+  });
+
+  const [notificationPermission, setNotificationPermission] = useState(() => {
+    if (typeof window === "undefined" || !("Notification" in window)) return "unsupported";
+    return Notification.permission;
+  });
+
+  const handleTogglePushNotifications = async () => {
+    if (typeof window === "undefined" || !("Notification" in window)) {
+      return;
+    }
+
+    if (pushNotificationsEnabled) {
+      setPushNotificationsEnabled(false);
+      localStorage.setItem("push_notifications_enabled", "false");
+    } else {
+      try {
+        const permission = await Notification.requestPermission();
+        setNotificationPermission(permission);
+        if (permission === "granted") {
+          setPushNotificationsEnabled(true);
+          localStorage.setItem("push_notifications_enabled", "true");
+          // Dispatch status update event and trigger custom simulated push confirmation
+          try {
+            new Notification("Valley Reigns", {
+              body: "Push notifications successfully enabled! You'll receive real-time recruitment and chat alerts.",
+              icon: "/icon.svg"
+            });
+          } catch (e) {
+            console.warn("Test notification failed:", e);
+          }
+        } else {
+          setPushNotificationsEnabled(false);
+          localStorage.setItem("push_notifications_enabled", "false");
+        }
+      } catch (err) {
+        console.error("Error toggling notifications:", err);
+      }
+    }
+  };
+
   // Staff Online State synced across components
   const [isStaffOnlineState, setIsStaffOnlineState] = useState(() => {
     if (currentUser?.uid) {
@@ -412,6 +457,41 @@ export const Header: React.FC = () => {
                           <div
                             className={`w-4 h-4 rounded-full bg-white shadow-sm transform duration-200 ${
                               currentUser.messagingPreference === "in-app" ? "translate-x-5" : "translate-x-0"
+                            }`}
+                          />
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Push Notifications Toggle Switch */}
+                    {currentUser && (
+                      <div className="px-3.5 py-2.5 bg-slate-50/50 border border-slate-100 rounded-2xl mx-1 my-1 flex items-center justify-between">
+                        <div className="flex flex-col text-left">
+                          <span className="text-[10px] font-bold text-slate-700">Push Notifications</span>
+                          <span className="text-[8px] font-mono font-medium text-slate-400">
+                            {notificationPermission === "unsupported"
+                              ? "NOT SUPPORTED"
+                              : notificationPermission === "denied"
+                              ? "BLOCKED"
+                              : pushNotificationsEnabled
+                              ? "ACTIVE"
+                              : "DISABLED"}
+                          </span>
+                        </div>
+                        <button
+                          onClick={handleTogglePushNotifications}
+                          disabled={notificationPermission === "unsupported"}
+                          className={`w-10 h-5 rounded-full p-0.5 transition-colors focus:outline-none flex items-center cursor-pointer ${
+                            notificationPermission === "unsupported"
+                              ? "bg-slate-200 cursor-not-allowed opacity-50"
+                              : pushNotificationsEnabled
+                              ? "bg-[#0F5132]"
+                              : "bg-slate-300"
+                          }`}
+                        >
+                          <div
+                            className={`w-4 h-4 rounded-full bg-white shadow-sm transform duration-200 ${
+                              pushNotificationsEnabled ? "translate-x-5" : "translate-x-0"
                             }`}
                           />
                         </button>
