@@ -179,6 +179,8 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const lastKnownTimestampsRef = useRef<Record<string, number>>({});
   const prevAvailableChatsRef = useRef<Set<string>>(new Set());
   const prevSystemNotificationsRef = useRef<Set<string>>(new Set());
+  const prevClaimedChatsRef = useRef<Set<string>>(new Set());
+  const prevAdminClaimedChatsRef = useRef<Set<string>>(new Set());
 
   // Function to request notification permission
   const requestPermission = async (): Promise<boolean> => {
@@ -334,12 +336,14 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     lastKnownTimestampsRef.current = {};
     prevAvailableChatsRef.current = new Set();
     prevSystemNotificationsRef.current = new Set();
+    prevClaimedChatsRef.current = new Set();
+    prevAdminClaimedChatsRef.current = new Set();
 
     let unsubscribeConvs: (() => void) | null = null;
     let unsubscribeNotifs: (() => void) | null = null;
 
-    // 1. Subscribe to conversations for Seeker or Staff messages and claims
-    if (currentUser.role === "staff" || currentUser.role === "seeker") {
+    // 1. Subscribe to conversations for Seeker, Staff, or Admin messages and claims
+    if (currentUser.role === "staff" || currentUser.role === "seeker" || currentUser.role === "admin") {
       unsubscribeConvs = subscribeToConversations((conversationsMap) => {
         const convs = Object.values(conversationsMap) as Conversation[];
         const now = Date.now();
@@ -383,6 +387,22 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
                 }
               }
             }
+
+            // C. Conversation in sharedWith is claimed by another staff member
+            if (conv.status === "ongoing" && conv.assignedTo && conv.sharedWith && conv.sharedWith.includes(currentUser.uid)) {
+              if (conv.assignedTo !== currentUser.uid) {
+                if (!prevClaimedChatsRef.current.has(conv.chatId)) {
+                  if (conv.lastMessageAt > start) {
+                    sendPush(
+                      "Conversation Claimed",
+                      `${conv.assignedToName || 'A staff member'} has claimed the conversation with ${conv.customerPhone}.`,
+                      { tag: `claimed-${conv.chatId}` }
+                    );
+                  }
+                  prevClaimedChatsRef.current.add(conv.chatId);
+                }
+              }
+            }
           }
 
           // SEEKER RULES
@@ -403,6 +423,22 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
                     { tag: `msg-${conv.chatId}` }
                   );
                 }
+              }
+            }
+          }
+
+          // ADMIN RULES
+          if (currentUser.role === "admin") {
+            if (conv.status === "ongoing" && conv.assignedTo) {
+              if (!prevAdminClaimedChatsRef.current.has(conv.chatId)) {
+                if (conv.lastMessageAt > start) {
+                  sendPush(
+                    "Conversation Claimed",
+                    `Staff member ${conv.assignedToName || 'unknown'} has claimed the conversation with ${conv.customerPhone}.`,
+                    { tag: `admin-claimed-${conv.chatId}` }
+                  );
+                }
+                prevAdminClaimedChatsRef.current.add(conv.chatId);
               }
             }
           }

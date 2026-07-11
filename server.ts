@@ -325,35 +325,135 @@ function startConversationsListener() {
       if (change.type === "added" || change.type === "modified") {
         const convData = change.doc.data();
         const messages = Array.isArray(convData.messages) ? convData.messages : [];
-        if (messages.length === 0) continue;
+        const lastMsg = messages.length > 0 ? messages[messages.length - 1] : null;
 
-        const lastMsg = messages[messages.length - 1];
-        // Only trigger on extremely fresh messages (sent within the last 15 seconds)
-        const isFresh = lastMsg.timestamp && (Date.now() - lastMsg.timestamp < 15000);
-        if (!isFresh) continue;
+        // Check freshness of various conditions
+        const isFreshPending = convData.status === "pending" && (Date.now() - convData.createdAt < 15000);
 
-        console.log(`[Web Push] Broadcast trigger: Chat "${convData.chatId || change.doc.id}" received message from ${lastMsg.sender}.`);
+        const isFreshClaim = lastMsg && 
+                             lastMsg.sender === "system" && 
+                             lastMsg.text && 
+                             lastMsg.text.startsWith("Chat claimed by") && 
+                             (Date.now() - lastMsg.timestamp < 15000);
+
+        const isFreshMessage = lastMsg && 
+                               lastMsg.sender !== "system" && 
+                               (Date.now() - lastMsg.timestamp < 15000);
+
+        // If none of these fresh triggers are met, skip
+        if (!isFreshPending && !isFreshClaim && !isFreshMessage) continue;
+
+        console.log(`[Web Push] Targeted trigger for chat "${change.doc.id}" (status: ${convData.status}).`);
 
         try {
           const subsSnap = await getDocs(collection(db, "push_subscriptions"));
           if (subsSnap.empty) continue;
 
-          const payload = {
-            title: lastMsg.sender === "customer" ? `Message from Seeker` : `Valley Reigns Support`,
-            body: lastMsg.text,
-            tag: `msg-${change.doc.id}`,
-            data: {
-              chatId: change.doc.id,
-              sender: lastMsg.sender
-            }
-          };
+          // Fetch profiles for all distinct userIds in parallel to respect exact roles and assignments
+          const userIds = Array.from(new Set(subsSnap.docs.map(d => d.data().userId).filter(Boolean))) as string[];
+          const profilesMap: Record<string, any> = {};
+
+          await Promise.all(
+            userIds.map(async (uid) => {
+              try {
+                const uDoc = await getDoc(doc(db, "users", uid));
+                if (uDoc.exists()) {
+                  profilesMap[uid] = uDoc.data();
+                }
+              } catch (err) {
+                console.error(`[Web Push] Error fetching profile for ${uid}:`, err);
+              }
+            })
+          );
 
           subsSnap.docs.forEach((subDoc) => {
             const subData = subDoc.data();
-            sendWebPush(subData, payload);
+            const userId = subData.userId;
+            if (!userId) return; // Ignore unregistered/guest devices
+
+            const profile = profilesMap[userId];
+            if (!profile) return; // Only target users with valid profiles
+
+            const userRole = profile.role;
+            let shouldNotify = false;
+            let payload: any = null;
+
+            // 1. Staffs are notified if a conversation is assigned to them that needs to be claimed
+            if (isFreshPending && convData.status === "pending") {
+              if (userRole === "staff" && convData.sharedWith && convData.sharedWith.includes(userId)) {
+                shouldNotify = true;
+                payload = {
+                  title: "New Request to Claim!",
+                  body: `A seeker has made an inquiry about "${convData.jobTitle || 'Job Listing'}" (${convData.customerPhone})`,
+                  tag: `claim-${convData.chatId}`,
+                  data: { chatId: convData.chatId }
+                };
+              }
+            }
+
+            // 2. Conversation claimed by staff
+            else if (isFreshClaim && convData.status === "ongoing" && convData.assignedTo) {
+              // 2a. Same staffs are notified if any of them claimed the conversation
+              if (userRole === "staff" && convData.sharedWith && convData.sharedWith.includes(userId) && userId !== convData.assignedTo) {
+                shouldNotify = true;
+                payload = {
+                  title: "Conversation Claimed",
+                  body: `${convData.assignedToName || 'A staff member'} has claimed the conversation with ${convData.customerPhone}.`,
+                  tag: `claimed-${convData.chatId}`,
+                  data: { chatId: convData.chatId }
+                };
+              }
+              // 2b. Admin is notified if a conversation is claimed by a staff
+              else if (userRole === "admin") {
+                shouldNotify = true;
+                payload = {
+                  title: "Conversation Claimed",
+                  body: `Staff member ${convData.assignedToName} has claimed the conversation with ${convData.customerPhone}.`,
+                  tag: `claimed-${convData.chatId}`,
+                  data: { chatId: convData.chatId }
+                };
+              }
+            }
+
+            // 3. Messages in ongoing conversations
+            else if (isFreshMessage && convData.status === "ongoing" && lastMsg) {
+              // 3a. Staffs get notified if they get a message from their ongoing conversation (seeker -> staff)
+              if (lastMsg.sender === "customer" && userRole === "staff" && userId === convData.assignedTo) {
+                shouldNotify = true;
+                payload = {
+                  title: `Message from ${convData.customerPhone}`,
+                  body: `[${convData.jobTitle || 'Chat'}] ${lastMsg.text}`,
+                  tag: `msg-${convData.chatId}`,
+                  data: { chatId: convData.chatId, sender: lastMsg.sender }
+                };
+              }
+              // 3b. Job seeker gets notified if a message is sent to them by a staff (staff -> seeker)
+              else if (lastMsg.sender === "staff" && userRole === "seeker") {
+                const seekerPhoneIdentifier = profile.displayName || profile.email || "";
+                const isMyChat = 
+                  convData.customerPhone === seekerPhoneIdentifier || 
+                  convData.customerPhone === profile.email ||
+                  convData.customerPhone === profile.displayName;
+
+                if (isMyChat) {
+                  shouldNotify = true;
+                  payload = {
+                    title: "Valley Reigns Support",
+                    body: `[${convData.jobTitle || 'Chat'}] ${lastMsg.text}`,
+                    tag: `msg-${convData.chatId}`,
+                    data: { chatId: convData.chatId, sender: lastMsg.sender }
+                  };
+                }
+              }
+            }
+
+            if (shouldNotify && payload) {
+              console.log(`[Web Push] Dispatching targeted notification to user ${userId} (${userRole}) for chat "${convData.chatId}"`);
+              sendWebPush(subData, payload);
+            }
           });
         } catch (err) {
-          console.error("[Web Push] Error during conversation broad-broadcast:", err);
+          console.error("[Web Push] Error during targeted conversation notifications:", err);
         }
       }
     }
@@ -373,11 +473,28 @@ function startSystemNotificationsListener() {
         const isFresh = notifData.timestamp && (Date.now() - notifData.timestamp < 15000);
         if (!isFresh) continue;
 
-        console.log(`[Web Push] Broadcast trigger: System notification "${notifData.title}" received.`);
+        console.log(`[Web Push] Targeted trigger: System notification "${notifData.title}" received.`);
 
         try {
           const subsSnap = await getDocs(collection(db, "push_subscriptions"));
           if (subsSnap.empty) continue;
+
+          // Fetch profiles for all distinct userIds in parallel to respect exact roles and assignments
+          const userIds = Array.from(new Set(subsSnap.docs.map(d => d.data().userId).filter(Boolean))) as string[];
+          const profilesMap: Record<string, any> = {};
+
+          await Promise.all(
+            userIds.map(async (uid) => {
+              try {
+                const uDoc = await getDoc(doc(db, "users", uid));
+                if (uDoc.exists()) {
+                  profilesMap[uid] = uDoc.data();
+                }
+              } catch (err) {
+                console.error(`[Web Push] Error fetching profile for ${uid}:`, err);
+              }
+            })
+          );
 
           const payload = {
             title: `System Alert: ${notifData.title}`,
@@ -390,10 +507,20 @@ function startSystemNotificationsListener() {
 
           subsSnap.docs.forEach((subDoc) => {
             const subData = subDoc.data();
-            sendWebPush(subData, payload);
+            const userId = subData.userId;
+            if (!userId) return;
+
+            const profile = profilesMap[userId];
+            if (!profile) return;
+
+            // Only notify Admin for system alerts
+            if (profile.role === "admin") {
+              console.log(`[Web Push] Dispatching system notification alert to Admin ${userId}`);
+              sendWebPush(subData, payload);
+            }
           });
         } catch (err) {
-          console.error("[Web Push] Error during system notification broadcast:", err);
+          console.error("[Web Push] Error during system notification targeted dispatch:", err);
         }
       }
     }
