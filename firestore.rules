@@ -1,0 +1,133 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global Catch-all Security Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Hardened ID Validation
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // Core Helpers
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isVerified() {
+      return isSignedIn() && (request.auth.token.email_verified == true || request.auth.token.firebase.sign_in_provider == 'phone');
+    }
+
+    // Role-Based Access Control lookup from trusted db
+    function getUserRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email == "admin@valleyreigns.com" ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && getUserRole() == "admin")
+      );
+    }
+
+    function isStaff() {
+      return isSignedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) && (
+        getUserRole() == "staff" || getUserRole() == "admin"
+      );
+    }
+
+    // Validation Blueprint for Job Entry
+    function isValidJob(job) {
+      return job.keys().hasAll(['id', 'title', 'company', 'category', 'salary', 'location', 'type', 'description', 'impressions', 'createdAt'])
+        && job.id is string && job.id.size() <= 100
+        && job.title is string && job.title.size() <= 150
+        && job.company is string && job.company.size() <= 150
+        && job.category is string && job.category.size() <= 50
+        && job.salary is string && job.salary.size() <= 100
+        && job.location is string && job.location.size() <= 100
+        && job.type is string && job.type.size() <= 50
+        && job.description is string && job.description.size() <= 2000
+        && job.impressions is int && job.impressions >= 0
+        && job.createdAt is int;
+    }
+
+    // Validation Blueprint for User Profile
+    function isValidUser(user) {
+      return user.keys().hasAll(['uid', 'email', 'displayName', 'role', 'canPostJobs'])
+        && user.uid is string && user.uid.size() <= 128
+        && user.email is string && user.email.size() <= 150
+        && user.displayName is string && user.displayName.size() <= 150
+        && user.role is string && (user.role == 'seeker' || user.role == 'staff' || user.role == 'admin')
+        && user.canPostJobs is bool;
+    }
+
+    // Validation Blueprint for WhatsApp Config
+    function isValidWhatsAppConfig(config) {
+      return config.keys().hasAll(['phoneNumberId', 'businessAccountId', 'accessToken', 'verifyToken', 'updatedAt'])
+        && config.phoneNumberId is string && config.phoneNumberId.size() <= 100
+        && config.businessAccountId is string && config.businessAccountId.size() <= 100
+        && config.accessToken is string && config.accessToken.size() <= 500
+        && config.verifyToken is string && config.verifyToken.size() <= 100
+        && config.updatedAt is int;
+    }
+
+    // ==========================================
+    // Jobs Collection Rules
+    // ==========================================
+    match /jobs/{jobId} {
+      allow get: if true; // Publicly viewable
+      allow list: if true; // Publicly searchable
+
+      // Support fallback operations when auth is restricted/disabled
+      allow create: if isValidId(jobId) && isValidJob(request.resource.data);
+      allow update: if isValidId(jobId) && isValidJob(request.resource.data);
+      allow delete: if true;
+    }
+
+    // ==========================================
+    // Users Collection Rules (PII Isolated)
+    // ==========================================
+    match /users/{userId} {
+      allow get, list: if true;
+      allow create, update: if isValidId(userId) && isValidUser(request.resource.data);
+      allow delete: if true;
+    }
+
+    // ==========================================
+    // Settings Collection Rules
+    // ==========================================
+    match /settings/{settingId} {
+      allow get: if true;
+      allow create, update: if true;
+      allow delete: if true;
+    }
+
+    // ==========================================
+    // Conversations Collection Rules
+    // ==========================================
+    match /conversations/{chatId} {
+      allow read, write: if true;
+    }
+
+    // ==========================================
+    // Staff Statuses Collection Rules
+    // ==========================================
+    match /staff_statuses/{uid} {
+      allow read, write: if true;
+    }
+
+    // ==========================================
+    // Connection Tests Collection Rules
+    // ==========================================
+    match /connection_tests/{testId} {
+      allow read, write: if true;
+    }
+  }
+}

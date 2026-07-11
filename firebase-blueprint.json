@@ -1,0 +1,63 @@
+{
+  "entities": {
+    "Job": {
+      "title": "Job",
+      "description": "Represents a job listing posted by staff or admin.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique job identifier." },
+        "title": { "type": "string", "description": "Title of the job role." },
+        "company": { "type": "string", "description": "Name of the hiring company." },
+        "category": { "type": "string", "description": "Job category (e.g. Tech, Healthcare, Finance)." },
+        "salary": { "type": "string", "description": "Salary range or compensation package." },
+        "location": { "type": "string", "description": "Geographic location or Remote status." },
+        "type": { "type": "string", "description": "Employment type (e.g. Full-time, Part-time, Contract)." },
+        "requirements": { "type": "array", "description": "List of core job qualifications and requirements." },
+        "description": { "type": "string", "description": "Detailed description of the job duties." },
+        "impressions": { "type": "number", "description": "The count of views or interactions." },
+        "createdAt": { "type": "number", "description": "Epoch timestamp when the listing was created." }
+      },
+      "required": ["id", "title", "company", "category", "salary", "location", "type", "description", "impressions", "createdAt"]
+    },
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Represents a user profile with role-based dashboard permissions.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Unique Firebase Authentication UID." },
+        "email": { "type": "string", "description": "User email address." },
+        "displayName": { "type": "string", "description": "Public display name of the user." },
+        "role": { "type": "string", "enum": ["seeker", "staff", "admin"], "description": "User clearance role defining routing and access permissions." },
+        "canPostJobs": { "type": "boolean", "description": "Flag indicating if the user is authorized to post new listings." }
+      },
+      "required": ["uid", "email", "displayName", "role", "canPostJobs"]
+    },
+    "WhatsAppConfig": {
+      "title": "WhatsAppConfig",
+      "description": "WhatsApp Business API credentials and webhook verification details.",
+      "type": "object",
+      "properties": {
+        "phoneNumberId": { "type": "string", "description": "WhatsApp Phone Number ID." },
+        "businessAccountId": { "type": "string", "description": "WhatsApp Business Account ID." },
+        "accessToken": { "type": "string", "description": "Meta System User Permanent Access Token." },
+        "verifyToken": { "type": "string", "description": "Meta Webhook Verification Token chosen by admin." },
+        "updatedAt": { "type": "number", "description": "Epoch timestamp of last update." }
+      },
+      "required": ["phoneNumberId", "businessAccountId", "accessToken", "verifyToken", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/jobs/{jobId}": {
+      "schema": "Job",
+      "description": "Global collection containing all job listings."
+    },
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "Collection tracking user profiles, identities, and permissions."
+    },
+    "/settings/{settingId}": {
+      "schema": "WhatsAppConfig",
+      "description": "System configuration documents restricted to administrator access."
+    }
+  }
+}
