@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { useNotification } from "../context/NotificationContext";
 import { Briefcase, MessageSquare, ShieldCheck, LogOut, Menu, X, UserPlus, User, Bell, Info, Plus, Search, Download, Settings, Cpu } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { setStaffOnlineStatus } from "../lib/services";
@@ -30,47 +31,33 @@ export const Header: React.FC = () => {
   const [showNotificationsModal, setShowNotificationsModal] = useState(false);
   const [showAboutModal, setShowAboutModal] = useState(false);
 
-  // Push notifications configuration state
-  const [pushNotificationsEnabled, setPushNotificationsEnabled] = useState(() => {
-    if (typeof window === "undefined" || !("Notification" in window)) return false;
-    return Notification.permission === "granted" && localStorage.getItem("push_notifications_enabled") === "true";
-  });
-
-  const [notificationPermission, setNotificationPermission] = useState(() => {
-    if (typeof window === "undefined" || !("Notification" in window)) return "unsupported";
-    return Notification.permission;
-  });
+  // Push notifications configuration state from global context
+  const { 
+    pushNotificationsEnabled, 
+    setPushNotificationsEnabled, 
+    requestPermission,
+    permission: notificationPermission,
+    sendPush
+  } = useNotification();
 
   const handleTogglePushNotifications = async () => {
-    if (typeof window === "undefined" || !("Notification" in window)) {
-      return;
-    }
-
     if (pushNotificationsEnabled) {
       setPushNotificationsEnabled(false);
-      localStorage.setItem("push_notifications_enabled", "false");
     } else {
-      try {
-        const permission = await Notification.requestPermission();
-        setNotificationPermission(permission);
-        if (permission === "granted") {
-          setPushNotificationsEnabled(true);
-          localStorage.setItem("push_notifications_enabled", "true");
-          // Dispatch status update event and trigger custom simulated push confirmation
-          try {
-            new Notification("Valley Reigns", {
-              body: "Push notifications successfully enabled! You'll receive real-time recruitment and chat alerts.",
-              icon: "/icon.svg"
-            });
-          } catch (e) {
-            console.warn("Test notification failed:", e);
-          }
-        } else {
-          setPushNotificationsEnabled(false);
-          localStorage.setItem("push_notifications_enabled", "false");
-        }
-      } catch (err) {
-        console.error("Error toggling notifications:", err);
+      const granted = await requestPermission();
+      if (granted) {
+        // Trigger an immediate, explicit test notification to verify push functionality
+        setTimeout(() => {
+          sendPush(
+            "Valley Reigns Notification Test",
+            "🎉 This is an instant browser push notification! Your real-time alerts are active and working perfectly.",
+            {
+              tag: "instant-test-alert",
+              silent: false,
+              requireInteraction: true
+            }
+          );
+        }, 500);
       }
     }
   };
@@ -469,22 +456,15 @@ export const Header: React.FC = () => {
                         <div className="flex flex-col text-left">
                           <span className="text-[10px] font-bold text-slate-700">Push Notifications</span>
                           <span className="text-[8px] font-mono font-medium text-slate-400">
-                            {notificationPermission === "unsupported"
-                              ? "NOT SUPPORTED"
-                              : notificationPermission === "denied"
-                              ? "BLOCKED"
-                              : pushNotificationsEnabled
-                              ? "ACTIVE"
+                            {pushNotificationsEnabled
+                              ? (localStorage.getItem("push_notifications_simulated") === "true" ? "ACTIVE (SIMULATED)" : "ACTIVE")
                               : "DISABLED"}
                           </span>
                         </div>
                         <button
                           onClick={handleTogglePushNotifications}
-                          disabled={notificationPermission === "unsupported"}
                           className={`w-10 h-5 rounded-full p-0.5 transition-colors focus:outline-none flex items-center cursor-pointer ${
-                            notificationPermission === "unsupported"
-                              ? "bg-slate-200 cursor-not-allowed opacity-50"
-                              : pushNotificationsEnabled
+                            pushNotificationsEnabled
                               ? "bg-[#0F5132]"
                               : "bg-slate-300"
                           }`}

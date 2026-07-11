@@ -2,8 +2,9 @@ import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
 import { initializeApp } from "firebase/app";
-import { getFirestore, doc, getDoc, updateDoc, setDoc, collection, getDocs } from "firebase/firestore";
+import { getFirestore, doc, getDoc, updateDoc, setDoc, collection, getDocs, onSnapshot, deleteDoc } from "firebase/firestore";
 import { getDatabase, ref, set } from "firebase/database";
+import webpush from "web-push";
 
 const app = express();
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
@@ -223,6 +224,279 @@ async function setupVite() {
   });
 }
 
-setupVite().catch((error) => {
-  console.error("Vite setup error:", error);
+// ---------------------------------------------------------
+// W3C True Web Push & VAPID Config Engine
+// ---------------------------------------------------------
+let vapidPublicKey = "";
+let vapidPrivateKey = "";
+
+async function initVapidKeys() {
+  try {
+    const envPublic = process.env.VAPID_PUBLIC_KEY;
+    const envPrivate = process.env.VAPID_PRIVATE_KEY;
+
+    if (envPublic && envPrivate) {
+      vapidPublicKey = envPublic.trim();
+      vapidPrivateKey = envPrivate.trim();
+      console.log("[Web Push] Successfully loaded VAPID credentials from environment variables.");
+    } else {
+      const vapidRef = doc(db, "settings", "vapid");
+      const vapidSnap = await getDoc(vapidRef);
+      if (vapidSnap.exists()) {
+        const data = vapidSnap.data();
+        vapidPublicKey = data.publicKey;
+        vapidPrivateKey = data.privateKey;
+        console.log("[Web Push] Loaded existing persistent VAPID keys from Firestore.");
+      } else {
+        const keys = webpush.generateVAPIDKeys();
+        vapidPublicKey = keys.publicKey;
+        vapidPrivateKey = keys.privateKey;
+        await setDoc(vapidRef, {
+          publicKey: vapidPublicKey,
+          privateKey: vapidPrivateKey,
+          updatedAt: Date.now()
+        });
+        console.log("[Web Push] Successfully generated and stored persistent VAPID keys in Firestore.");
+      }
+    }
+    webpush.setVapidDetails(
+      "mailto:admin@valleyreigns.com",
+      vapidPublicKey,
+      vapidPrivateKey
+    );
+  } catch (err) {
+    console.error("[Web Push] Failed to initialize VAPID keys. Falling back to ephemeral:", err);
+    // Ephemeral fallback
+    const keys = webpush.generateVAPIDKeys();
+    vapidPublicKey = keys.publicKey;
+    vapidPrivateKey = keys.privateKey;
+    webpush.setVapidDetails(
+      "mailto:admin@valleyreigns.com",
+      vapidPublicKey,
+      vapidPrivateKey
+    );
+  }
+}
+
+// Send standard Web Push with payload signing
+async function sendWebPush(subscription: any, payload: any) {
+  try {
+    // Ensure subscription has keys formatted correctly
+    const subObj = {
+      endpoint: subscription.endpoint,
+      keys: subscription.keys || {}
+    };
+    await webpush.sendNotification(subObj, JSON.stringify(payload));
+    console.log(`[Web Push] Successfully dispatched message to endpoint: ${subscription.endpoint}`);
+  } catch (error: any) {
+    console.warn(`[Web Push] Send failed for endpoint ${subscription.endpoint}:`, error.message);
+    // Cleanup expired subscriptions (410 Gone / 404 Not Found)
+    if (error.statusCode === 410 || error.statusCode === 404) {
+      console.log(`[Web Push] Purging expired/invalid subscription.`);
+      try {
+        const subId = Buffer.from(subscription.endpoint).toString("base64").substring(0, 100).replace(/[^a-zA-Z0-9_-]/g, "");
+        await deleteDoc(doc(db, "push_subscriptions", subId));
+      } catch (delErr) {
+        console.error("[Web Push] Failed to purge stale subscription:", delErr);
+      }
+    }
+  }
+}
+
+// Real-time broad-scoped listeners to broadcast alerts
+const SERVER_START_TIME = Date.now();
+let isInitialSync = true;
+
+function startConversationsListener() {
+  console.log("[Web Push] Instantiating real-time chats monitoring listener...");
+  
+  // Ignore initial history sync triggers
+  setTimeout(() => {
+    isInitialSync = false;
+    console.log("[Web Push] Real-time message push broadcast system is now LIVE.");
+  }, 4000);
+
+  onSnapshot(collection(db, "conversations"), async (snapshot) => {
+    if (isInitialSync) return;
+
+    for (const change of snapshot.docChanges()) {
+      if (change.type === "added" || change.type === "modified") {
+        const convData = change.doc.data();
+        const messages = Array.isArray(convData.messages) ? convData.messages : [];
+        if (messages.length === 0) continue;
+
+        const lastMsg = messages[messages.length - 1];
+        // Only trigger on extremely fresh messages (sent within the last 15 seconds)
+        const isFresh = lastMsg.timestamp && (Date.now() - lastMsg.timestamp < 15000);
+        if (!isFresh) continue;
+
+        console.log(`[Web Push] Broadcast trigger: Chat "${convData.chatId || change.doc.id}" received message from ${lastMsg.sender}.`);
+
+        try {
+          const subsSnap = await getDocs(collection(db, "push_subscriptions"));
+          if (subsSnap.empty) continue;
+
+          const payload = {
+            title: lastMsg.sender === "customer" ? `Message from Seeker` : `Valley Reigns Support`,
+            body: lastMsg.text,
+            tag: `msg-${change.doc.id}`,
+            data: {
+              chatId: change.doc.id,
+              sender: lastMsg.sender
+            }
+          };
+
+          subsSnap.docs.forEach((subDoc) => {
+            const subData = subDoc.data();
+            sendWebPush(subData, payload);
+          });
+        } catch (err) {
+          console.error("[Web Push] Error during conversation broad-broadcast:", err);
+        }
+      }
+    }
+  }, (error) => {
+    console.error("[Web Push] Conversations snapshot listener error:", error);
+  });
+}
+
+function startSystemNotificationsListener() {
+  console.log("[Web Push] Instantiating system notification alerts listener...");
+  onSnapshot(collection(db, "system_notifications"), async (snapshot) => {
+    if (isInitialSync) return;
+
+    for (const change of snapshot.docChanges()) {
+      if (change.type === "added") {
+        const notifData = change.doc.data();
+        const isFresh = notifData.timestamp && (Date.now() - notifData.timestamp < 15000);
+        if (!isFresh) continue;
+
+        console.log(`[Web Push] Broadcast trigger: System notification "${notifData.title}" received.`);
+
+        try {
+          const subsSnap = await getDocs(collection(db, "push_subscriptions"));
+          if (subsSnap.empty) continue;
+
+          const payload = {
+            title: `System Alert: ${notifData.title}`,
+            body: notifData.message,
+            tag: `sys-${change.doc.id}`,
+            data: {
+              notifId: change.doc.id
+            }
+          };
+
+          subsSnap.docs.forEach((subDoc) => {
+            const subData = subDoc.data();
+            sendWebPush(subData, payload);
+          });
+        } catch (err) {
+          console.error("[Web Push] Error during system notification broadcast:", err);
+        }
+      }
+    }
+  }, (error) => {
+    console.error("[Web Push] System notifications snapshot listener error:", error);
+  });
+}
+
+// ---------------------------------------------------------
+// Push subscription REST API endpoints
+// ---------------------------------------------------------
+
+app.get("/api/push/public-key", (req, res) => {
+  if (!vapidPublicKey) {
+    res.status(503).json({ error: "Push notification system is booting. Please retry shortly." });
+    return;
+  }
+  res.status(200).json({ publicKey: vapidPublicKey });
+});
+
+app.post("/api/push/subscribe", async (req, res) => {
+  const { subscription, userId } = req.body;
+  if (!subscription || !subscription.endpoint) {
+    res.status(400).json({ error: "Missing required W3C subscription endpoint." });
+    return;
+  }
+
+  try {
+    const subId = Buffer.from(subscription.endpoint).toString("base64").substring(0, 100).replace(/[^a-zA-Z0-9_-]/g, "");
+    const subData = {
+      id: subId,
+      endpoint: subscription.endpoint,
+      keys: subscription.keys || {},
+      userId: userId || null,
+      createdAt: Date.now()
+    };
+
+    await setDoc(doc(db, "push_subscriptions", subId), subData);
+    console.log(`[Web Push] Device registered successfully under subId: ${subId}`);
+    res.status(200).json({ success: true, id: subId });
+  } catch (err) {
+    console.error("[Web Push] Failed to register push subscription:", err);
+    res.status(500).json({ error: "Internal store failure registration." });
+  }
+});
+
+app.post("/api/push/unsubscribe", async (req, res) => {
+  const { endpoint } = req.body;
+  if (!endpoint) {
+    res.status(400).json({ error: "Missing subscription endpoint." });
+    return;
+  }
+
+  try {
+    const subId = Buffer.from(endpoint).toString("base64").substring(0, 100).replace(/[^a-zA-Z0-9_-]/g, "");
+    await deleteDoc(doc(db, "push_subscriptions", subId));
+    console.log(`[Web Push] Device unregistered successfully: ${subId}`);
+    res.status(200).json({ success: true });
+  } catch (err) {
+    console.error("[Web Push] Unregistration failed:", err);
+    res.status(500).json({ error: "Internal unregistration failed." });
+  }
+});
+
+app.post("/api/push/test", async (req, res) => {
+  const { title, body, endpoint } = req.body;
+  const testTitle = title || "True Web Push Test";
+  const testBody = body || "If you see this, native browser-level push notifications are active and working perfectly!";
+
+  try {
+    if (endpoint) {
+      const subId = Buffer.from(endpoint).toString("base64").substring(0, 100).replace(/[^a-zA-Z0-9_-]/g, "");
+      const subSnap = await getDoc(doc(db, "push_subscriptions", subId));
+      if (subSnap.exists()) {
+        await sendWebPush(subSnap.data(), { title: testTitle, body: testBody, tag: "test-alert" });
+        res.status(200).json({ success: true, message: "Targeted test push sent." });
+      } else {
+        res.status(404).json({ error: "Subscription endpoint not recognized." });
+      }
+    } else {
+      const subsSnap = await getDocs(collection(db, "push_subscriptions"));
+      if (subsSnap.empty) {
+        res.status(404).json({ error: "No devices registered. Turn on notifications first!" });
+        return;
+      }
+
+      subsSnap.docs.forEach((subDoc) => {
+        sendWebPush(subDoc.data(), { title: testTitle, body: testBody, tag: "test-alert" });
+      });
+      res.status(200).json({ success: true, message: `Broadcast test notification sent to ${subsSnap.size} devices.` });
+    }
+  } catch (err) {
+    console.error("[Web Push] Connection test failed:", err);
+    res.status(500).json({ error: "Failed to dispatch test push." });
+  }
+});
+
+// Boot the integrated push systems & standard server
+async function startServer() {
+  await initVapidKeys();
+  startConversationsListener();
+  startSystemNotificationsListener();
+  await setupVite();
+}
+
+startServer().catch((error) => {
+  console.error("Critical integrated startup failure:", error);
 });

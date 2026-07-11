@@ -78,6 +78,15 @@ service cloud.firestore {
         && config.updatedAt is int;
     }
 
+    // Validation Blueprint for Push Subscription
+    function isValidPushSubscription(sub) {
+      return sub.keys().hasAll(['id', 'endpoint', 'keys', 'createdAt'])
+        && sub.id is string && sub.id.size() <= 200
+        && sub.endpoint is string && sub.endpoint.size() <= 1000
+        && sub.keys is map
+        && sub.createdAt is int;
+    }
+
     // ==========================================
     // Jobs Collection Rules
     // ==========================================
@@ -128,6 +137,13 @@ service cloud.firestore {
     // ==========================================
     match /connection_tests/{testId} {
       allow read, write: if true;
+    }
+
+    // ==========================================
+    // Push Subscriptions Rules
+    // ==========================================
+    match /push_subscriptions/{subscriptionId} {
+      allow read, write: if true; // Clients read and write subscriptions directly
     }
   }
 }

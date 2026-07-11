@@ -83,3 +83,45 @@ self.addEventListener('fetch', (event) => {
     })
   );
 });
+
+// Push notification handlers
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      if (clientList.length > 0) {
+        let client = clientList[0];
+        for (let i = 0; i < clientList.length; i++) {
+          if (clientList[i].focused) {
+            client = clientList[i];
+            break;
+          }
+        }
+        return client.focus();
+      }
+      return self.clients.openWindow('/');
+    })
+  );
+});
+
+self.addEventListener('push', (event) => {
+  let data = { title: 'Valley Reigns', body: 'New notification received!' };
+  if (event.data) {
+    try {
+      data = event.data.json();
+    } catch (e) {
+      data = { title: 'Valley Reigns', body: event.data.text() };
+    }
+  }
+  const options = {
+    body: data.body,
+    icon: '/icon.svg',
+    badge: '/icon.svg',
+    tag: data.tag || 'push-alert',
+    data: data.data || {}
+  };
+  event.waitUntil(
+    self.registration.showNotification(data.title, options)
+  );
+});
+

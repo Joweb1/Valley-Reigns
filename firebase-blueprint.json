@@ -44,6 +44,19 @@
         "updatedAt": { "type": "number", "description": "Epoch timestamp of last update." }
       },
       "required": ["phoneNumberId", "businessAccountId", "accessToken", "verifyToken", "updatedAt"]
+    },
+    "PushSubscription": {
+      "title": "PushSubscription",
+      "description": "Represents a browser's W3C standard PushSubscription for Web Push notifications.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique identifier, usually hashed subscription endpoint." },
+        "endpoint": { "type": "string", "description": "The push service subscription endpoint URL." },
+        "keys": { "type": "object", "description": "The client encryption keys (p256dh and auth)." },
+        "userId": { "type": "string", "description": "The associated user ID, or null/guest if logged out." },
+        "createdAt": { "type": "number", "description": "The epoch timestamp when this device subscribed." }
+      },
+      "required": ["id", "endpoint", "keys", "createdAt"]
     }
   },
   "firestore": {
@@ -58,6 +71,10 @@
     "/settings/{settingId}": {
       "schema": "WhatsAppConfig",
       "description": "System configuration documents restricted to administrator access."
+    },
+    "/push_subscriptions/{subscriptionId}": {
+      "schema": "PushSubscription",
+      "description": "Collection of active browser web push subscriptions for triggering system notifications."
     }
   }
 }
