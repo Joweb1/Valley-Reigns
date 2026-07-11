@@ -29,44 +29,65 @@ function urlBase64ToUint8Array(base64String: string) {
   return outputArray;
 }
 
+let activeSubscribePromise: Promise<PushSubscription | undefined> | null = null;
+
 // Subscribe the device browser service worker to standard Web Push
 async function subscribeToWebPush(userId: string | null = null): Promise<PushSubscription | undefined> {
   if (typeof window === "undefined" || !("serviceWorker" in navigator)) return;
 
-  try {
-    const registration = await navigator.serviceWorker.ready;
-    let subscription = await registration.pushManager.getSubscription();
-
-    if (!subscription) {
-      // 1. Fetch persistent public VAPID key from Node express backend
-      const res = await fetch("/api/push/public-key");
-      if (!res.ok) {
-        throw new Error(`Failed to load VAPID public key: ${res.statusText}`);
-      }
-      const data = await res.json();
-      if (!data.publicKey) {
-        throw new Error("VAPID public key payload empty.");
-      }
-
-      // 2. Subscribe using the standard browser push manager
-      subscription = await registration.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(data.publicKey)
-      });
-    }
-
-    // 3. Register/Update subscription in persistent Firestore collection
-    await fetch("/api/push/subscribe", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ subscription, userId })
-    });
-
-    console.log("[Web Push] Subscription successfully registered on server.");
-    return subscription;
-  } catch (err) {
-    console.error("[Web Push] Subscription registration failed:", err);
+  if (activeSubscribePromise) {
+    return activeSubscribePromise;
   }
+
+  activeSubscribePromise = (async () => {
+    try {
+      const registration = await navigator.serviceWorker.ready;
+      let subscription = await registration.pushManager.getSubscription();
+
+      if (!subscription) {
+        // 1. Fetch persistent public VAPID key from Node express backend
+        const res = await fetch("/api/push/public-key");
+        if (!res.ok) {
+          throw new Error(`Failed to load VAPID public key: ${res.statusText}`);
+        }
+        const data = await res.json();
+        if (!data.publicKey) {
+          throw new Error("VAPID public key payload empty.");
+        }
+
+        // 2. Subscribe using the standard browser push manager
+        subscription = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(data.publicKey)
+        });
+      }
+
+      // 3. Register/Update subscription in persistent Firestore collection
+      const rawSubscription = subscription.toJSON();
+      const serializedSubscription = {
+        endpoint: subscription.endpoint,
+        keys: {
+          p256dh: rawSubscription.keys?.p256dh || "",
+          auth: rawSubscription.keys?.auth || ""
+        }
+      };
+
+      await fetch("/api/push/subscribe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ subscription: serializedSubscription, userId })
+      });
+
+      console.log("[Web Push] Subscription successfully registered on server.");
+      return subscription;
+    } catch (err) {
+      console.error("[Web Push] Subscription registration failed:", err);
+    } finally {
+      activeSubscribePromise = null;
+    }
+  })();
+
+  return activeSubscribePromise;
 }
 
 // Unsubscribe the device browser service worker from Web Push

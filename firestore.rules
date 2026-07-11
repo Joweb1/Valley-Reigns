@@ -145,5 +145,12 @@ service cloud.firestore {
     match /push_subscriptions/{subscriptionId} {
       allow read, write: if true; // Clients read and write subscriptions directly
     }
+
+    // ==========================================
+    // System Notifications Rules
+    // ==========================================
+    match /system_notifications/{notificationId} {
+      allow read, write: if true;
+    }
   }
 }

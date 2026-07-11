@@ -44,21 +44,7 @@ export const Header: React.FC = () => {
     if (pushNotificationsEnabled) {
       setPushNotificationsEnabled(false);
     } else {
-      const granted = await requestPermission();
-      if (granted) {
-        // Trigger an immediate, explicit test notification to verify push functionality
-        setTimeout(() => {
-          sendPush(
-            "Valley Reigns Notification Test",
-            "🎉 This is an instant browser push notification! Your real-time alerts are active and working perfectly.",
-            {
-              tag: "instant-test-alert",
-              silent: false,
-              requireInteraction: true
-            }
-          );
-        }, 500);
-      }
+      await requestPermission();
     }
   };
 

@@ -290,9 +290,11 @@ async function sendWebPush(subscription: any, payload: any) {
     console.log(`[Web Push] Successfully dispatched message to endpoint: ${subscription.endpoint}`);
   } catch (error: any) {
     console.warn(`[Web Push] Send failed for endpoint ${subscription.endpoint}:`, error.message);
-    // Cleanup expired subscriptions (410 Gone / 404 Not Found)
-    if (error.statusCode === 410 || error.statusCode === 404) {
-      console.log(`[Web Push] Purging expired/invalid subscription.`);
+    
+    // Cleanup expired/invalid/mismatched subscriptions (400 Bad Request, 401 Unauthorized, 403 Forbidden, 404 Not Found, 410 Gone)
+    const unrecoverableCodes = [400, 401, 403, 404, 410];
+    if (error.statusCode && unrecoverableCodes.includes(error.statusCode)) {
+      console.log(`[Web Push] Purging expired, invalid, or mismatched subscription (status ${error.statusCode}).`);
       try {
         const subId = Buffer.from(subscription.endpoint).toString("base64").substring(0, 100).replace(/[^a-zA-Z0-9_-]/g, "");
         await deleteDoc(doc(db, "push_subscriptions", subId));
