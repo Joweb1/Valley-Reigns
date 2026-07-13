@@ -1,7 +1,7 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { ShieldAlert, Loader2 } from "lucide-react";
+import { ShieldAlert } from "lucide-react";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -11,28 +11,64 @@ interface ProtectedRouteProps {
 export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowedRoles }) => {
   const { currentUser, loading } = useAuth();
   const location = useLocation();
+  const [isStandaloneOrFs, setIsStandaloneOrFs] = useState(false);
 
-  // Show premium layout loader while Auth State is initializing
+  useEffect(() => {
+    const checkMode = () => {
+      const isStandalone = 
+        window.matchMedia("(display-mode: standalone)").matches || 
+        (navigator as any).standalone === true;
+      const isFullscreen = !!document.fullscreenElement;
+      setIsStandaloneOrFs(isStandalone || isFullscreen);
+    };
+
+    checkMode();
+    document.addEventListener("fullscreenchange", checkMode);
+    
+    const mediaQuery = window.matchMedia("(display-mode: standalone)");
+    if (mediaQuery.addEventListener) {
+      mediaQuery.addEventListener("change", checkMode);
+    } else {
+      mediaQuery.addListener(checkMode);
+    }
+
+    return () => {
+      document.removeEventListener("fullscreenchange", checkMode);
+      if (mediaQuery.removeEventListener) {
+        mediaQuery.removeEventListener("change", checkMode);
+      } else {
+        mediaQuery.removeListener(checkMode);
+      }
+    };
+  }, []);
+
+  // Show nothing while loading (the global loading overlay in App.tsx handles visual feedback)
   if (loading) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-[#F8FAFC]">
-        <div className="p-8 rounded-3xl bg-white shadow-xl shadow-slate-100 flex flex-col items-center">
-          <Loader2 className="w-12 h-12 text-[#0F5132] animate-spin mb-4" />
-          <p className="text-sm font-sans font-medium text-slate-600 animate-pulse">
-            Verifying credentials...
-          </p>
-        </div>
-      </div>
-    );
+    return null;
   }
 
   // Not authenticated
   if (!currentUser) {
+    if (isStandaloneOrFs) {
+      // In PWA/Fullscreen, keep logged-out users on /seeker to display the forced AuthModal
+      if (location.pathname === "/seeker") {
+        return <>{children}</>;
+      } else {
+        return <Navigate to="/seeker" replace />;
+      }
+    }
     return <Navigate to="/" state={{ from: location }} replace />;
   }
 
   // Check role authorization
   if (!allowedRoles.includes(currentUser.role)) {
+    if (isStandaloneOrFs) {
+      // In PWA/Fullscreen, if role is not authorized, redirect to their proper dashboard or /seeker
+      const dashboardPath = currentUser.role === "admin" ? "/admin" : currentUser.role === "staff" ? "/staff" : "/seeker";
+      if (location.pathname !== dashboardPath) {
+        return <Navigate to={dashboardPath} replace />;
+      }
+    }
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC] p-4">
         <div className="max-w-md w-full bg-white rounded-3xl p-8 border border-slate-100 shadow-xl shadow-slate-100 text-center">

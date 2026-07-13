@@ -43,7 +43,7 @@ import {
   HeartPulse,
   LogIn
 } from "lucide-react";
-import { motion } from "motion/react";
+import { motion, AnimatePresence } from "motion/react";
 
 // ==========================================
 // 1. PUBLIC LANDING & JOB DISCOVERY FEED (/)
@@ -793,14 +793,18 @@ function AppContent() {
     };
   }, []);
 
-  // Handle automatic dashboard redirect for logged-in users in standalone/fullscreen mode on homepage
+  // Handle automatic dashboard redirect for users in standalone/fullscreen mode on homepage
   useEffect(() => {
-    if (!loading && currentUser && isHomePage && isStandaloneOrFs) {
-      const role = currentUser.role || "seeker";
-      if (role === "admin") {
-        navigate("/admin", { replace: true });
-      } else if (role === "staff") {
-        navigate("/staff", { replace: true });
+    if (!loading && isHomePage && isStandaloneOrFs) {
+      if (currentUser) {
+        const role = currentUser.role || "seeker";
+        if (role === "admin") {
+          navigate("/admin", { replace: true });
+        } else if (role === "staff") {
+          navigate("/staff", { replace: true });
+        } else {
+          navigate("/seeker", { replace: true });
+        }
       } else {
         navigate("/seeker", { replace: true });
       }
@@ -964,126 +968,170 @@ function AppContent() {
   const shouldHideHeader = hideFloating || noHeaderPaths.includes(location.pathname);
 
   return (
-    <div 
-      className={`bg-[#FAFCFD] flex flex-col font-sans select-text ${hideFloating ? "overflow-hidden" : "min-h-screen"}`}
-      style={hideFloating ? { height: "var(--visual-viewport-height, 100dvh)" } : undefined}
-    >
-      {/* Main Navigation Header - Hidden in chat view or specific admin/management views */}
-      {!shouldHideHeader && <Header />}
+    <>
+      {/* Nice cool loading overlay checking authentication status from Firebase */}
+      <AnimatePresence>
+        {loading && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.35 }}
+            className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-gradient-to-tr from-[#021317] via-[#0F5132] to-[#0B3C49] text-white"
+          >
+            <div className="relative flex flex-col items-center justify-center space-y-6 max-w-sm px-6 text-center">
+              {/* Spinning and pulsing loader structure */}
+              <div className="relative flex items-center justify-center">
+                <div className="absolute w-24 h-24 rounded-full bg-emerald-500/10 border border-emerald-400/20 animate-ping duration-1000" />
+                <div className="absolute w-16 h-16 rounded-full bg-emerald-400/10 animate-pulse duration-700" />
+                <div className="relative w-12 h-12 rounded-full border-2 border-white/20 border-t-emerald-300 animate-spin" />
+              </div>
+              <div className="space-y-2">
+                <h2 className="text-2xl font-display font-black tracking-tight text-white uppercase tracking-wider">
+                  Valley Reigns
+                </h2>
+                <p className="text-xs font-mono text-emerald-300 font-bold uppercase tracking-widest animate-pulse">
+                  Verifying Workspace Session...
+                </p>
+                <p className="text-[10px] text-slate-300 leading-relaxed font-sans font-light max-w-xs">
+                  We are securely syncing your profile and checking active credentials from Firebase Auth.
+                </p>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      {/* Main Workspace Router Feed */}
-      <main className={`flex-grow ${hideFloating ? "h-full min-h-0 flex flex-col" : ""}`}>
-        <Routes>
-          {/* Public route */}
-          <Route path="/" element={<JobSeekerDashboard />} />
-          
-          {/* Staff invited route */}
-          <Route path="/auth/staff-portal-invite" element={<StaffPortalInvite />} />
+      <div 
+        className={`bg-[#FAFCFD] flex flex-col font-sans select-text ${hideFloating ? "overflow-hidden" : "min-h-screen"}`}
+        style={hideFloating ? { height: "var(--visual-viewport-height, 100dvh)" } : undefined}
+      >
+        {/* Main Navigation Header - Hidden in chat view or specific admin/management views */}
+        {!shouldHideHeader && <Header />}
 
-          {/* Private Staff Route Guard */}
-          <Route
-            path="/staff"
-            element={
-              <ProtectedRoute allowedRoles={["staff", "admin"]}>
-                <StaffDashboardView />
-              </ProtectedRoute>
-            }
-          />
+        {/* Main Workspace Router Feed */}
+        <main className={`flex-grow ${hideFloating ? "h-full min-h-0 flex flex-col" : ""}`}>
+          <Routes>
+            {/* Public route - Render a clean transition background if we are in PWA/Fullscreen mode and redirecting to the dashboard */}
+            <Route 
+              path="/" 
+              element={
+                isStandaloneOrFs ? (
+                  <div className="min-h-screen bg-[#FAFCFD]" />
+                ) : (
+                  <JobSeekerDashboard />
+                )
+              } 
+            />
+            
+            {/* Staff invited route */}
+            <Route path="/auth/staff-portal-invite" element={<StaffPortalInvite />} />
 
-          {/* Private Admin Routes */}
-          <Route
-            path="/admin"
-            element={
-              <ProtectedRoute allowedRoles={["admin"]}>
-                <AdminDashboardView />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/admin/notifications"
-            element={
-              <ProtectedRoute allowedRoles={["admin"]}>
-                <AdminNotifications />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/admin/post-jobs"
-            element={
-              <ProtectedRoute allowedRoles={["admin"]}>
-                <AdminPostJobPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/admin/whatsapp-config"
-            element={
-              <ProtectedRoute allowedRoles={["admin"]}>
-                <WhatsAppConfigPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/admin/diagnostics"
-            element={
-              <ProtectedRoute allowedRoles={["admin"]}>
-                <AdminDiagnosticsPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/admin/manage-jobs"
-            element={
-              <ProtectedRoute allowedRoles={["admin"]}>
-                <JobManagement />
-              </ProtectedRoute>
-            }
-          />
+            {/* Private Staff Route Guard */}
+            <Route
+              path="/staff"
+              element={
+                <ProtectedRoute allowedRoles={["staff", "admin"]}>
+                  <StaffDashboardView />
+                </ProtectedRoute>
+              }
+            />
 
-          {/* Staff Manage Jobs */}
-          <Route
-            path="/staff/manage-jobs"
-            element={
-              <ProtectedRoute allowedRoles={["staff", "admin"]}>
-                <JobManagement />
-              </ProtectedRoute>
-            }
-          />
+            {/* Private Admin Routes */}
+            <Route
+              path="/admin"
+              element={
+                <ProtectedRoute allowedRoles={["admin"]}>
+                  <AdminDashboardView />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/notifications"
+              element={
+                <ProtectedRoute allowedRoles={["admin"]}>
+                  <AdminNotifications />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/post-jobs"
+              element={
+                <ProtectedRoute allowedRoles={["admin"]}>
+                  <AdminPostJobPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/whatsapp-config"
+              element={
+                <ProtectedRoute allowedRoles={["admin"]}>
+                  <WhatsAppConfigPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/diagnostics"
+              element={
+                <ProtectedRoute allowedRoles={["admin"]}>
+                  <AdminDiagnosticsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/manage-jobs"
+              element={
+                <ProtectedRoute allowedRoles={["admin"]}>
+                  <JobManagement />
+                </ProtectedRoute>
+              }
+            />
 
-          {/* Private Seeker Route Guard */}
-          <Route
-            path="/seeker"
-            element={
-              <ProtectedRoute allowedRoles={["seeker", "staff", "admin"]}>
-                <SeekerDashboardView />
-              </ProtectedRoute>
-            }
-          />
+            {/* Staff Manage Jobs */}
+            <Route
+              path="/staff/manage-jobs"
+              element={
+                <ProtectedRoute allowedRoles={["staff", "admin"]}>
+                  <JobManagement />
+                </ProtectedRoute>
+              }
+            />
 
-          {/* Private Seeker Messages Route Guard */}
-          <Route
-            path="/seeker/messages"
-            element={
-              <ProtectedRoute allowedRoles={["seeker", "staff", "admin"]}>
-                <SeekerMessagesView />
-              </ProtectedRoute>
-            }
-          />
+            {/* Private Seeker Route Guard */}
+            <Route
+              path="/seeker"
+              element={
+                <ProtectedRoute allowedRoles={["seeker", "staff", "admin"]}>
+                  <SeekerDashboardView />
+                </ProtectedRoute>
+              }
+            />
 
-          {/* Catch-all */}
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </main>
+            {/* Private Seeker Messages Route Guard */}
+            <Route
+              path="/seeker/messages"
+              element={
+                <ProtectedRoute allowedRoles={["seeker", "staff", "admin"]}>
+                  <SeekerMessagesView />
+                </ProtectedRoute>
+              }
+            />
 
-      {/* Authentication Gateway Portal Popup */}
-      <AuthModal forcedOpen={isHomePage && isStandaloneOrFs && !currentUser && !loading} />
+            {/* Catch-all */}
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </main>
 
-      {/* Progressive Web App Install Banner Overlay */}
-      <PwaInstallPrompt />
+        {/* Authentication Gateway Portal Popup - forced open in standalone/fullscreen mode if unauthenticated */}
+        <AuthModal forcedOpen={isStandaloneOrFs && !currentUser && !loading} />
 
-      {/* Real-time Network Connectivity Monitor Toast */}
-      <NetworkStatusMonitor />
-    </div>
+        {/* Progressive Web App Install Banner Overlay */}
+        <PwaInstallPrompt />
+
+        {/* Real-time Network Connectivity Monitor Toast */}
+        <NetworkStatusMonitor />
+      </div>
+    </>
   );
 }
 
