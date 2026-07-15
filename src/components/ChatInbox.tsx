@@ -250,7 +250,7 @@ export const ChatInbox: React.FC<ChatInboxProps> = ({ jobsList, searchQuery: ext
   };
 
   return (
-    <div className={`bg-transparent border-0 rounded-none shadow-none flex flex-col ${activeConversation ? "h-full min-h-0" : "h-[750px]"}`}>
+    <div className={`border-0 rounded-none shadow-none flex flex-col ${activeConversation ? "h-full min-h-0 md:h-[750px] md:border md:border-slate-200/80 md:rounded-3xl md:shadow-sm md:overflow-hidden md:bg-white" : "bg-white border border-slate-200/80 rounded-3xl shadow-sm h-[750px]"}`}>
       {/* Main Split-Pane Workspace */}
       <div className="flex-1 flex overflow-hidden min-h-0 bg-transparent relative">
         {/* ========================================== */}
@@ -356,14 +356,14 @@ export const ChatInbox: React.FC<ChatInboxProps> = ({ jobsList, searchQuery: ext
                         setActiveChatId(conv.chatId);
                       }
                     }}
-                    className={`w-full text-left p-4 rounded-2xl transition-all duration-300 border ${
+                    className={`w-full text-left p-5 rounded-3xl transition-all duration-300 border ${
                       activeTab === "my-chats" ? "cursor-pointer" : ""
                     } ${
                       isSelected
-                        ? "bg-emerald-50 border-emerald-200 shadow-md shadow-emerald-900/5 scale-[1.02]"
+                        ? "bg-[#FAFDFB] border-2 border-[#0F5132] shadow-md scale-[1.01]"
                         : activeTab === "available"
-                        ? "bg-gradient-to-r from-amber-50/60 via-amber-100/50 to-amber-50/60 animate-gradient-x border-amber-300 shadow-sm"
-                        : "bg-white border-slate-100 hover:border-slate-200 hover:shadow-sm"
+                        ? "bg-gradient-to-r from-amber-50/70 via-amber-100/40 to-amber-50/70 border border-[#0F5132] shadow-sm hover:shadow-md hover:scale-[1.01]"
+                        : "bg-white border border-[#0F5132]/30 hover:border-[#0F5132] hover:shadow-sm"
                     }`}
                   >
                     <div className="flex items-center justify-between gap-2 mb-1.5">
@@ -425,9 +425,9 @@ export const ChatInbox: React.FC<ChatInboxProps> = ({ jobsList, searchQuery: ext
           {activeConversation ? (
             <motion.div
               key={activeConversation.chatId}
-              initial={{ x: "100%", opacity: 0.8 }}
-              animate={{ x: 0, opacity: 1 }}
-              transition={{ type: "spring", damping: 25, stiffness: 200 }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.25 }}
               className="flex-grow flex flex-col overflow-y-auto h-full relative pt-16 pb-48 md:overflow-y-hidden md:h-auto md:min-h-0 md:pt-0 md:pb-0"
             >
               {/* Active Conversation Metadata Header */}

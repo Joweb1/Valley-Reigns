@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { getJobs, updateJob, deleteJob } from "../lib/services";
-import { Job } from "../types";
+import { getJobs, updateJob, deleteJob, getAllUserProfiles, subscribeToJobs } from "../lib/services";
+import { Job, UserProfile } from "../types";
 import { 
   Briefcase, 
   ArrowLeft, 
@@ -20,7 +20,8 @@ import {
   Copy,
   Calendar,
   Flame,
-  Banknote
+  Banknote,
+  Search
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { JobCardSkeleton } from "./JobCardSkeleton";
@@ -29,9 +30,11 @@ interface JobManagementCardProps {
   job: Job;
   onEdit: (job: Job) => void;
   onDelete: (job: Job) => void;
+  postedByProfile?: UserProfile;
 }
 
-export const JobManagementCard: React.FC<JobManagementCardProps> = ({ job, onEdit, onDelete }) => {
+export const JobManagementCard: React.FC<JobManagementCardProps> = ({ job, onEdit, onDelete, postedByProfile }) => {
+  const { currentUser } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [copied, setCopied] = useState(false);
 
@@ -54,62 +57,42 @@ export const JobManagementCard: React.FC<JobManagementCardProps> = ({ job, onEdi
   const formattedSalary = job.salary.replace(/\$/g, "₦");
 
   return (
-    <div className="bg-white border border-[#0F5132] rounded-3xl overflow-hidden shadow-none hover:shadow-none transition-all duration-300 text-left">
+    <div className={`bg-white border border-[#0B3C2D]/40 rounded-2xl overflow-hidden shadow-[0_2px_8px_rgba(11,60,45,0.03)] hover:shadow-[0_4px_12px_rgba(11,60,45,0.05)] transition-all duration-300 text-left relative ${isOpen ? "ring-1 ring-[#0B3C2D]" : ""}`}>
       {/* Accordion Header */}
       <div
         onClick={() => setIsOpen(!isOpen)}
-        className="relative w-full text-left p-6 sm:p-8 focus:outline-none cursor-pointer"
+        className="relative w-full text-left p-4 sm:p-5 focus:outline-none cursor-pointer z-10"
       >
-        <div className="space-y-4 w-full">
-          <div className="flex flex-wrap items-center gap-2 pr-14 sm:pr-16">
-            <span className="px-3 py-1 bg-emerald-50 text-[#0F5132] rounded-full text-[10px] font-sans font-bold tracking-wide border border-[#0F5132]/20">
-              {job.category}
-            </span>
-            <span className="px-3 py-1 bg-emerald-100 text-emerald-950 font-sans font-bold rounded-full text-[10px]">
-              {job.type}
-            </span>
-            {((job.impressions || 0) > 50) && (
-              <span className="flex items-center gap-1 text-[9px] font-mono font-bold uppercase tracking-wider text-amber-800">
-                <Flame className="w-3.5 h-3.5 fill-amber-500 stroke-amber-600" />
-                Popular ({job.impressions} Views)
-              </span>
-            )}
-          </div>
-
-          <h3 className="text-xl sm:text-2xl md:text-3xl font-sans font-black text-black tracking-tight leading-snug pr-14 sm:pr-16">
+        <div className="space-y-1.5 w-full pr-28 sm:pr-32">
+          <h3 className="text-base sm:text-lg font-sans font-black text-[#0B3C2D] tracking-tight leading-snug">
             {job.title}
           </h3>
 
-          <div className="flex flex-row items-center justify-between gap-3 text-xs font-sans font-bold text-black w-full pt-1">
-            <span className="flex items-center gap-1.5 text-black min-w-0">
-              <MapPin className="w-4 h-4 text-[#0F5132] shrink-0" />
+          <div className="flex flex-wrap sm:flex-row sm:items-center gap-2 text-[11px] sm:text-xs font-sans font-bold text-emerald-800 w-full pt-0.5">
+            <span className="flex items-center gap-1 text-emerald-800 min-w-0">
+              <MapPin className="w-3.5 h-3.5 text-[#0B3C2D] shrink-0" />
               <span className="truncate">{job.location}</span>
             </span>
-
-            {/* Edit / Delete Buttons Row - matching the placement of apply button */}
-            <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-              <button
-                onClick={() => onEdit(job)}
-                className="px-3.5 py-2 sm:px-4 sm:py-2.5 bg-emerald-50 hover:bg-emerald-100 text-[#0F5132] font-sans font-extrabold text-xs rounded-xl flex items-center gap-1.5 cursor-pointer border border-[#0F5132]/30 transition-all active:translate-y-px"
-                title="Edit Job Listing"
-              >
-                <Edit2 className="w-3.5 h-3.5" />
-                <span>Edit</span>
-              </button>
-              <button
-                onClick={() => onDelete(job)}
-                className="px-3.5 py-2 sm:px-4 sm:py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 font-sans font-extrabold text-xs rounded-xl flex items-center gap-1.5 cursor-pointer border border-rose-300/30 transition-all active:translate-y-px"
-                title="Delete Job"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-                <span>Delete</span>
-              </button>
-            </div>
           </div>
         </div>
 
-        <div className={`absolute right-6 top-6 sm:right-8 sm:top-8 w-11 h-11 rounded-full bg-emerald-50 flex items-center justify-center border border-[#0F5132]/20 transform transition-transform duration-300 ${isOpen ? "rotate-180" : ""} text-[#0F5132]`}>
-          <ChevronDown className="w-5.5 h-5.5" />
+        {/* Edit and Dropdown Action Buttons Side-by-Side */}
+        <div className="absolute right-4 top-4 sm:right-5 sm:top-5 flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+          <button
+            onClick={() => onEdit(job)}
+            className="px-2.5 py-1.5 bg-[#0B3C2D] hover:bg-[#06241B] text-white font-sans font-black text-[10px] sm:text-xs rounded-lg flex items-center gap-1 cursor-pointer transition-all shadow-sm hover:-translate-y-0.5"
+            title="Edit Job Listing"
+          >
+            <Edit2 className="w-3 h-3 text-white" />
+            <span>Edit</span>
+          </button>
+          <button
+            onClick={() => setIsOpen(!isOpen)}
+            className={`w-8 h-8 rounded-full bg-emerald-950/10 hover:bg-emerald-950/20 border border-emerald-900/10 flex items-center justify-center text-[#0B3C2D] transform transition-transform duration-300 ${isOpen ? "rotate-180" : ""}`}
+            title={isOpen ? "Collapse Details" : "Expand Details"}
+          >
+            <ChevronDown className="w-4.5 h-4.5" />
+          </button>
         </div>
       </div>
 
@@ -121,28 +104,47 @@ export const JobManagementCard: React.FC<JobManagementCardProps> = ({ job, onEdi
             animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.25 }}
-            className="border-t border-[#0F5132]/30 bg-[#FAFDFB]"
+            className="border-t border-emerald-200 bg-white/40"
           >
-            <div className="p-6 sm:p-8 space-y-6">
+            <div className="p-4 sm:p-5 space-y-4 relative z-10">
+              {/* Job Metadata Tags */}
+              <div className="flex flex-wrap items-center gap-1.5 pb-3 border-b border-emerald-200">
+                <span className="px-2.5 py-0.5 bg-[#0B3C2D] text-white rounded-full text-[9px] font-sans font-extrabold tracking-wide shadow-sm">
+                  {job.category}
+                </span>
+                <span className="px-2.5 py-0.5 bg-emerald-100 border border-emerald-200 text-emerald-800 font-sans font-extrabold rounded-full text-[9px]">
+                  {job.type}
+                </span>
+                {((job.impressions || 0) > 50) && (
+                  <span className="flex items-center gap-1 text-[9px] font-mono font-bold uppercase tracking-wider text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
+                    <Flame className="w-3 h-3 fill-amber-500 stroke-amber-500" />
+                    Popular ({job.impressions} Views)
+                  </span>
+                )}
+                <span className="px-2.5 py-0.5 bg-emerald-100/50 text-emerald-800 border border-emerald-200 rounded-full text-[9px] font-sans font-semibold">
+                  Posted by: {postedByProfile?.displayName || postedByProfile?.email || (job.postedByUid === "admin-seed" || job.postedByUid === "admin-demo" ? "Admin" : "Unknown Staff")}
+                </span>
+              </div>
+
               {/* Organization & Remuneration Details */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-[#FAFDFB] p-5 rounded-2xl border border-[#0F5132]/30">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-white/80 p-4 rounded-xl border border-emerald-200">
                 <div className="space-y-1">
-                  <h4 className="text-[10px] font-mono font-black tracking-widest text-[#0F5132] uppercase">
+                  <h4 className="text-[9px] font-mono font-black tracking-widest text-emerald-800 uppercase">
                     Hiring Organization
                   </h4>
-                  <div className="flex items-center gap-2 mt-1">
-                    <span className="font-extrabold text-[#0F5132] bg-emerald-50 px-3 py-1 rounded-xl border border-[#0F5132]/25 text-xs sm:text-sm">
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <span className="font-extrabold text-[#0B3C2D] bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-100 text-xs">
                       {job.company}
                     </span>
                   </div>
                 </div>
                 <div className="space-y-1">
-                  <h4 className="text-[10px] font-mono font-black tracking-widest text-[#0F5132] uppercase">
+                  <h4 className="text-[9px] font-mono font-black tracking-widest text-emerald-800 uppercase">
                     Salary & Compensation
                   </h4>
-                  <div className="flex items-center gap-2 mt-1">
-                    <span className="font-extrabold text-emerald-950 bg-emerald-100 px-3 py-1 rounded-xl border border-[#0F5132]/20 text-xs sm:text-sm flex items-center gap-1.5">
-                      <Banknote className="w-4 h-4 text-[#0F5132]" />
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <span className="font-extrabold text-[#0B3C2D] bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-100 text-xs flex items-center gap-1.5">
+                      <Banknote className="w-3.5 h-3.5 text-emerald-700" />
                       {formattedSalary}
                     </span>
                   </div>
@@ -150,26 +152,26 @@ export const JobManagementCard: React.FC<JobManagementCardProps> = ({ job, onEdi
               </div>
 
               {/* Job Description */}
-              <div className="space-y-2">
-                <h4 className="text-[10px] font-mono font-black tracking-widest text-[#0F5132] uppercase">
+              <div className="space-y-2 text-left">
+                <h4 className="text-[9px] font-mono font-black tracking-widest text-[#0B3C2D] uppercase">
                   Job Description & Scope
                 </h4>
-                <p className="text-sm font-sans text-black font-semibold leading-relaxed">
+                <p className="text-xs font-sans text-emerald-950 font-semibold leading-relaxed">
                   {job.description}
                 </p>
               </div>
 
               {/* Requirements Bullet Points */}
               {job.requirements && job.requirements.length > 0 && (
-                <div className="space-y-3">
-                  <h4 className="text-[10px] font-mono font-black tracking-widest text-[#0F5132] uppercase">
+                <div className="space-y-3 text-left">
+                  <h4 className="text-[9px] font-mono font-black tracking-widest text-[#0B3C2D] uppercase">
                     Candidate Requirements
                   </h4>
-                  <ul className="space-y-2">
+                  <ul className="space-y-1.5">
                     {job.requirements.map((req, idx) => (
-                      <li key={idx} className="flex items-start gap-3 text-sm font-sans text-black font-semibold">
-                        <div className="w-5 h-5 rounded-full bg-emerald-100 text-[#0F5132] flex items-center justify-center flex-shrink-0 mt-0.5 border border-[#0F5132]/30">
-                          <Check className="w-3 h-3" />
+                      <li key={idx} className="flex items-start gap-2.5 text-xs font-sans text-emerald-950 font-semibold">
+                        <div className="w-4.5 h-4.5 rounded-full bg-white text-[#0B3C2D] flex items-center justify-center flex-shrink-0 mt-0.5 border border-emerald-200">
+                          <Check className="w-2.5 h-2.5" />
                         </div>
                         <span>{req}</span>
                       </li>
@@ -179,31 +181,41 @@ export const JobManagementCard: React.FC<JobManagementCardProps> = ({ job, onEdi
               )}
 
               {/* Engagement Panel */}
-              <div className="pt-6 border-t border-[#0F5132]/20 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div className="flex items-center gap-1.5 text-[10px] font-mono text-[#0F5132] font-bold">
-                  <Calendar className="w-4 h-4 text-[#0F5132]" />
+              <div className="pt-4 border-t border-emerald-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-1.5 text-[9px] font-mono text-emerald-800 font-bold">
+                  <Calendar className="w-3.5 h-3.5 text-emerald-700" />
                   Posted {new Date(job.createdAt).toLocaleDateString()}
-                  <span className="mx-2">•</span>
+                  <span className="mx-1.5">•</span>
                   <span>ID: {job.id}</span>
-                  <span className="mx-2">•</span>
+                  <span className="mx-1.5">•</span>
                   <span>{job.impressions || 0} views</span>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  {/* Delete Button inside the dropdown */}
+                  <button
+                    onClick={() => onDelete(job)}
+                    className="px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 font-sans font-extrabold text-[10px] sm:text-xs rounded-xl flex items-center gap-1.5 cursor-pointer transition-all border border-rose-200 hover:-translate-y-0.5"
+                    title="Delete Job"
+                  >
+                    <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                    <span>Delete</span>
+                  </button>
+
                   {/* Copy Link Button */}
                   <button
                     onClick={handleCopyLink}
-                    className="px-5 py-2.5 bg-white border border-[#0F5132]/30 hover:border-[#0F5132] text-[#0F5132] rounded-xl text-[11px] font-sans font-extrabold flex items-center gap-2 transition-all cursor-pointer shadow-sm hover:shadow-md"
+                    className="px-4 py-2 bg-white border border-emerald-800 text-[#0B3C2D] rounded-xl text-[10px] font-sans font-black flex items-center gap-1.5 transition-all cursor-pointer shadow-sm hover:bg-emerald-50"
                     title="Copy WhatsApp Application Link"
                   >
                     {copied ? (
                       <>
-                        <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+                        <Check className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
                         <span>Copied Link!</span>
                       </>
                     ) : (
                       <>
-                        <Copy className="w-4 h-4 shrink-0" />
+                        <Copy className="w-3.5 h-3.5 shrink-0 text-[#0B3C2D]" />
                         <span>Copy Link</span>
                       </>
                     )}
@@ -218,13 +230,20 @@ export const JobManagementCard: React.FC<JobManagementCardProps> = ({ job, onEdi
   );
 };
 
-export const JobManagement: React.FC = () => {
+interface JobManagementProps {
+  onBack?: () => void;
+  onPostJob?: () => void;
+}
+
+export const JobManagement: React.FC<JobManagementProps> = ({ onBack, onPostJob }) => {
   const { currentUser } = useAuth();
   const navigate = useNavigate();
 
   const [jobs, setJobs] = useState<Job[]>([]);
+  const [usersMap, setUsersMap] = useState<Record<string, UserProfile>>({});
   const [loading, setLoading] = useState(true);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
 
   // Modal / Edit state
   const [deletingJob, setDeletingJob] = useState<Job | null>(null);
@@ -264,26 +283,37 @@ export const JobManagement: React.FC = () => {
     }
   }, [jobs]);
 
-  const fetchJobs = async () => {
-    try {
-      const allJobs = await getJobs();
-      if (currentUser?.role === "admin") {
+  useEffect(() => {
+    if (!currentUser) return;
+    
+    setLoading(true);
+
+    // Fetch user profiles once for admin user mapping
+    if (currentUser.role === "admin") {
+      getAllUserProfiles().then(profiles => {
+        const pMap: Record<string, UserProfile> = {};
+        profiles.forEach(p => {
+          pMap[p.uid] = p;
+        });
+        setUsersMap(pMap);
+      }).catch(err => {
+        console.warn("Failed to fetch user profiles for mapping:", err);
+      });
+    } else {
+      // Map current user profile for staff or other roles to show correct "Posted by" info
+      setUsersMap({ [currentUser.uid]: currentUser });
+    }
+
+    const unsubscribe = subscribeToJobs((allJobs) => {
+      if (currentUser.role === "admin") {
         setJobs(allJobs);
       } else {
-        // Staff only see jobs they posted
-        setJobs(allJobs.filter(j => j.postedByUid === currentUser?.uid));
+        setJobs(allJobs.filter(j => j.postedByUid === currentUser.uid));
       }
-    } catch (err) {
-      console.error(err);
-    } finally {
       setLoading(false);
-    }
-  };
+    });
 
-  useEffect(() => {
-    if (currentUser) {
-      fetchJobs();
-    }
+    return () => unsubscribe();
   }, [currentUser]);
 
   const handleOpenEdit = (job: Job) => {
@@ -343,7 +373,6 @@ export const JobManagement: React.FC = () => {
 
       setSuccessMsg("Job listing updated successfully!");
       setEditingJob(null);
-      await fetchJobs();
       setTimeout(() => setSuccessMsg(null), 3000);
     } catch (err) {
       console.error(err);
@@ -359,7 +388,6 @@ export const JobManagement: React.FC = () => {
       await deleteJob(deletingJob.id, currentUser.uid);
       setSuccessMsg("Job listing deleted successfully!");
       setDeletingJob(null);
-      await fetchJobs();
       setTimeout(() => setSuccessMsg(null), 3000);
     } catch (err) {
       console.error(err);
@@ -367,38 +395,50 @@ export const JobManagement: React.FC = () => {
   };
 
   return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <motion.div
+      initial={{ opacity: 0, y: 15 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -15 }}
+      transition={{ duration: 0.3, ease: "easeOut" }}
+      className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 pb-24 space-y-6"
+    >
       {/* Header section */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
-        <div className="flex items-center gap-4">
+      <div className="flex flex-col gap-4 mb-6">
+        <div className="flex items-center justify-between">
           <button 
-            onClick={() => navigate(-1)}
-            className="w-10 h-10 bg-white border border-slate-200 hover:border-slate-300 text-slate-600 hover:text-slate-900 rounded-xl flex items-center justify-center shadow-sm hover:shadow transition-all cursor-pointer"
+            onClick={onBack || (() => navigate(-1))}
+            className="px-4 py-2 border border-emerald-800 rounded-xl bg-white hover:bg-emerald-50/20 text-[#0B3C2D] hover:text-[#06241B] text-xs font-extrabold transition-all flex items-center gap-2 cursor-pointer shadow-[0_4px_12px_rgba(0,0,0,0.03)] hover:-translate-y-0.5"
             title="Go Back"
           >
-            <ArrowLeft className="w-5 h-5" />
+            <ArrowLeft className="w-4 h-4" /> Go Back
           </button>
-          <div>
-            <h1 className="text-2xl font-serif font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
-              <Briefcase className="w-6 h-6 text-emerald-700" />
-              Job Openings Management
-            </h1>
-            <p className="text-xs font-sans text-slate-500 mt-1">
-              {currentUser?.role === "admin" 
-                ? "Full administrative control over all job listings in the system." 
-                : "Manage and edit job listings published by your recruiter account."}
-            </p>
+          <div className="flex items-center gap-1.5 bg-[#0B3C2D] border border-emerald-900 text-emerald-200 px-3 py-1.5 rounded-xl text-[10px] font-mono font-bold uppercase tracking-wider">
+            <Briefcase className="w-3.5 h-3.5" /> Job Openings Management
           </div>
         </div>
 
-        <div>
-          <Link
-            to={currentUser?.role === "admin" ? "/admin/post-jobs" : "/staff?tab=post-job"}
-            className="px-4 py-2.5 bg-emerald-900 hover:bg-emerald-950 text-white rounded-xl text-xs font-sans font-bold flex items-center gap-2 cursor-pointer shadow-sm transition-all"
-          >
-            <Plus className="w-4 h-4" />
-            Publish New Job
-          </Link>
+        <div className="w-full">
+          {onPostJob ? (
+            <button
+              onClick={onPostJob}
+              className="w-full px-4 py-3.5 border border-emerald-800 rounded-2xl bg-emerald-50/10 hover:bg-emerald-50/35 text-[#0B3C2D] text-xs font-extrabold transition-all flex items-center justify-center gap-2.5 cursor-pointer shadow-[0_15px_30px_rgba(0,0,0,0.02)] hover:shadow-[0_20px_35px_rgba(0,0,0,0.04)] hover:-translate-y-0.5 group"
+            >
+              <span className="bg-[#0B3C2D] text-emerald-200 p-1.5 rounded-xl transition-transform group-hover:scale-110">
+                <Plus className="w-4 h-4" />
+              </span>
+              <span>Publish New Job</span>
+            </button>
+          ) : (
+            <Link
+              to={currentUser?.role === "admin" ? "/admin/post-jobs" : "/staff?tab=post-job"}
+              className="w-full px-4 py-3.5 border border-emerald-800 rounded-2xl bg-emerald-50/10 hover:bg-emerald-50/35 text-[#0B3C2D] text-xs font-extrabold transition-all flex items-center justify-center gap-2.5 cursor-pointer shadow-[0_15px_30px_rgba(0,0,0,0.02)] hover:shadow-[0_20px_35px_rgba(0,0,0,0.04)] hover:-translate-y-0.5 group"
+            >
+              <span className="bg-[#0B3C2D] text-emerald-200 p-1.5 rounded-xl transition-transform group-hover:scale-110">
+                <Plus className="w-4 h-4" />
+              </span>
+              <span>Publish New Job</span>
+            </Link>
+          )}
         </div>
       </div>
 
@@ -409,37 +449,104 @@ export const JobManagement: React.FC = () => {
         </div>
       )}
 
-      {/* Main List */}
-      {loading ? (
-        <div className="grid grid-cols-1 gap-6">
-          <JobCardSkeleton />
-          <JobCardSkeleton />
-          <JobCardSkeleton />
-        </div>
-      ) : jobs.length === 0 ? (
-        <div className="bg-white border border-slate-100 rounded-3xl p-12 text-center shadow-sm">
-          <div className="w-16 h-16 bg-slate-50 border border-slate-100 rounded-2xl flex items-center justify-center text-slate-400 mx-auto mb-4">
-            <Briefcase className="w-8 h-8" />
-          </div>
-          <h3 className="text-base font-sans font-bold text-slate-900">No Job Listings</h3>
-          <p className="text-xs font-sans text-slate-500 max-w-sm mx-auto mt-1 leading-relaxed">
-            {currentUser?.role === "admin"
-              ? "The database doesn't contain any job records."
-              : "You haven't posted any jobs under this account yet."}
-          </p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 gap-6">
-          {jobs.map((job) => (
-            <JobManagementCard 
-              key={job.id} 
-              job={job}
-              onEdit={handleOpenEdit}
-              onDelete={setDeletingJob}
-            />
-          ))}
-        </div>
-      )}
+      {/* Filter search queries */}
+      {(() => {
+        const filteredJobs = jobs.filter((job) => {
+          if (!searchQuery.trim()) return true;
+          const query = searchQuery.toLowerCase();
+          
+          const titleMatch = job.title?.toLowerCase().includes(query) || false;
+          const locationMatch = job.location?.toLowerCase().includes(query) || false;
+          
+          const profile = job.postedByUid ? usersMap[job.postedByUid] : undefined;
+          const displayName = profile?.displayName?.toLowerCase() || "";
+          const email = profile?.email?.toLowerCase() || "";
+          const isSpecialAdmin = job.postedByUid === "admin-seed" || job.postedByUid === "admin-demo";
+          const postedByName = isSpecialAdmin ? "admin" : (profile ? `${displayName} ${email}` : "unknown staff");
+          
+          const postedByMatch = postedByName.toLowerCase().includes(query);
+          
+          return titleMatch || locationMatch || postedByMatch;
+        });
+
+        return (
+          <>
+            {/* Search Bar */}
+            {jobs.length > 0 && (
+              <div className="mb-6 relative">
+                <div className="relative flex items-center">
+                  <Search className="absolute left-4 w-4 h-4 text-white/90 pointer-events-none" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search jobs by title, location, or publisher..."
+                    className="w-full pl-11 pr-10 py-3.5 bg-[#0B3C2D] border border-emerald-900/60 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 text-white placeholder-emerald-200/60 rounded-2xl text-xs font-sans font-semibold transition-all shadow-[0_4px_12px_rgba(11,60,45,0.08)] outline-none"
+                  />
+                  {searchQuery && (
+                    <button
+                      onClick={() => setSearchQuery("")}
+                      className="absolute right-4 p-1 rounded-full text-emerald-200 hover:text-white hover:bg-white/10 cursor-pointer transition-colors"
+                      title="Clear search"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Main List */}
+            {loading ? (
+              <div className="grid grid-cols-1 gap-6">
+                <JobCardSkeleton />
+                <JobCardSkeleton />
+                <JobCardSkeleton />
+              </div>
+            ) : jobs.length === 0 ? (
+              <div className="bg-white border border-slate-100 rounded-3xl p-12 text-center shadow-sm">
+                <div className="w-16 h-16 bg-slate-50 border border-slate-100 rounded-2xl flex items-center justify-center text-slate-400 mx-auto mb-4">
+                  <Briefcase className="w-8 h-8" />
+                </div>
+                <h3 className="text-base font-sans font-bold text-slate-900">No Job Listings</h3>
+                <p className="text-xs font-sans text-slate-500 max-w-sm mx-auto mt-1 leading-relaxed">
+                  {currentUser?.role === "admin"
+                    ? "The database doesn't contain any job records."
+                    : "You haven't posted any jobs under this account yet."}
+                </p>
+              </div>
+            ) : filteredJobs.length === 0 ? (
+              <div className="bg-white border border-slate-100 rounded-3xl p-12 text-center shadow-sm">
+                <div className="w-16 h-16 bg-slate-50 border border-slate-100 rounded-2xl flex items-center justify-center text-slate-400 mx-auto mb-4">
+                  <Search className="w-8 h-8 text-slate-300" />
+                </div>
+                <h3 className="text-base font-sans font-bold text-slate-900">No Matches Found</h3>
+                <p className="text-xs font-sans text-slate-500 max-w-sm mx-auto mt-1 leading-relaxed">
+                  We couldn't find any job listings matching &ldquo;{searchQuery}&rdquo;. Try checking the spelling or searching for another term.
+                </p>
+                <button
+                  onClick={() => setSearchQuery("")}
+                  className="mt-4 px-4 py-2 bg-[#0B3C2D] text-white hover:bg-[#06241B] rounded-xl text-xs font-sans font-bold transition-all shadow-sm cursor-pointer"
+                >
+                  Clear Search
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-6">
+                {filteredJobs.map((job) => (
+                  <JobManagementCard 
+                    key={job.id} 
+                    job={job}
+                    onEdit={handleOpenEdit}
+                    onDelete={setDeletingJob}
+                    postedByProfile={job.postedByUid ? usersMap[job.postedByUid] : undefined}
+                  />
+                ))}
+              </div>
+            )}
+          </>
+        );
+      })()}
 
       {/* Edit Job Modal */}
       <AnimatePresence>
@@ -467,7 +574,7 @@ export const JobManagement: React.FC = () => {
                     <h3 className="text-lg font-sans font-extrabold text-slate-900 tracking-tight leading-none">
                       Edit Job Listing
                     </h3>
-                    <span className="text-[10px] font-mono text-[#0F5132] font-bold uppercase tracking-wider block mt-1">
+                    <span className="text-[10px] font-mono text-[#0B3C2D] font-bold uppercase tracking-wider block mt-1">
                       ID: {editingJob.id}
                     </span>
                   </div>
@@ -492,7 +599,7 @@ export const JobManagement: React.FC = () => {
                       required
                       value={title}
                       onChange={(e) => setTitle(e.target.value)}
-                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-sans font-medium focus:border-[#0F5132] focus:outline-none"
+                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-sans font-medium focus:border-[#0B3C2D] focus:outline-none"
                     />
                   </div>
 
@@ -506,7 +613,7 @@ export const JobManagement: React.FC = () => {
                       required
                       value={company}
                       onChange={(e) => setCompany(e.target.value)}
-                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-sans font-medium focus:border-[#0F5132] focus:outline-none"
+                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-sans font-medium focus:border-[#0B3C2D] focus:outline-none"
                     />
                   </div>
                 </div>
@@ -545,18 +652,18 @@ export const JobManagement: React.FC = () => {
                                 key={cat}
                                 type="button"
                                 onClick={() => {
-                                  setShowCustomCategory(false);
-                                  setCategory(cat);
-                                  setIsCategoryDropdownOpen(false);
+                                   setShowCustomCategory(false);
+                                   setCategory(cat);
+                                   setIsCategoryDropdownOpen(false);
                                 }}
                                 className={`w-full text-left px-3.5 py-2 text-[11px] font-sans font-bold transition-all flex items-center justify-between border-b border-slate-50 last:border-b-0 cursor-pointer ${
                                   isSelected 
-                                    ? "bg-[#0F5132]/[0.05] text-[#0F5132]" 
+                                    ? "bg-[#0B3C2D]/[0.05] text-[#0B3C2D]" 
                                     : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
                                 }`}
                               >
                                 <span className="truncate">{cat}</span>
-                                {isSelected && <Check className="w-3.5 h-3.5 text-[#0F5132]" />}
+                                {isSelected && <Check className="w-3.5 h-3.5 text-[#0B3C2D]" />}
                               </button>
                             );
                           })}
@@ -569,13 +676,13 @@ export const JobManagement: React.FC = () => {
                               setIsCategoryDropdownOpen(false);
                             }}
                             className={`w-full text-left px-3.5 py-2 text-[11px] font-sans font-bold transition-all flex items-center justify-between cursor-pointer border-t border-slate-100 text-emerald-700 hover:bg-emerald-50/50 ${
-                              showCustomCategory ? "bg-[#0F5132]/[0.05] text-[#0F5132]" : ""
+                              showCustomCategory ? "bg-[#0B3C2D]/[0.05] text-[#0B3C2D]" : ""
                             }`}
                           >
                             <span className="truncate flex items-center gap-1.5">
                               <Plus className="w-3.5 h-3.5" /> + Add Custom Category...
                             </span>
-                            {showCustomCategory && <Check className="w-3.5 h-3.5 text-[#0F5132]" />}
+                            {showCustomCategory && <Check className="w-3.5 h-3.5 text-[#0B3C2D]" />}
                           </button>
                         </div>
                       </>
@@ -583,7 +690,7 @@ export const JobManagement: React.FC = () => {
 
                     {showCustomCategory && (
                       <div className="space-y-1 mt-2 animate-fadeIn relative z-10 text-left">
-                        <label className="text-[9px] font-mono font-bold text-[#0F5132] uppercase tracking-wider block">
+                        <label className="text-[9px] font-mono font-bold text-[#0B3C2D] uppercase tracking-wider block">
                           New Category Name
                         </label>
                         <input
@@ -595,7 +702,7 @@ export const JobManagement: React.FC = () => {
                             setCustomCategoryInput(e.target.value);
                             setCategory(e.target.value);
                           }}
-                          className="w-full px-4 py-2 rounded-xl border border-emerald-300 text-xs font-sans font-medium focus:border-[#0F5132] focus:outline-none bg-emerald-50/10"
+                          className="w-full px-4 py-2 rounded-xl border border-emerald-300 text-xs font-sans font-medium focus:border-[#0B3C2D] focus:outline-none bg-emerald-50/10"
                         />
                       </div>
                     )}
@@ -637,12 +744,12 @@ export const JobManagement: React.FC = () => {
                                 }}
                                 className={`w-full text-left px-3.5 py-2 text-[11px] font-sans font-bold transition-all flex items-center justify-between border-b border-slate-50 last:border-b-0 cursor-pointer ${
                                   isSelected 
-                                    ? "bg-[#0F5132]/[0.05] text-[#0F5132]" 
+                                    ? "bg-[#0B3C2D]/[0.05] text-[#0B3C2D]" 
                                     : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
                                 }`}
                               >
                                 <span className="truncate">{opt}</span>
-                                {isSelected && <Check className="w-3.5 h-3.5 text-[#0F5132]" />}
+                                {isSelected && <Check className="w-3.5 h-3.5 text-[#0B3C2D]" />}
                               </button>
                             );
                           })}
@@ -661,7 +768,7 @@ export const JobManagement: React.FC = () => {
                       required
                       value={location}
                       onChange={(e) => setLocation(e.target.value)}
-                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-sans font-medium focus:border-[#0F5132] focus:outline-none"
+                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-sans font-medium focus:border-[#0B3C2D] focus:outline-none"
                     />
                   </div>
                 </div>
@@ -807,6 +914,6 @@ export const JobManagement: React.FC = () => {
           </div>
         )}
       </AnimatePresence>
-    </div>
+    </motion.div>
   );
 };

@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "motion/react";
 import { addJob, getJobs } from "../lib/services";
 import { useAuth } from "../context/AuthContext";
-import { Lock, FilePlus2, Plus, Trash2, CheckCircle2, Banknote, ChevronDown, Briefcase, Sparkles, Check } from "lucide-react";
+import { Lock, FilePlus2, Plus, Trash2, CheckCircle2, Banknote, ChevronDown, Briefcase, Sparkles, Check, ArrowLeft } from "lucide-react";
 import { Job } from "../types";
 
 const SPREAD_PARTICLES = Array.from({ length: 24 }).map((_, i) => ({
@@ -25,9 +25,10 @@ const DRIP_COLUMNS = [
 
 interface JobPostingFormProps {
   onJobAdded?: (job: Job) => void;
+  hideHeader?: boolean;
 }
 
-export const JobPostingForm: React.FC<JobPostingFormProps> = ({ onJobAdded }) => {
+export const JobPostingForm: React.FC<JobPostingFormProps> = ({ onJobAdded, hideHeader }) => {
   const navigate = useNavigate();
   const { currentUser } = useAuth();
   
@@ -158,6 +159,8 @@ export const JobPostingForm: React.FC<JobPostingFormProps> = ({ onJobAdded }) =>
     if (postedJob) {
       if (onJobAdded) {
         onJobAdded(postedJob);
+        setPostedJob(null);
+        return;
       }
       setPostedJob(null);
     }
@@ -187,29 +190,56 @@ export const JobPostingForm: React.FC<JobPostingFormProps> = ({ onJobAdded }) =>
   }
 
   return (
-    <div className="bg-white border border-slate-100 rounded-3xl p-6 sm:p-8 shadow-sm">
-      <div className="flex items-center gap-3 mb-6">
-        <div className="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center text-[#0F5132]">
+    <div className="space-y-6">
+      {/* Header section with back button and page tag */}
+      {!hideHeader && (
+        <div className="flex flex-col gap-4 mb-2">
+          <div className="flex items-center justify-between">
+            <button 
+              onClick={() => navigate(-1)}
+              className="px-4 py-2 border border-emerald-800 rounded-xl bg-white hover:bg-emerald-50/20 text-[#0B3C2D] hover:text-[#06241B] text-xs font-extrabold transition-all flex items-center gap-2 cursor-pointer shadow-[0_4px_12px_rgba(0,0,0,0.03)] hover:-translate-y-0.5"
+              title="Go Back"
+            >
+              <ArrowLeft className="w-4 h-4" /> Go Back
+            </button>
+            <div className="flex items-center gap-1.5 bg-[#0B3C2D] border border-emerald-900 text-emerald-200 px-3 py-1.5 rounded-xl text-[10px] font-mono font-bold uppercase tracking-wider">
+              <FilePlus2 className="w-3.5 h-3.5" /> Job Creation Form
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="bg-white border border-emerald-800 rounded-3xl p-6 sm:p-8 shadow-[0_10px_25px_-5px_rgba(0,0,0,0.04)] relative overflow-hidden">
+      {/* Vector pattern background overlay */}
+      <div className="absolute inset-0 pointer-events-none opacity-[0.03] z-0">
+        <svg width="100%" height="100%" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="95%" cy="5%" r="40" stroke="#0B3C2D" strokeWidth="1" />
+          <path d="M-20,100 C40,70 100,120 180,80" stroke="#0B3C2D" strokeWidth="1" />
+        </svg>
+      </div>
+
+      <div className="flex items-center gap-3 mb-6 relative z-10">
+        <div className="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center text-[#0B3C2D] border border-emerald-800/20">
           <FilePlus2 className="w-5 h-5" />
         </div>
         <div>
           <h3 className="text-lg font-sans font-extrabold text-slate-900 tracking-tight leading-none">
             Post New Job Opening
           </h3>
-          <span className="text-[10px] font-mono text-[#0F5132] font-bold uppercase tracking-wider block mt-1">
+          <span className="text-[10px] font-mono text-[#0B3C2D] font-bold uppercase tracking-wider block mt-1">
             Firestore-Linked Form
           </span>
         </div>
       </div>
 
       {success && (
-        <div className="mb-6 p-4 bg-emerald-50 text-[#0F5132] rounded-2xl flex items-center gap-3 text-sm font-sans font-semibold border border-emerald-100">
-          <CheckCircle2 className="w-5 h-5" />
+        <div className="mb-6 p-4 bg-emerald-50 text-[#0B3C2D] rounded-2xl flex items-center gap-3 text-sm font-sans font-semibold border border-emerald-100 relative z-10">
+          <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
           Job listed successfully! It is now instantly visible on the public seeker board.
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-5 text-slate-800">
+      <form onSubmit={handleSubmit} className="space-y-5 text-slate-800 relative z-10">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {/* Job Title */}
           <div className="space-y-1">
@@ -222,7 +252,7 @@ export const JobPostingForm: React.FC<JobPostingFormProps> = ({ onJobAdded }) =>
               placeholder="e.g. Senior Backend Engineer"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-sans font-medium focus:border-[#0F5132] focus:outline-none"
+              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-sans font-medium focus:border-[#0B3C2D] focus:outline-none"
             />
           </div>
 
@@ -237,7 +267,7 @@ export const JobPostingForm: React.FC<JobPostingFormProps> = ({ onJobAdded }) =>
               placeholder="e.g. Valley Reigns Ltd"
               value={company}
               onChange={(e) => setCompany(e.target.value)}
-              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-sans font-medium focus:border-[#0F5132] focus:outline-none"
+              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-sans font-medium focus:border-[#0B3C2D] focus:outline-none"
             />
           </div>
         </div>
@@ -282,12 +312,12 @@ export const JobPostingForm: React.FC<JobPostingFormProps> = ({ onJobAdded }) =>
                         }}
                         className={`w-full text-left px-3.5 py-2 text-[11px] font-sans font-bold transition-all flex items-center justify-between border-b border-slate-50 last:border-b-0 cursor-pointer ${
                           isSelected 
-                            ? "bg-emerald-50/70 text-[#0F5132]" 
+                            ? "bg-emerald-50 text-[#0B3C2D]" 
                             : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
                         }`}
                       >
                         <span className="truncate">{cat}</span>
-                        {isSelected && <Check className="w-3.5 h-3.5 text-[#0F5132]" />}
+                        {isSelected && <Check className="w-3.5 h-3.5 text-[#0B3C2D]" />}
                       </button>
                     );
                   })}
@@ -300,13 +330,13 @@ export const JobPostingForm: React.FC<JobPostingFormProps> = ({ onJobAdded }) =>
                       setIsCategoryDropdownOpen(false);
                     }}
                     className={`w-full text-left px-3.5 py-2 text-[11px] font-sans font-bold transition-all flex items-center justify-between cursor-pointer border-t border-slate-100 text-emerald-700 hover:bg-emerald-50/50 ${
-                      showCustomCategory ? "bg-emerald-50/70 text-[#0F5132]" : ""
+                      showCustomCategory ? "bg-emerald-50 text-[#0B3C2D]" : ""
                     }`}
                   >
                     <span className="truncate flex items-center gap-1.5">
                       <Plus className="w-3.5 h-3.5" /> + Add Custom Category...
                     </span>
-                    {showCustomCategory && <Check className="w-3.5 h-3.5 text-[#0F5132]" />}
+                    {showCustomCategory && <Check className="w-3.5 h-3.5 text-[#0B3C2D]" />}
                   </button>
                 </div>
               </>
@@ -314,7 +344,7 @@ export const JobPostingForm: React.FC<JobPostingFormProps> = ({ onJobAdded }) =>
 
             {showCustomCategory && (
               <div className="space-y-1 mt-2 animate-fadeIn relative z-10">
-                <label className="text-[9px] font-mono font-bold text-[#0F5132] uppercase tracking-wider block">
+                <label className="text-[9px] font-mono font-bold text-[#0B3C2D] uppercase tracking-wider block">
                   New Category Name
                 </label>
                 <input
@@ -326,7 +356,7 @@ export const JobPostingForm: React.FC<JobPostingFormProps> = ({ onJobAdded }) =>
                     setCustomCategoryInput(e.target.value);
                     setCategory(e.target.value);
                   }}
-                  className="w-full px-4 py-2 rounded-xl border border-emerald-300 text-xs font-sans font-medium focus:border-[#0F5132] focus:outline-none bg-emerald-50/10"
+                  className="w-full px-4 py-2 rounded-xl border border-emerald-300 text-xs font-sans font-medium focus:border-[#0B3C2D] focus:outline-none bg-emerald-50/10"
                 />
               </div>
             )}
@@ -368,12 +398,12 @@ export const JobPostingForm: React.FC<JobPostingFormProps> = ({ onJobAdded }) =>
                         }}
                         className={`w-full text-left px-3.5 py-2 text-[11px] font-sans font-bold transition-all flex items-center justify-between border-b border-slate-50 last:border-b-0 cursor-pointer ${
                           isSelected 
-                            ? "bg-emerald-50/70 text-[#0F5132]" 
+                            ? "bg-emerald-50 text-[#0B3C2D]" 
                             : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
                         }`}
                       >
                         <span className="truncate">{opt}</span>
-                        {isSelected && <Check className="w-3.5 h-3.5 text-[#0F5132]" />}
+                        {isSelected && <Check className="w-3.5 h-3.5 text-[#0B3C2D]" />}
                       </button>
                     );
                   })}
@@ -393,7 +423,7 @@ export const JobPostingForm: React.FC<JobPostingFormProps> = ({ onJobAdded }) =>
               placeholder="e.g. Lagos (Remote) / Abuja"
               value={location}
               onChange={(e) => setLocation(e.target.value)}
-              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-sans font-medium focus:border-[#0F5132] focus:outline-none"
+              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-sans font-medium focus:border-[#0B3C2D] focus:outline-none"
             />
           </div>
         </div>
@@ -409,7 +439,7 @@ export const JobPostingForm: React.FC<JobPostingFormProps> = ({ onJobAdded }) =>
             placeholder="e.g. ₦450,000 - ₦600,000 / month"
             value={salary}
             onChange={(e) => setSalary(e.target.value)}
-            className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-sans font-medium focus:border-[#0F5132] focus:outline-none"
+            className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-sans font-medium focus:border-[#0B3C2D] focus:outline-none"
           />
         </div>
 
@@ -424,7 +454,7 @@ export const JobPostingForm: React.FC<JobPostingFormProps> = ({ onJobAdded }) =>
             placeholder="Summarize the core day-to-day responsibilities..."
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-sans font-medium focus:border-[#0F5132] focus:outline-none resize-none"
+            className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-sans font-medium focus:border-[#0B3C2D] focus:outline-none resize-none"
           />
         </div>
 
@@ -440,7 +470,7 @@ export const JobPostingForm: React.FC<JobPostingFormProps> = ({ onJobAdded }) =>
               value={reqInput}
               onChange={(e) => setReqInput(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), handleAddRequirement())}
-              className="w-full px-4 py-2 rounded-xl border border-slate-200 text-xs font-sans font-medium focus:border-[#0F5132] focus:outline-none"
+              className="w-full px-4 py-2 rounded-xl border border-slate-200 text-xs font-sans font-medium focus:border-[#0B3C2D] focus:outline-none"
             />
             <button
               type="button"
@@ -471,7 +501,7 @@ export const JobPostingForm: React.FC<JobPostingFormProps> = ({ onJobAdded }) =>
         <button
           type="submit"
           disabled={isSubmitting}
-          className="w-full py-3 bg-[#0F5132] hover:bg-[#0c4027] text-white rounded-xl text-sm font-sans font-extrabold shadow-md shadow-emerald-950/10 hover:shadow-lg transition-all cursor-pointer flex items-center justify-center"
+          className="w-full py-3.5 bg-[#0B3C2D] hover:bg-[#06241B] text-white rounded-xl text-sm font-sans font-extrabold shadow-md shadow-emerald-950/15 hover:shadow-lg transition-all cursor-pointer flex items-center justify-center"
         >
           {isSubmitting ? "Listing Job Openings..." : "Publish Job to Platform"}
         </button>
@@ -493,7 +523,7 @@ export const JobPostingForm: React.FC<JobPostingFormProps> = ({ onJobAdded }) =>
                   {/* Outer pulsing ring */}
                   <div className="absolute w-20 h-20 rounded-full border-2 border-emerald-500/20 animate-ping" />
                   {/* Spinning active ring */}
-                  <div className="w-14 h-14 rounded-full border-4 border-emerald-100 border-t-[#0F5132] animate-spin" />
+                  <div className="w-14 h-14 rounded-full border-4 border-emerald-100 border-t-[#0B3C2D] animate-spin" />
                 </div>
                 
                 <motion.h4
@@ -508,7 +538,7 @@ export const JobPostingForm: React.FC<JobPostingFormProps> = ({ onJobAdded }) =>
                   initial={{ opacity: 0, y: 5 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.3 }}
-                  className="text-xs font-mono text-[#0F5132] uppercase tracking-wider mt-1.5"
+                  className="text-xs font-mono text-[#0B3C2D] uppercase tracking-wider mt-1.5"
                 >
                   Publishing job details to the platform feed
                 </motion.p>
@@ -670,6 +700,7 @@ export const JobPostingForm: React.FC<JobPostingFormProps> = ({ onJobAdded }) =>
           </motion.div>
         )}
       </AnimatePresence>
+    </div>
     </div>
   );
 };

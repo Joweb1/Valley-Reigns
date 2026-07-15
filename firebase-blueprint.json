@@ -57,6 +57,36 @@
         "createdAt": { "type": "number", "description": "The epoch timestamp when this device subscribed." }
       },
       "required": ["id", "endpoint", "keys", "createdAt"]
+    },
+    "StaffDailyReport": {
+      "title": "StaffDailyReport",
+      "description": "Daily activity performance report submitted by recruiters and staff.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique report identifier." },
+        "uid": { "type": "string", "description": "UID of the staff who submitted the report." },
+        "staffName": { "type": "string", "description": "Name of the staff." },
+        "date": { "type": "string", "description": "YYYY-MM-DD date representation." },
+        "timestamp": { "type": "number", "description": "Submission timestamp." },
+        "newReachOuts": { "type": "number", "description": "Number of new reach-outs." },
+        "resumptions": { "type": "number", "description": "Number of resumptions." },
+        "cvsCollected": { "type": "number", "description": "Number of CVs collected." },
+        "candidatesRegistered": { "type": "number", "description": "Number of candidates registered." },
+        "addressesGiven": { "type": "number", "description": "Number of addresses referred/given." },
+        "commissionRetrieved": { "type": "string", "description": "Commission details retrieved." },
+        "flyersMade": { "type": "number", "description": "Number of flyers made." },
+        "videosMade": { "type": "number", "description": "Number of videos made." },
+        "jobsGotten": { "type": "number", "description": "Number of jobs gotten." },
+        "newJobsGottenClientRelations": { "type": "string", "description": "Details of new jobs from Client Relations." },
+        "challenges": { "type": "string", "description": "Challenges encountered." },
+        "plansTomorrow": { "type": "string", "description": "Plans for tomorrow." },
+        "chatsClearedConfirmed": { "type": "boolean", "description": "Whether the staff confirmed chats were cleared." },
+        "chatsClearedProofUrl": { "type": "string", "description": "Image proof of chats cleared." },
+        "targetReachOutsMet": { "type": "boolean", "description": "If reach-outs target >= 20 was met." },
+        "targetAddressesMet": { "type": "boolean", "description": "If addresses referred target >= 4 was met." },
+        "targetOnTimeMet": { "type": "boolean", "description": "If submitted before 9:00 PM local." }
+      },
+      "required": ["id", "uid", "staffName", "date", "timestamp", "newReachOuts", "resumptions", "cvsCollected", "candidatesRegistered", "addressesGiven", "challenges", "plansTomorrow", "chatsClearedConfirmed", "targetReachOutsMet", "targetAddressesMet", "targetOnTimeMet"]
     }
   },
   "firestore": {
@@ -75,6 +105,10 @@
     "/push_subscriptions/{subscriptionId}": {
       "schema": "PushSubscription",
       "description": "Collection of active browser web push subscriptions for triggering system notifications."
+    },
+    "/daily_reports/{reportId}": {
+      "schema": "StaffDailyReport",
+      "description": "Recruiter and staff daily activity reports tracked by administrators."
     }
   }
 }

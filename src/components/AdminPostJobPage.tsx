@@ -1,39 +1,46 @@
 import React from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ArrowLeft, ShieldCheck } from "lucide-react";
+import { ArrowLeft, Sparkles } from "lucide-react";
 import { JobPostingForm } from "./JobPostingForm";
 
-export const AdminPostJobPage: React.FC = () => {
+interface AdminPostJobPageProps {
+  onBack?: () => void;
+  onJobAdded?: () => void;
+}
+
+export const AdminPostJobPage: React.FC<AdminPostJobPageProps> = ({ onBack, onJobAdded }) => {
   const navigate = useNavigate();
 
   const handleJobAdded = () => {
-    // Redirection to the Job Management page is handled beautifully by the JobPostingForm success overlay
+    if (onJobAdded) {
+      onJobAdded();
+    }
   };
 
   return (
-    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="flex items-center gap-4 mb-8">
-        <Link 
-          to="/admin" 
-          className="w-10 h-10 bg-white border border-slate-200 hover:border-slate-300 text-slate-600 hover:text-slate-900 rounded-xl flex items-center justify-center shadow-sm hover:shadow transition-all cursor-pointer"
-          title="Back to Admin Panel"
-        >
-          <ArrowLeft className="w-5 h-5" />
-        </Link>
-        <div>
-          <h1 className="text-2xl font-serif font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
-            <ShieldCheck className="w-6 h-6 text-emerald-700" />
-            Admin Job Publisher
-          </h1>
-          <p className="text-xs font-sans text-slate-500 mt-1">
-            Publish a new job listing directly to the public seeker board.
-          </p>
+    <div className="max-w-4xl mx-auto px-1 sm:px-2 py-1.5">
+      <div className="flex items-center justify-between mb-6">
+        {onBack ? (
+          <button 
+            onClick={onBack}
+            className="px-4 py-2 border border-emerald-800 rounded-xl bg-white hover:bg-emerald-50/20 text-[#0B3C2D] hover:text-[#06241B] text-xs font-extrabold transition-all flex items-center gap-2 cursor-pointer shadow-[0_4px_12px_rgba(0,0,0,0.03)] hover:-translate-y-0.5"
+          >
+            <ArrowLeft className="w-4 h-4" /> Go Back
+          </button>
+        ) : (
+          <Link 
+            to="/admin" 
+            className="px-4 py-2 border border-emerald-800 rounded-xl bg-white hover:bg-emerald-50/20 text-[#0B3C2D] hover:text-[#06241B] text-xs font-extrabold transition-all flex items-center gap-2 cursor-pointer shadow-[0_4px_12px_rgba(0,0,0,0.03)] hover:-translate-y-0.5"
+          >
+            <ArrowLeft className="w-4 h-4" /> Go Back
+          </Link>
+        )}
+        <div className="flex items-center gap-1.5 bg-[#0B3C2D] border border-emerald-900 text-emerald-200 px-3 py-1.5 rounded-xl text-[10px] font-mono font-bold uppercase tracking-wider">
+          <Sparkles className="w-3.5 h-3.5" /> Admin Job Publisher
         </div>
       </div>
 
-      <div className="bg-white border border-slate-100 rounded-3xl shadow-sm p-2">
-        <JobPostingForm onJobAdded={handleJobAdded} />
-      </div>
+      <JobPostingForm onJobAdded={handleJobAdded} hideHeader={true} />
     </div>
   );
 };

@@ -15,12 +15,14 @@ export interface Job {
 
 export interface SystemNotification {
   id: string;
-  type: "offline_routing" | "closed_conversation" | "reported_conversation" | "finished_conversation" | "new_job_posted" | "job_updated" | "job_deleted";
+  type: "offline_routing" | "closed_conversation" | "reported_conversation" | "finished_conversation" | "new_job_posted" | "job_updated" | "job_deleted" | "report_submitted" | "awaiting_claim" | "abandoned_conversation" | "transferred_conversation" | "conversation_started" | "conversation_closed" | "conversation_finished" | "conversation_transferred" | "conversation_claimed";
   title: string;
   message: string;
   timestamp: number;
   read?: boolean;
   metadata?: Record<string, any>;
+  staffUid?: string;
+  seekerUid?: string;
 }
 
 export interface UserProfile {
@@ -32,6 +34,7 @@ export interface UserProfile {
   password?: string;
   authProvider?: "email" | "google";
   messagingPreference?: "whatsapp" | "in-app";
+  photoURL?: string;
 }
 
 export interface ChatMessage {
@@ -56,6 +59,9 @@ export interface Conversation {
   messages?: Record<string, ChatMessage> | ChatMessage[];
   assignedToOffline?: boolean;
   isReported?: boolean;
+  abandonedAt?: number;
+  finishedAt?: number;
+  seekerUid?: string;
   typing?: Record<string, { isTyping: boolean; name: string; updatedAt: number }>;
 }
 
@@ -77,4 +83,38 @@ export interface DailyStat {
   abandoned: number;
   timestamp: number;
 }
+
+export interface StaffDailyReport {
+  id: string;
+  uid: string;
+  staffName: string;
+  date: string; // YYYY-MM-DD
+  timestamp: number;
+  
+  // Targets / Stats (Direct metrics)
+  newReachOuts: number;
+  resumptions: number;
+  cvsCollected: number;
+  candidatesRegistered: number;
+  addressesGiven: number;
+  commissionRetrieved: string; // Can be currency or empty
+  flyersMade: number;
+  videosMade: number;
+  jobsGotten: number;
+  newJobsGottenClientRelations: string; // Detail or description
+  
+  // Qualitative fields
+  challenges: string;
+  plansTomorrow: string;
+  
+  // Proof & Confirmations
+  chatsClearedConfirmed: boolean;
+  chatsClearedProofUrl?: string; // Simulated file/image upload base64/url
+  
+  // Computed target status checked at submission
+  targetReachOutsMet: boolean;   // Target >= 20
+  targetAddressesMet: boolean;   // Target >= 4
+  targetOnTimeMet: boolean;      // Submitted on or before 9:00 PM local
+}
+
 

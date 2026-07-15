@@ -198,8 +198,15 @@ export const AuthModal: React.FC<AuthModalProps> = ({ forcedOpen = false, onClos
   }, []);
 
   useEffect(() => {
-    if (forcedOpen) {
-      setIsOpen(true);
+    setIsOpen(forcedOpen);
+    if (!forcedOpen) {
+      setShowMagicLinkView(false);
+      setShowEmailForm(false);
+      setShowHifiPreview(false);
+      setEmailLinkError(null);
+      setEmailError("");
+      setSignupError("");
+      setIsProcessing(false);
     }
   }, [forcedOpen]);
 
@@ -462,7 +469,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({ forcedOpen = false, onClos
                     {!showEmailForm ? (
                       /* First view: Only "Sign in with Email" and "Continue with Google" buttons */
                       <div className="space-y-3 pt-2">
-                        <button
+                        <motion.button
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
                           type="button"
                           onClick={() => {
                             setEmailError("");
@@ -472,9 +481,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({ forcedOpen = false, onClos
                         >
                           <Mail className="w-4 h-4" />
                           <span>Sign in with Email</span>
-                        </button>
+                        </motion.button>
 
-                        <button
+                        <motion.button
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
                           type="button"
                           onPointerDown={handleGooglePointerDown}
                           onPointerUp={handleGooglePointerUp}
@@ -501,7 +512,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ forcedOpen = false, onClos
                             />
                           </svg>
                           <span>Continue with Google</span>
-                        </button>
+                        </motion.button>
 
                         <div className="flex gap-1.5 justify-center pt-3 border-t border-slate-100 mt-2">
                           <span className="text-[10px] text-slate-500 font-medium">
@@ -563,7 +574,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ forcedOpen = false, onClos
                                 placeholder="e.g. admin@valleyreigns.com"
                                 value={emailInput}
                                 onChange={(e) => setEmailInput(e.target.value)}
-                                className="w-full pl-9 pr-4 py-2.5 bg-slate-50 border border-slate-200/80 rounded-xl text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-[#0F5132] focus:bg-white transition-all shadow-sm"
+                                className="w-full pl-9 pr-4 py-2.5 bg-slate-50 border border-slate-200/80 rounded-xl text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none hover:border-[#0F5132]/60 focus:border-[#0F5132] focus:bg-white focus:ring-4 focus:ring-[#0F5132]/10 transition-all focus:scale-[1.01] shadow-sm"
                               />
                             </div>
                           </div>
@@ -585,7 +596,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ forcedOpen = false, onClos
                                 placeholder="••••••••"
                                 value={passwordInput}
                                 onChange={(e) => setPasswordInput(e.target.value)}
-                                className="w-full pl-9 pr-10 py-2.5 bg-slate-50 border border-slate-200/80 rounded-xl text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-[#0F5132] focus:bg-white transition-all shadow-sm"
+                                className="w-full pl-9 pr-10 py-2.5 bg-slate-50 border border-slate-200/80 rounded-xl text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none hover:border-[#0F5132]/60 focus:border-[#0F5132] focus:bg-white focus:ring-4 focus:ring-[#0F5132]/10 transition-all focus:scale-[1.01] shadow-sm"
                               />
                               <button
                                 type="button"
@@ -597,13 +608,15 @@ export const AuthModal: React.FC<AuthModalProps> = ({ forcedOpen = false, onClos
                             </div>
                           </div>
 
-                          <button
+                          <motion.button
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
                             type="submit"
                             className="w-full py-2.5 px-4 bg-[#0F5132] hover:bg-[#0c4027] text-white rounded-xl font-bold text-xs shadow-md shadow-[#0F5132]/10 transition-all flex items-center justify-center gap-2 cursor-pointer mt-1"
                           >
                             <LogIn className="w-3.5 h-3.5" />
                             <span>Sign In with Email</span>
-                          </button>
+                          </motion.button>
                         </form>
 
                         <div className="flex gap-1.5 justify-center pt-3 border-t border-slate-100 mt-2">
@@ -790,7 +803,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ forcedOpen = false, onClos
                           value={signupName}
                           onChange={(e) => setSignupName(e.target.value)}
                           required
-                          className="w-full px-4 py-2 border border-slate-200 focus:border-[#0F5132] focus:outline-none rounded-xl text-sm font-sans font-medium"
+                          className="w-full px-4 py-2 border border-slate-200/80 rounded-xl text-sm font-sans font-medium focus:outline-none hover:border-[#0F5132]/60 focus:border-[#0F5132] focus:bg-white focus:ring-4 focus:ring-[#0F5132]/10 transition-all focus:scale-[1.01]"
                         />
                       </div>
 
@@ -804,7 +817,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ forcedOpen = false, onClos
                           value={signupEmail}
                           onChange={(e) => setSignupEmail(e.target.value)}
                           required
-                          className="w-full px-4 py-2 border border-slate-200 focus:border-[#0F5132] focus:outline-none rounded-xl text-sm font-sans font-medium"
+                          className="w-full px-4 py-2 border border-slate-200/80 rounded-xl text-sm font-sans font-medium focus:outline-none hover:border-[#0F5132]/60 focus:border-[#0F5132] focus:bg-white focus:ring-4 focus:ring-[#0F5132]/10 transition-all focus:scale-[1.01]"
                         />
                       </div>
 
@@ -822,7 +835,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ forcedOpen = false, onClos
                             placeholder="••••••••"
                             value={signupPassword}
                             onChange={(e) => setSignupPassword(e.target.value)}
-                            className="w-full pl-9 pr-10 py-2 border border-slate-200 focus:border-[#0F5132] focus:outline-none rounded-xl text-sm font-sans font-medium"
+                            className="w-full pl-9 pr-10 py-2 border border-slate-200/80 rounded-xl text-sm font-sans font-medium focus:outline-none hover:border-[#0F5132]/60 focus:border-[#0F5132] focus:bg-white focus:ring-4 focus:ring-[#0F5132]/10 transition-all focus:scale-[1.01]"
                           />
                           <button
                             type="button"
@@ -848,7 +861,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ forcedOpen = false, onClos
                             placeholder="••••••••"
                             value={confirmPassword}
                             onChange={(e) => setConfirmPassword(e.target.value)}
-                            className="w-full pl-9 pr-10 py-2 border border-slate-200 focus:border-[#0F5132] focus:outline-none rounded-xl text-sm font-sans font-medium"
+                            className="w-full pl-9 pr-10 py-2 border border-slate-200/80 rounded-xl text-sm font-sans font-medium focus:outline-none hover:border-[#0F5132]/60 focus:border-[#0F5132] focus:bg-white focus:ring-4 focus:ring-[#0F5132]/10 transition-all focus:scale-[1.01]"
                           />
                           <button
                             type="button"
@@ -864,13 +877,15 @@ export const AuthModal: React.FC<AuthModalProps> = ({ forcedOpen = false, onClos
                         <p className="text-xs text-rose-600 font-semibold">{signupError}</p>
                       )}
 
-                      <button
+                      <motion.button
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
                         type="submit"
                         className="w-full py-3 bg-[#0F5132] hover:bg-[#0c4027] text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm cursor-pointer transition-colors mt-2"
                       >
                         <UserPlus className="w-3.5 h-3.5" />
                         <span>{signupRole === "staff" ? "Create Staff Account" : "Register & Log In"}</span>
-                      </button>
+                      </motion.button>
                     </form>
                   </motion.div>
                 )}

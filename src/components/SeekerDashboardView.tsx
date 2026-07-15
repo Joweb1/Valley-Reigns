@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import { JobCard } from "./JobCard";
 import { JobCardSkeleton } from "./JobCardSkeleton";
-import { getJobs } from "../lib/services";
+import { getJobs, subscribeToJobs } from "../lib/services";
 import { Job } from "../types";
 import { 
   Search, 
@@ -11,7 +11,9 @@ import {
   Sparkles, 
   Cpu, 
   HeartPulse, 
-  Sparkle 
+  Sparkle,
+  ArrowRight,
+  Clock
 } from "lucide-react";
 import { motion } from "motion/react";
 
@@ -38,74 +40,19 @@ const itemVariants = {
   },
 };
 
-const getCategoryConfig = (categoryName: string) => {
+const getCategoryIcon = (categoryName: string) => {
   const normalized = categoryName.trim();
   switch (normalized) {
     case "Tech":
-      return {
-        name: "Tech",
-        label: "Technology",
-        icon: Cpu,
-        color: "bg-[#2563EB]",
-        borderColor: "border-[#2563EB]",
-        textColor: "text-[#2563EB]",
-        hoverBg: "hover:bg-blue-50/50",
-        iconBg: "bg-blue-50 text-[#2563EB]"
-      };
+      return Cpu;
     case "Healthcare":
-      return {
-        name: "Healthcare",
-        label: "Medical & Health",
-        icon: HeartPulse,
-        color: "bg-[#E11D48]",
-        borderColor: "border-[#E11D48]",
-        textColor: "text-[#E11D48]",
-        hoverBg: "hover:bg-rose-50/50",
-        iconBg: "bg-rose-50 text-[#E11D48]"
-      };
+      return HeartPulse;
     case "Finance":
-      return {
-        name: "Finance",
-        label: "Money & Finance",
-        icon: Banknote,
-        color: "bg-[#059669]",
-        borderColor: "border-[#059669]",
-        textColor: "text-[#059669]",
-        hoverBg: "hover:bg-teal-50/50",
-        iconBg: "bg-teal-50 text-[#059669]"
-      };
+      return Banknote;
     case "AI & Analytics":
-      return {
-        name: "AI & Analytics",
-        label: "Smart AI Systems",
-        icon: Sparkles,
-        color: "bg-[#7C3AED]",
-        borderColor: "border-[#7C3AED]",
-        textColor: "text-[#7C3AED]",
-        hoverBg: "hover:bg-violet-50/50",
-        iconBg: "bg-violet-50 text-[#7C3AED]"
-      };
-    default: {
-      const colors = [
-        { color: "bg-[#D97706]", text: "text-[#D97706]", border: "border-[#D97706]", iconBg: "bg-amber-50 text-[#D97706]" },
-        { color: "bg-[#0891B2]", text: "text-[#0891B2]", border: "border-[#0891B2]", iconBg: "bg-cyan-50 text-[#0891B2]" },
-        { color: "bg-[#4F46E5]", text: "text-[#4F46E5]", border: "border-[#4F46E5]", iconBg: "bg-indigo-50 text-[#4F46E5]" },
-        { color: "bg-[#DB2777]", text: "text-[#DB2777]", border: "border-[#DB2777]", iconBg: "bg-pink-50 text-[#DB2777]" },
-        { color: "bg-[#059669]", text: "text-[#059669]", border: "border-[#059669]", iconBg: "bg-emerald-50 text-[#059669]" }
-      ];
-      const index = Math.abs(normalized.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0)) % colors.length;
-      const theme = colors[index];
-      return {
-        name: normalized,
-        label: normalized,
-        icon: Briefcase,
-        color: theme.color,
-        borderColor: theme.border,
-        textColor: theme.text,
-        hoverBg: "hover:bg-slate-50",
-        iconBg: theme.iconBg
-      };
-    }
+      return Sparkles;
+    default:
+      return Briefcase;
   }
 };
 
@@ -116,90 +63,95 @@ export const SeekerDashboardView: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
 
-  const loadJobs = async () => {
-    setLoading(true);
-    const allJobs = await getJobs();
-    setJobs(allJobs);
-    setLoading(false);
-  };
-
   useEffect(() => {
-    loadJobs();
+    setLoading(true);
+    const unsubscribe = subscribeToJobs((allJobs) => {
+      setJobs(allJobs);
+      setLoading(false);
+    });
+    return () => unsubscribe();
   }, []);
 
   // Dynamically derive categories from current listings in database
   const uniqueCategoryNames: string[] = Array.from(new Set<string>(jobs.map(j => (j.category as string || "")).filter(Boolean)))
-    .filter((name: string) => !["Tech", "Healthcare", "Finance", "AI & Analytics"].includes(name));
+    .filter((name: string) => !["Tech", "Healthcare", "Finance", "AI & Analytics", "New"].includes(name));
 
   const CATEGORIES = [
     { 
       name: "All", 
       label: "All Jobs", 
       icon: Briefcase,
-      color: "bg-[#0F5132]", 
-      borderColor: "border-[#0F5132]", 
-      textColor: "text-[#0F5132]",
-      hoverBg: "hover:bg-emerald-50/50",
-      iconBg: "bg-emerald-50 text-[#0F5132]"
+    },
+    { 
+      name: "New", 
+      label: "New", 
+      icon: Clock,
     },
     { 
       name: "Tech", 
       label: "Technology", 
       icon: Cpu,
-      color: "bg-[#2563EB]", 
-      borderColor: "border-[#2563EB]", 
-      textColor: "text-[#2563EB]",
-      hoverBg: "hover:bg-blue-50/50",
-      iconBg: "bg-blue-50 text-[#2563EB]"
     },
     { 
       name: "Healthcare", 
       label: "Medical & Health", 
       icon: HeartPulse,
-      color: "bg-[#E11D48]", 
-      borderColor: "border-[#E11D48]", 
-      textColor: "text-[#E11D48]",
-      hoverBg: "hover:bg-rose-50/50",
-      iconBg: "bg-rose-50 text-[#E11D48]"
     },
     { 
       name: "Finance", 
       label: "Money & Finance", 
       icon: Banknote,
-      color: "bg-[#059669]", 
-      borderColor: "border-[#059669]", 
-      textColor: "text-[#059669]",
-      hoverBg: "hover:bg-teal-50/50",
-      iconBg: "bg-teal-50 text-[#059669]"
     },
     { 
       name: "AI & Analytics", 
       label: "Smart AI Systems", 
       icon: Sparkles,
-      color: "bg-[#7C3AED]", 
-      borderColor: "border-[#7C3AED]", 
-      textColor: "text-[#7C3AED]",
-      hoverBg: "hover:bg-violet-50/50",
-      iconBg: "bg-violet-50 text-[#7C3AED]"
     },
-    ...uniqueCategoryNames.map(name => getCategoryConfig(name))
+    ...uniqueCategoryNames.map(name => ({
+      name,
+      label: name,
+      icon: getCategoryIcon(name)
+    }))
   ];
 
   // Filter listings dynamically based on criteria
-  const filteredJobs = jobs.filter((job) => {
-    const matchesCategory = selectedCategory === "All" || job.category === selectedCategory;
-    const matchesSearch = 
-      job.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      job.company.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      job.description.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesCategory && matchesSearch;
-  });
+  const filteredJobs = (() => {
+    const list = jobs.filter((job) => {
+      let matchesCategory = false;
+      if (selectedCategory === "All") {
+        matchesCategory = true;
+      } else if (selectedCategory === "New") {
+        const sevenDaysAgo = Date.now() - (7 * 24 * 60 * 60 * 1000);
+        const hasRecent = jobs.some(j => j.createdAt && j.createdAt >= sevenDaysAgo);
+        if (hasRecent) {
+          matchesCategory = !!(job.createdAt && job.createdAt >= sevenDaysAgo);
+        } else {
+          const sortedByNewest = [...jobs].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+          const top5Ids = sortedByNewest.slice(0, 5).map(j => j.id);
+          matchesCategory = top5Ids.includes(job.id);
+        }
+      } else {
+        matchesCategory = job.category === selectedCategory;
+      }
+
+      const matchesSearch = 
+        job.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        job.company.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        job.description.toLowerCase().includes(searchQuery.toLowerCase());
+      return matchesCategory && matchesSearch;
+    });
+
+    if (selectedCategory === "New") {
+      return [...list].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    }
+    return list;
+  })();
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-10 pb-8 sm:pb-16 space-y-6">
       
       {/* Personalized Welcome Header Section */}
-      <section className="space-y-4 text-slate-900 border-b border-slate-100 pb-3 text-left">
+      <section className="space-y-4 text-slate-900 border-b border-slate-100 pb-3 text-left md:text-center md:flex md:flex-col md:items-center">
         <div className="flex items-center gap-2">
           <div className="p-1.5 bg-[#0F5132]/10 text-[#0F5132] rounded-lg">
             <Sparkle className="w-4 h-4" />
@@ -213,25 +165,22 @@ export const SeekerDashboardView: React.FC = () => {
           <h1 className="text-3xl sm:text-4xl font-display font-black tracking-tight text-slate-900">
             Welcome back, <span className="text-[#0F5132]">{currentUser?.displayName || "Seeker"}</span>!
           </h1>
-          <p className="text-sm text-slate-500 mt-1 max-w-2xl">
-            Browse premium open roles, refine listings with smart category filters, and message recruiters in real-time.
-          </p>
         </div>
       </section>
 
       {/* Main Discover Workspace Section */}
       <div id="jobs-explore" className="space-y-6 pt-0">
-        {/* Search Input bar - matching exact spec (rounded, thin dark solid border, lighter shadow, dark green search icon) */}
-        <div className="relative max-w-2xl bg-white border border-[#0F5132] p-2 rounded-[28px] shadow-none flex items-center gap-2">
-          <Search className="w-5 h-5 text-[#0F5132] ml-3 shrink-0" />
+        {/* Search Input bar - Hover & Focus scale / shadow enhancements */}
+        <div className="relative max-w-lg bg-white border border-[#0F5132] p-1.5 rounded-[24px] shadow-[0_16px_36px_-6px_rgba(15,81,50,0.03)] hover:border-[#0F5132] hover:shadow-[0_16px_40px_rgba(15,81,50,0.06)] focus-within:ring-4 focus-within:ring-[#0F5132]/10 focus-within:scale-[1.015] transition-all duration-300 flex items-center gap-2 md:mx-auto">
+          <Search className="w-4.5 h-4.5 text-[#0F5132] ml-3 shrink-0" />
           <input
             type="text"
             placeholder="Type any job title, skill, or company name..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full py-2 bg-transparent text-sm font-medium focus:outline-none text-slate-800 placeholder-slate-400"
+            className="w-full py-1 bg-transparent text-xs font-medium focus:outline-none text-slate-800 placeholder-slate-400"
           />
-          <span className="text-xs font-mono font-bold bg-[#FAFDFB] border border-emerald-150 text-[#0F5132] px-3.5 py-2 rounded-xl uppercase tracking-wider shrink-0 hidden sm:inline">
+          <span className="text-[10px] font-mono font-bold bg-[#FAFDFB] border border-emerald-150 text-[#0F5132] px-3 py-1.5 rounded-xl uppercase tracking-wider shrink-0 hidden sm:inline">
             {filteredJobs.length} Matches
           </span>
         </div>
@@ -242,30 +191,36 @@ export const SeekerDashboardView: React.FC = () => {
             Tap a Category Card to Filter
           </span>
           
-          {/* Horizontal Scrolling Carousel - matching cards with thin solid accent borders and no shadow */}
-          <div className="overflow-x-auto flex gap-3 pb-4 px-1 scrollbar-none snap-x snap-mandatory">
+          {/* Horizontal Scrolling Carousel with springy hover animations */}
+          <div className="overflow-x-auto flex gap-2 pb-4 px-1 scrollbar-none snap-x snap-mandatory">
             {CATEGORIES.map((cat) => {
               const IconComp = cat.icon;
               const isSelected = selectedCategory === cat.name;
               return (
-                <button
+                <motion.button
+                  whileHover={{ 
+                    scale: 1.05, 
+                    y: -2,
+                    boxShadow: isSelected ? "none" : "0 8px 20px -8px rgba(11, 60, 45, 0.2)"
+                  }}
+                  whileTap={{ scale: 0.95 }}
                   key={cat.name}
-                  onClick={() => setSelectedCategory(cat.name)}
-                  className={`w-[28%] min-w-[110px] sm:w-auto sm:flex-1 flex-shrink-0 flex flex-col items-center justify-center p-4 sm:p-5 rounded-2xl cursor-pointer transition-all snap-start select-none border text-center space-y-2.5 ${
+                  onClick={() => setSelectedCategory(isSelected ? "All" : cat.name)}
+                  className={`w-[20%] min-w-[80px] sm:w-auto sm:flex-1 flex-shrink-0 flex flex-col items-center justify-center p-2 sm:p-2.5 rounded-lg cursor-pointer transition-all snap-start select-none border text-center space-y-1.5 ${
                     isSelected
-                      ? `${cat.color} text-white ${cat.borderColor} shadow-none scale-[1.02]`
-                      : `bg-white ${cat.textColor} ${cat.borderColor} hover:bg-slate-50 hover:shadow-none`
+                      ? "bg-[#0B3C2D] text-white border-[#0B3C2D] shadow-none"
+                      : "bg-white text-[#0B3C2D] border-[#0B3C2D]/40 hover:bg-slate-50"
                   }`}
                 >
-                  <div className={`w-9 h-9 rounded-full flex items-center justify-center ${
-                    isSelected ? "bg-white/15 text-white" : cat.iconBg
+                  <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${
+                    isSelected ? "bg-white text-[#0B3C2D]" : "bg-[#0B3C2D] text-white"
                   }`}>
-                    <IconComp className="w-4.5 h-4.5" />
+                    <IconComp className="w-3 h-3" />
                   </div>
-                  <span className="text-xs font-sans font-extrabold tracking-tight block">
+                  <span className="text-[9px] sm:text-[11px] font-sans font-extrabold tracking-tight block">
                     {cat.label}
                   </span>
-                </button>
+                </motion.button>
               );
             })}
           </div>
@@ -273,7 +228,7 @@ export const SeekerDashboardView: React.FC = () => {
 
         {/* Job Accordions Feed */}
         <motion.div 
-          className="space-y-4 max-w-4xl text-left"
+          className="space-y-4 max-w-4xl text-left mx-auto"
           variants={containerVariants}
           initial="hidden"
           animate="show"
@@ -296,7 +251,7 @@ export const SeekerDashboardView: React.FC = () => {
           ) : (
             filteredJobs.map((job) => (
               <motion.div key={job.id} variants={itemVariants}>
-                <JobCard job={job} onImpressionsUpdate={loadJobs} />
+                <JobCard job={job} />
               </motion.div>
             ))
           )}

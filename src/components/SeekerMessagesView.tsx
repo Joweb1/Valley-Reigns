@@ -264,9 +264,9 @@ export const SeekerMessagesView: React.FC = () => {
   const isChatActive = !!activeConversation;
 
   return (
-    <div className={isChatActive ? "w-full h-full flex flex-col bg-white min-h-0" : "max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 pt-8 pb-10 flex flex-col"}>
+    <div className={isChatActive ? "w-full h-full md:h-auto md:max-w-7xl md:mx-auto md:px-4 sm:md:px-6 lg:md:px-8 md:pt-8 md:pb-10 flex flex-col bg-white min-h-0" : "max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 pt-8 pb-10 flex flex-col"}>
       {/* Main Split-Pane Workspace Frame */}
-      <div className={isChatActive ? "bg-white flex-grow flex flex-row relative overflow-hidden min-h-0" : "bg-white border border-slate-200/80 rounded-3xl shadow-sm h-[700px] flex flex-row relative overflow-hidden"}>
+      <div className={isChatActive ? "bg-white flex-grow flex flex-row relative overflow-hidden min-h-0 md:border md:border-slate-200/80 md:rounded-3xl md:shadow-sm md:h-[700px]" : "bg-white border border-slate-200/80 rounded-3xl shadow-sm h-[700px] flex flex-row relative overflow-hidden"}>
         
         {/* ========================================== */}
         {/* LEFT PANEL: Messaging Threads & Lists */}
@@ -289,13 +289,6 @@ export const SeekerMessagesView: React.FC = () => {
                 </span>
               </div>
             </div>
-            <Link 
-              to="/seeker"
-              className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-900 rounded-xl text-[10px] font-sans font-extrabold transition-all flex items-center gap-1 border border-slate-200/50 cursor-pointer shadow-sm"
-            >
-              <ArrowLeft className="w-3 h-3" />
-              Exit
-            </Link>
           </div>
 
           {/* List Scroll Container */}
@@ -392,9 +385,9 @@ export const SeekerMessagesView: React.FC = () => {
           {activeConversation ? (
             <motion.div
               key={activeConversation.chatId}
-              initial={{ x: "100%", opacity: 0.8 }}
-              animate={{ x: 0, opacity: 1 }}
-              transition={{ type: "spring", damping: 25, stiffness: 200 }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.25 }}
               className="flex-grow flex flex-col overflow-y-auto h-full relative pt-16 pb-48 md:overflow-y-hidden md:h-auto md:min-h-0 md:pt-0 md:pb-0 text-left"
             >
               {/* Active Conversation Metadata Header */}

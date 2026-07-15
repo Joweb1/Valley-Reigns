@@ -11,7 +11,14 @@ interface ProtectedRouteProps {
 export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowedRoles }) => {
   const { currentUser, loading } = useAuth();
   const location = useLocation();
-  const [isStandaloneOrFs, setIsStandaloneOrFs] = useState(false);
+  const [isStandaloneOrFs, setIsStandaloneOrFs] = useState(() => {
+    if (typeof window === "undefined") return false;
+    const isStandalone = 
+      window.matchMedia("(display-mode: standalone)").matches || 
+      (navigator as any).standalone === true;
+    const isFullscreen = !!document.fullscreenElement;
+    return isStandalone || isFullscreen;
+  });
 
   useEffect(() => {
     const checkMode = () => {

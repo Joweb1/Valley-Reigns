@@ -54,13 +54,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (profile) {
           const userEmail = profile.email || "";
           const isAdminEmail = adminEmails.includes(userEmail.toLowerCase());
+          let profileChanged = false;
           if (isAdminEmail && profile.role !== "admin") {
             profile.role = "admin";
             profile.canPostJobs = true;
-            await saveUserProfile(profile);
+            profileChanged = true;
           } else if (!isAdminEmail && profile.role === "admin") {
             profile.role = "seeker";
             profile.canPostJobs = false;
+            profileChanged = true;
+          }
+          if (user.photoURL && profile.photoURL !== user.photoURL) {
+            profile.photoURL = user.photoURL;
+            profileChanged = true;
+          }
+          if (profileChanged) {
             await saveUserProfile(profile);
           }
           setCurrentUser(profile);
@@ -74,7 +82,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             email: userEmail,
             displayName: user.displayName || userEmail.split("@")[0] || "User",
             role: isAdminEmail ? "admin" : "seeker",
-            canPostJobs: isAdminEmail ? true : false
+            canPostJobs: isAdminEmail ? true : false,
+            photoURL: user.photoURL || undefined
           };
           await saveUserProfile(newProfile);
           setCurrentUser(newProfile);
@@ -446,13 +455,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (profile) {
         const userEmail = profile.email || "";
         const isAdminEmail = adminEmails.includes(userEmail.toLowerCase());
+        let profileChanged = false;
         if (isAdminEmail && profile.role !== "admin") {
           profile.role = "admin";
           profile.canPostJobs = true;
-          await saveUserProfile(profile);
+          profileChanged = true;
         } else if (!isAdminEmail && profile.role === "admin") {
           profile.role = "seeker";
           profile.canPostJobs = false;
+          profileChanged = true;
+        }
+        if (user.photoURL && profile.photoURL !== user.photoURL) {
+          profile.photoURL = user.photoURL;
+          profileChanged = true;
+        }
+        if (profileChanged) {
           await saveUserProfile(profile);
         }
         setCurrentUser(profile);
@@ -464,7 +481,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           displayName: user.displayName || "Google Job Seeker",
           role: "seeker",
           canPostJobs: false,
-          authProvider: "google"
+          authProvider: "google",
+          photoURL: user.photoURL || undefined
         };
         await saveUserProfile(newProfile);
         setCurrentUser(newProfile);

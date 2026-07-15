@@ -31,15 +31,22 @@ const RecruiterDropdown: React.FC<{
   onSelect: (uid: string, displayName: string) => void;
   placeholder: string;
   label: string;
-}> = ({ currentOwnerId, staffList, getActiveChatsCount, onSelect, placeholder, label }) => {
+  onOpenChange?: (open: boolean) => void;
+}> = ({ currentOwnerId, staffList, getActiveChatsCount, onSelect, placeholder, label, onOpenChange }) => {
   const [isOpen, setIsOpen] = useState(false);
 
   const filteredStaff = currentOwnerId 
     ? staffList.filter(s => s.uid !== currentOwnerId)
     : staffList;
 
+  const toggleDropdown = () => {
+    const nextState = !isOpen;
+    setIsOpen(nextState);
+    if (onOpenChange) onOpenChange(nextState);
+  };
+
   return (
-    <div className="relative space-y-1 text-left w-full">
+    <div className={`relative space-y-1 text-left w-full ${isOpen ? "z-50" : "z-10"}`}>
       <label className="text-[9px] font-mono font-bold text-slate-400 uppercase tracking-wider block">
         {label}
       </label>
@@ -47,7 +54,7 @@ const RecruiterDropdown: React.FC<{
       {/* Trigger Button */}
       <button
         type="button"
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={toggleDropdown}
         className="w-full text-[10px] font-sans font-bold px-3 py-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 hover:border-slate-300 rounded-xl text-slate-700 flex items-center justify-between transition-all cursor-pointer shadow-sm select-none"
       >
         <span className="truncate">{placeholder}</span>
@@ -59,7 +66,10 @@ const RecruiterDropdown: React.FC<{
         <>
           {/* Backdrop layer to click-out */}
           <div 
-            onClick={() => setIsOpen(false)}
+            onClick={() => {
+              setIsOpen(false);
+              if (onOpenChange) onOpenChange(false);
+            }}
             className="fixed inset-0 z-30"
           />
           
@@ -78,6 +88,7 @@ const RecruiterDropdown: React.FC<{
                     onClick={() => {
                       onSelect(staff.uid, staff.displayName);
                       setIsOpen(false);
+                      if (onOpenChange) onOpenChange(false);
                     }}
                     className="w-full text-left px-3.5 py-2 text-[10px] font-sans font-bold text-slate-700 hover:bg-emerald-50/60 hover:text-emerald-950 transition-all flex items-center justify-between border-b border-slate-50 last:border-b-0 cursor-pointer"
                   >
@@ -108,6 +119,7 @@ export const TicketRoutingBoard: React.FC<TicketRoutingBoardProps> = ({
   // Tabs correspond to the 4 status types
   const [activeTab, setActiveTab] = useState<"pending" | "ongoing" | "finished" | "abandoned">("pending");
   const [expandedPendingChatId, setExpandedPendingChatId] = useState<string | null>(null);
+  const [activeDropdownChatId, setActiveDropdownChatId] = useState<string | null>(null);
 
   // Group counts
   const pendingChats = conversationsList.filter(c => c.status === "pending");
@@ -194,7 +206,13 @@ export const TicketRoutingBoard: React.FC<TicketRoutingBoardProps> = ({
                 <span>{tab.label}</span>
                 <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold ${
                   isActive 
-                    ? "bg-white/20 text-white" 
+                    ? tab.id === "pending"
+                      ? "bg-amber-900 text-white"
+                      : tab.id === "ongoing"
+                      ? "bg-blue-900 text-white"
+                      : tab.id === "finished"
+                      ? "bg-emerald-950 text-white"
+                      : "bg-rose-900 text-white"
                     : "bg-slate-200 text-slate-700"
                 }`}>
                   {count}
@@ -254,13 +272,16 @@ export const TicketRoutingBoard: React.FC<TicketRoutingBoardProps> = ({
                 >
                   {activeList.map((c) => {
                     const isExpanded = expandedPendingChatId === c.chatId;
+                    const isDropdownActive = activeDropdownChatId === c.chatId;
                     return (
                       <div 
                         key={c.chatId}
-                        className={`bg-white border rounded-2xl p-4.5 space-y-4 shadow-sm flex flex-col justify-between transition-all ${
-                          isExpanded 
-                            ? "border-[#0F5132]/30 shadow-[#0F5132]/5 bg-[#0F5132]/[0.01]" 
-                            : "border-slate-200/70 hover:border-slate-300"
+                        className={`bg-white border rounded-3xl p-6 space-y-4 transition-all duration-300 flex flex-col justify-between relative ${
+                          isDropdownActive
+                            ? "border-2 border-[#0F5132] shadow-lg z-50 bg-[#FAFDFB]"
+                            : isExpanded 
+                            ? "border-2 border-[#0F5132] shadow-md z-20 bg-[#FAFDFB]" 
+                            : "border border-[#0F5132]/30 hover:border-[#0F5132]/80 hover:shadow-md z-10"
                         }`}
                       >
                         {/* Header Details */}
@@ -325,6 +346,9 @@ export const TicketRoutingBoard: React.FC<TicketRoutingBoardProps> = ({
                               }}
                               placeholder="-- Force claim to staff --"
                               label="Force Assign Recruiter"
+                              onOpenChange={(isOpen) => {
+                                setActiveDropdownChatId(isOpen ? c.chatId : null);
+                              }}
                             />
                           </div>
                         )}
@@ -348,6 +372,9 @@ export const TicketRoutingBoard: React.FC<TicketRoutingBoardProps> = ({
                               }}
                               placeholder="-- Reassign to another recruiter... --"
                               label="Reallocate Conversation"
+                              onOpenChange={(isOpen) => {
+                                setActiveDropdownChatId(isOpen ? c.chatId : null);
+                              }}
                             />
                           </div>
                         )}

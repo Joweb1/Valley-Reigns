@@ -149,8 +149,8 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
       const alreadyToasted = sessionStorage.getItem("sw_registered_toast_shown");
       if (!alreadyToasted) {
         addToast(
-          "Service Worker Registered",
-          "Background synchronization active! Push notifications can now be received even if this tab is closed or minimized."
+          "Notification Access Available",
+          ""
         );
         sessionStorage.setItem("sw_registered_toast_shown", "true");
       }

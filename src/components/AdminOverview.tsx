@@ -174,7 +174,7 @@ export const AdminOverview: React.FC<AdminOverviewProps> = ({
       {/* ========================================== */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Card: Job Impressions */}
-        <div className="bg-white border border-slate-200/60 rounded-[28px] p-6 sm:p-8 shadow-[0_4px_20px_rgba(15,81,50,0.02)] flex items-start justify-between">
+        <div className="bg-white border border-slate-200/60 hover:border-[#0F5132]/30 rounded-[28px] p-6 sm:p-8 shadow-[0_4px_20px_rgba(15,81,50,0.02)] hover:shadow-[0_12px_30px_rgba(15,81,50,0.06)] hover:-translate-y-0.5 transition-all duration-300 flex items-start justify-between">
           <div className="space-y-2">
             <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-widest block leading-none">
               Aggregate Discovery
@@ -192,7 +192,7 @@ export const AdminOverview: React.FC<AdminOverviewProps> = ({
         </div>
 
         {/* Card: Registered Recruiters */}
-        <div className="bg-white border border-slate-200/60 rounded-[28px] p-6 sm:p-8 shadow-[0_4px_20px_rgba(15,81,50,0.02)] flex items-start justify-between">
+        <div className="bg-white border border-slate-200/60 hover:border-blue-500/30 rounded-[28px] p-6 sm:p-8 shadow-[0_4px_20px_rgba(15,81,50,0.02)] hover:shadow-[0_12px_30px_rgba(37,99,235,0.06)] hover:-translate-y-0.5 transition-all duration-300 flex items-start justify-between">
           <div className="space-y-2">
             <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-widest block leading-none">
               Operational Pool
@@ -210,7 +210,7 @@ export const AdminOverview: React.FC<AdminOverviewProps> = ({
         </div>
 
         {/* Card: Abandoned Tickets (SLA) */}
-        <div className="bg-white border border-slate-200/60 rounded-[28px] p-6 sm:p-8 shadow-[0_4px_20px_rgba(15,81,50,0.02)] flex items-start justify-between">
+        <div className="bg-white border border-slate-200/60 hover:border-red-500/30 rounded-[28px] p-6 sm:p-8 shadow-[0_4px_20px_rgba(15,81,50,0.02)] hover:shadow-[0_12px_30px_rgba(239,68,68,0.06)] hover:-translate-y-0.5 transition-all duration-300 flex items-start justify-between">
           <div className="space-y-2">
             <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-widest block leading-none">
               SLA Compliance

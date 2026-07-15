@@ -3,12 +3,12 @@ import { createPortal } from "react-dom";
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useNotification } from "../context/NotificationContext";
-import { Briefcase, MessageSquare, ShieldCheck, LogOut, Menu, X, UserPlus, User, Bell, Info, Plus, Search, Download, Settings, Cpu } from "lucide-react";
+import { Briefcase, MessageSquare, ShieldCheck, LogOut, Menu, X, UserPlus, User, Bell, Info, Plus, Search, Download, Settings, Cpu, ClipboardList, Users } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
-import { setStaffOnlineStatus } from "../lib/services";
+import { setStaffOnlineStatus, getAllUserProfiles } from "../lib/services";
 
 export const Header: React.FC = () => {
-  const { currentUser, loginWithGoogle, logout, updateUserPreference } = useAuth();
+  const { currentUser, firebaseUser, loginWithGoogle, logout, updateUserPreference } = useAuth();
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isInstalled, setIsInstalled] = useState(false);
@@ -30,6 +30,22 @@ export const Header: React.FC = () => {
   const [showAccountModal, setShowAccountModal] = useState(false);
   const [showNotificationsModal, setShowNotificationsModal] = useState(false);
   const [showAboutModal, setShowAboutModal] = useState(false);
+
+  const [totalUsers, setTotalUsers] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (currentUser?.role === "admin") {
+      const fetchUsers = async () => {
+        try {
+          const profiles = await getAllUserProfiles();
+          setTotalUsers(profiles.length);
+        } catch (error) {
+          console.error("Failed to load user count for header popup:", error);
+        }
+      };
+      fetchUsers();
+    }
+  }, [currentUser]);
 
   // Push notifications configuration state from global context
   const { 
@@ -73,7 +89,7 @@ export const Header: React.FC = () => {
     return () => window.removeEventListener("staff-status-changed", handleStatusChange);
   }, []);
 
-  const isDashboardPage = location.pathname === "/seeker" || location.pathname === "/seeker/messages" || location.pathname === "/staff" || location.pathname === "/admin";
+  const isDashboardPage = location.pathname === "/seeker" || location.pathname === "/seeker/messages" || location.pathname === "/seeker/notifications" || location.pathname === "/staff" || location.pathname === "/admin" || location.pathname === "/staff/manage-jobs" || location.pathname === "/admin/manage-jobs" || location.pathname === "/staff/notifications" || location.pathname === "/admin/notifications";
 
   const handleFindJobsClick = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -93,24 +109,54 @@ export const Header: React.FC = () => {
       <header id="app-header" className="sticky top-4 z-40 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
         <div className="bg-white/95 backdrop-blur-md border border-slate-200/60 rounded-[28px] shadow-[0_24px_55px_-10px_rgba(15,81,50,0.12),0_12px_24px_-12px_rgba(15,81,50,0.08)] px-4 sm:px-6 h-16 flex items-center justify-between relative">
           
-          {/* Left: Companies logo only */}
-          <Link to={currentUser?.role === "seeker" ? "/seeker" : "/staff"} className="flex items-center group">
-            <div className="w-10 h-10 bg-[#0F5132] rounded-xl flex items-center justify-center shadow-md shadow-emerald-900/10 group-hover:scale-105 transition-all duration-300">
-              <Briefcase className="w-5 h-5 text-white" />
-            </div>
-          </Link>
+          {/* Left: Companies logo and Administration tag */}
+          <div className="flex items-center gap-3">
+            <Link to={currentUser?.role === "seeker" ? "/seeker" : "/staff"} className="flex items-center group">
+              <div className="w-10 h-10 bg-[#0F5132] rounded-xl flex items-center justify-center shadow-md shadow-emerald-900/10 group-hover:scale-105 transition-all duration-300">
+                <Briefcase className="w-5 h-5 text-white" />
+              </div>
+            </Link>
+            {currentUser?.role === "admin" && (
+              <span className="text-sm font-sans font-black tracking-tight text-slate-800 border-l border-slate-200 pl-3">
+                Administration
+              </span>
+            )}
+            {currentUser?.role === "staff" && (
+              <span className="text-sm font-sans font-black tracking-tight text-slate-800 border-l border-slate-200 pl-3">
+                Staff
+              </span>
+            )}
+            {(!currentUser || currentUser?.role === "seeker") && (
+              <span className="text-sm font-sans font-black tracking-tight text-slate-800 border-l border-slate-200 pl-3">
+                Find Jobs
+              </span>
+            )}
+          </div>
 
           {/* Right: Message icon and Profile Avatar */}
           <div className="flex items-center gap-3">
-            {/* Message Icon */}
-            {location.pathname !== "/admin" && (
+            {/* Seeker Notifications Bell Icon */}
+            {currentUser?.role === "seeker" && (
               <Link
-                to={currentUser?.role === "seeker" ? "/seeker/messages" : "/staff"}
-                className="w-10 h-10 flex items-center justify-center text-[#0B3C49] hover:bg-slate-100 rounded-xl transition-all relative cursor-pointer"
-                title="Messages"
+                to="/seeker/notifications"
+                className="w-10 h-10 flex items-center justify-center text-[#0B3C49] hover:bg-slate-100 rounded-xl transition-all relative cursor-pointer hover:scale-105 active:scale-95"
+                title="Notifications"
+                id="seeker-header-notif-btn"
               >
-                <MessageSquare className="w-5 h-5" />
+                <Bell className="w-5 h-5" />
                 <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-[#0F5132] rounded-full animate-pulse" />
+              </Link>
+            )}
+
+            {/* Staff Notifications Bell Icon */}
+            {currentUser?.role === "staff" && (
+              <Link
+                to="/staff/notifications"
+                className="w-10 h-10 flex items-center justify-center text-[#0B3C49] hover:bg-slate-100 rounded-xl transition-all relative cursor-pointer hover:scale-105 active:scale-95"
+                title="Staff Notifications"
+              >
+                <Bell className="w-5 h-5" />
+                <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-rose-600 rounded-full animate-pulse" />
               </Link>
             )}
 
@@ -118,7 +164,7 @@ export const Header: React.FC = () => {
             {currentUser?.role === "admin" && (
               <Link
                 to="/admin/notifications"
-                className="w-10 h-10 flex items-center justify-center text-[#0B3C49] hover:bg-slate-100 rounded-xl transition-all relative cursor-pointer"
+                className="w-10 h-10 flex items-center justify-center text-[#0B3C49] hover:bg-slate-100 rounded-xl transition-all relative cursor-pointer hover:scale-105 active:scale-95"
                 title="System Notifications"
               >
                 <Bell className="w-5 h-5" />
@@ -126,18 +172,17 @@ export const Header: React.FC = () => {
               </Link>
             )}
 
-            {/* User Profile Avatar */}
+            {/* User Profile Avatar - replaced with deep green user icon button with no bg or shadows */}
             <div className="relative">
-              <button
+              <motion.button
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.93 }}
                 onClick={() => setProfilePopupOpen(!profilePopupOpen)}
-                className="w-10 h-10 rounded-xl border border-slate-200 hover:border-[#0F5132] bg-[#0F5132]/5 flex items-center justify-center text-[#0F5132] font-bold text-xs shadow-sm hover:shadow-md transition-all cursor-pointer relative overflow-hidden font-mono"
+                className="p-2 text-[#0F5132] bg-transparent border-0 shadow-none transition-all cursor-pointer flex items-center justify-center focus:outline-none"
+                title="User Menu"
               >
-                {currentUser?.displayName ? (
-                  currentUser.displayName.split(" ").map(n => n[0]).join("").substring(0, 2).toUpperCase()
-                ) : (
-                  "U"
-                )}
-              </button>
+                <User className="w-6 h-6 text-[#0F5132]" />
+              </motion.button>
 
               {/* Seeker / Staff Tooltip Popup Menu */}
               <AnimatePresence>
@@ -155,13 +200,22 @@ export const Header: React.FC = () => {
                       animate={{ opacity: 1, scale: 1, y: 0 }}
                       exit={{ opacity: 0, scale: 0.92, y: 10 }}
                       transition={{ type: "spring", duration: 0.3 }}
-                      className="absolute right-0 mt-3 w-64 bg-white/95 backdrop-blur-md border border-slate-200/60 rounded-3xl shadow-[0_24px_50px_rgba(15,81,50,0.18),0_1px_3px_rgba(0,0,0,0.05)] p-2 z-50 overflow-hidden"
+                      className="absolute right-[-8px] mt-3 w-64 bg-white/95 backdrop-blur-md border border-slate-200/60 rounded-xl shadow-[0_24px_50px_rgba(15,81,50,0.18),0_1px_3px_rgba(0,0,0,0.05)] p-2 z-50 overflow-hidden"
                     >
                     {/* User profile header inside popup */}
                     <div className="px-3.5 py-3 border-b border-slate-100 mb-2 flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-[#0F5132] to-[#20c997] text-white flex items-center justify-center font-bold text-sm shadow-sm select-none font-sans">
-                        {currentUser?.displayName ? currentUser.displayName[0].toUpperCase() : "U"}
-                      </div>
+                      {firebaseUser?.photoURL || currentUser?.photoURL ? (
+                        <img 
+                          src={firebaseUser?.photoURL || currentUser?.photoURL} 
+                          alt={currentUser?.displayName || "User"} 
+                          className="w-9 h-9 rounded-full object-cover shadow-sm select-none"
+                          referrerPolicy="no-referrer"
+                        />
+                      ) : (
+                        <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-[#0F5132] to-[#20c997] text-white flex items-center justify-center font-bold text-sm shadow-sm select-none font-sans">
+                          {currentUser?.displayName ? currentUser.displayName[0].toUpperCase() : "U"}
+                        </div>
+                      )}
                       <div className="flex-1 min-w-0">
                         <p className="text-xs font-bold text-slate-800 truncate leading-snug">{currentUser?.displayName}</p>
                         <p className="text-[10px] text-slate-400 font-medium truncate mt-0.5 leading-none font-mono">{currentUser?.email}</p>
@@ -178,164 +232,25 @@ export const Header: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* Seeker Dashboard & Find Jobs Switcher */}
-                    {currentUser?.role === "seeker" && (
-                      <div className="px-1.5 py-1 space-y-1">
-                        <div className="text-[9px] font-mono font-bold text-slate-400 uppercase tracking-wider px-2 mb-1">
-                          Workspace Navigation
+                    {/* Total User Count for Admin */}
+                    {currentUser?.role === "admin" && totalUsers !== null && (
+                      <div className="px-1.5 py-1">
+                        <div className="px-3 py-2 bg-purple-50/70 border border-purple-100 rounded-2xl mx-1 mb-2 flex items-center justify-between">
+                          <div className="flex items-center gap-2 text-purple-950 font-bold text-xs">
+                            <Users className="w-4 h-4 text-purple-700" />
+                            <span>Users Registered</span>
+                          </div>
+                          <span className="font-mono font-black text-purple-950 text-xs bg-white border border-purple-200 px-2 py-0.5 rounded-lg shadow-sm">
+                            {totalUsers}
+                          </span>
                         </div>
-                        <Link
-                          to="/seeker"
-                          onClick={() => setProfilePopupOpen(false)}
-                          className={`w-full text-left px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2.5 cursor-pointer ${
-                            location.pathname === "/seeker"
-                              ? "bg-emerald-50 text-[#0F5132]"
-                              : "text-slate-600 hover:bg-slate-50 hover:text-[#0F5132]"
-                          }`}
-                        >
-                          <Briefcase className="w-4 h-4 text-[#0F5132] shrink-0" />
-                          <span>Find Jobs / Dashboard</span>
-                        </Link>
-                        <div className="border-t border-slate-100 my-1.5"></div>
                       </div>
                     )}
 
-                    {/* Staff Live Inbox & Job Posting Switchers */}
+                    {/* Staff Online Status Switcher */}
                     {(currentUser?.role === "staff" || currentUser?.role === "admin") && (
                       <div className="px-1.5 py-1 space-y-1">
-                        <div className="text-[9px] font-mono font-bold text-slate-400 uppercase tracking-wider px-2 mb-1">
-                          Workspace Navigation
-                        </div>
-                        {currentUser?.role === "admin" ? (
-                          <>
-                            <Link
-                              to="/admin"
-                              onClick={() => setProfilePopupOpen(false)}
-                              className={`w-full text-left px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2.5 cursor-pointer ${
-                                location.pathname === "/admin"
-                                  ? "bg-emerald-50 text-[#0F5132]"
-                                  : "text-slate-600 hover:bg-slate-50 hover:text-[#0F5132]"
-                              }`}
-                            >
-                              <ShieldCheck className="w-4 h-4 text-[#0F5132] shrink-0" />
-                              <span>Admin Control</span>
-                            </Link>
-                            <Link
-                              to="/admin/post-jobs"
-                              onClick={() => setProfilePopupOpen(false)}
-                              className={`w-full text-left px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2.5 cursor-pointer ${
-                                location.pathname === "/admin/post-jobs"
-                                  ? "bg-emerald-50 text-[#0F5132]"
-                                  : "text-slate-600 hover:bg-slate-50 hover:text-[#0F5132]"
-                              }`}
-                            >
-                              <Plus className="w-4 h-4 text-[#0F5132] shrink-0" />
-                              <span>Post New Job</span>
-                            </Link>
-                            <Link
-                              to="/admin/manage-jobs"
-                              onClick={() => setProfilePopupOpen(false)}
-                              className={`w-full text-left px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2.5 cursor-pointer ${
-                                location.pathname === "/admin/manage-jobs"
-                                  ? "bg-emerald-50 text-[#0F5132]"
-                                  : "text-slate-600 hover:bg-slate-50 hover:text-[#0F5132]"
-                              }`}
-                            >
-                              <Briefcase className="w-4 h-4 text-[#0F5132] shrink-0" />
-                              <span>Manage Jobs</span>
-                            </Link>
-                            <Link
-                              to="/admin/whatsapp-config"
-                              onClick={() => setProfilePopupOpen(false)}
-                              className={`w-full text-left px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2.5 cursor-pointer ${
-                                location.pathname === "/admin/whatsapp-config"
-                                  ? "bg-emerald-50 text-[#0F5132]"
-                                  : "text-slate-600 hover:bg-slate-50 hover:text-[#0F5132]"
-                              }`}
-                            >
-                              <Settings className="w-4 h-4 text-[#0F5132] shrink-0" />
-                              <span>WhatsApp Config</span>
-                            </Link>
-                            <Link
-                              to="/admin/diagnostics"
-                              onClick={() => setProfilePopupOpen(false)}
-                              className={`w-full text-left px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2.5 cursor-pointer ${
-                                location.pathname === "/admin/diagnostics"
-                                  ? "bg-emerald-50 text-[#0F5132]"
-                                  : "text-slate-600 hover:bg-slate-50 hover:text-[#0F5132]"
-                              }`}
-                            >
-                              <Cpu className="w-4 h-4 text-[#0F5132] shrink-0" />
-                              <span>Dev & Diagnostics Center</span>
-                            </Link>
-                            <Link
-                              to="/seeker"
-                              onClick={() => setProfilePopupOpen(false)}
-                              className={`w-full text-left px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2.5 cursor-pointer ${
-                                location.pathname === "/seeker"
-                                  ? "bg-emerald-50 text-[#0F5132]"
-                                  : "text-slate-600 hover:bg-slate-50 hover:text-[#0F5132]"
-                              }`}
-                            >
-                              <Search className="w-4 h-4 text-[#0F5132] shrink-0" />
-                              <span>Find Jobs</span>
-                            </Link>
-                          </>
-                        ) : (
-                          <>
-                            <Link
-                              to="/staff?tab=inbox"
-                              onClick={() => setProfilePopupOpen(false)}
-                              className={`w-full text-left px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2.5 cursor-pointer ${
-                                location.pathname === "/staff" && (!location.search || location.search.includes("tab=inbox"))
-                                  ? "bg-emerald-50 text-[#0F5132]"
-                                  : "text-slate-600 hover:bg-slate-50 hover:text-[#0F5132]"
-                              }`}
-                            >
-                              <MessageSquare className="w-4 h-4 text-[#0F5132] shrink-0" />
-                              <span>Live Inbox Logs</span>
-                            </Link>
-                            <Link
-                              to="/staff?tab=post-job"
-                              onClick={() => setProfilePopupOpen(false)}
-                              className={`w-full text-left px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2.5 cursor-pointer ${
-                                location.pathname === "/staff" && location.search.includes("tab=post-job")
-                                  ? "bg-emerald-50 text-[#0F5132]"
-                                  : "text-slate-600 hover:bg-slate-50 hover:text-[#0F5132]"
-                              }`}
-                            >
-                              <Plus className="w-4 h-4 text-[#0F5132] shrink-0" />
-                              <span>Post New Job</span>
-                            </Link>
-                            <Link
-                              to="/staff/manage-jobs"
-                              onClick={() => setProfilePopupOpen(false)}
-                              className={`w-full text-left px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2.5 cursor-pointer ${
-                                location.pathname === "/staff/manage-jobs"
-                                  ? "bg-emerald-50 text-[#0F5132]"
-                                  : "text-slate-600 hover:bg-slate-50 hover:text-[#0F5132]"
-                              }`}
-                            >
-                              <Briefcase className="w-4 h-4 text-[#0F5132] shrink-0" />
-                              <span>Job Management</span>
-                            </Link>
-                            <Link
-                              to="/seeker"
-                              onClick={() => setProfilePopupOpen(false)}
-                              className={`w-full text-left px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2.5 cursor-pointer ${
-                                location.pathname === "/seeker"
-                                  ? "bg-emerald-50 text-[#0F5132]"
-                                  : "text-slate-600 hover:bg-slate-50 hover:text-[#0F5132]"
-                              }`}
-                            >
-                              <Search className="w-4 h-4 text-[#0F5132] shrink-0" />
-                              <span>Find Jobs</span>
-                            </Link>
-                          </>
-                        )}
-
-                        {/* Staff Online Status Switcher */}
-                        <div className="px-3 py-2 bg-slate-50/80 border border-slate-100 rounded-2xl flex items-center justify-between mt-1.5">
+                        <div className="px-3 py-2 bg-slate-50/80 border border-slate-100 rounded-2xl flex items-center justify-between mx-1 mb-1">
                           <div className="flex flex-col text-left">
                             <span className="text-[10px] font-bold text-slate-700">Staff Status</span>
                             <span className="text-[8px] font-mono font-medium text-slate-400">
@@ -346,9 +261,11 @@ export const Header: React.FC = () => {
                             onClick={async () => {
                               const nextStatus = !isStaffOnlineState;
                               setIsStaffOnlineState(nextStatus);
-                              localStorage.setItem(`staff_online_${currentUser.uid}`, nextStatus ? "online" : "offline");
-                              await setStaffOnlineStatus(currentUser.uid, nextStatus);
-                              window.dispatchEvent(new CustomEvent("staff-status-changed", { detail: nextStatus }));
+                              if (currentUser?.uid) {
+                                localStorage.setItem(`staff_online_${currentUser.uid}`, nextStatus ? "online" : "offline");
+                                await setStaffOnlineStatus(currentUser.uid, nextStatus);
+                                window.dispatchEvent(new CustomEvent("staff-status-changed", { detail: nextStatus }));
+                              }
                             }}
                             className={`w-10 h-5 rounded-full p-0.5 transition-colors focus:outline-none flex items-center cursor-pointer ${
                               isStaffOnlineState ? "bg-emerald-500" : "bg-slate-300"
@@ -361,138 +278,88 @@ export const Header: React.FC = () => {
                             />
                           </button>
                         </div>
-                        <div className="border-t border-slate-100 my-1.5"></div>
                       </div>
                     )}
 
-                    <button
-                      onClick={() => {
-                        setProfilePopupOpen(false);
-                        setShowAccountModal(true);
-                      }}
-                      className="w-full text-left px-3.5 py-2 hover:bg-slate-50 text-xs font-bold text-slate-600 hover:text-[#0F5132] transition-all rounded-xl flex items-center gap-3 cursor-pointer group border-0 bg-transparent"
-                    >
-                      <div className="w-7 h-7 rounded-lg bg-slate-50 group-hover:bg-[#0F5132]/10 text-slate-400 group-hover:text-[#0F5132] flex items-center justify-center transition-colors">
-                        <User className="w-3.5 h-3.5" />
-                      </div>
-                      <span>Account Details</span>
-                    </button>
-
-                    <button
-                      onClick={() => {
-                        setProfilePopupOpen(false);
-                        setShowNotificationsModal(true);
-                      }}
-                      className="w-full text-left px-3.5 py-2 hover:bg-slate-50 text-xs font-bold text-slate-600 hover:text-[#0F5132] transition-all rounded-xl flex items-center justify-between cursor-pointer group border-0 bg-transparent"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="w-7 h-7 rounded-lg bg-slate-50 group-hover:bg-[#0F5132]/10 text-slate-400 group-hover:text-[#0F5132] flex items-center justify-center transition-colors">
-                          <Bell className="w-3.5 h-3.5" />
-                        </div>
-                        <span>Notifications</span>
-                      </div>
-                      <span className="bg-rose-100 text-rose-700 text-[9px] font-bold font-mono px-2 py-0.5 rounded-full select-none">New</span>
-                    </button>
-
-                    <button
-                      onClick={() => {
-                        setProfilePopupOpen(false);
-                        setShowAboutModal(true);
-                      }}
-                      className="w-full text-left px-3.5 py-2 hover:bg-slate-50 text-xs font-bold text-slate-600 hover:text-[#0F5132] transition-all rounded-xl flex items-center gap-3 cursor-pointer group border-0 bg-transparent"
-                    >
-                      <div className="w-7 h-7 rounded-lg bg-slate-50 group-hover:bg-[#0F5132]/10 text-slate-400 group-hover:text-[#0F5132] flex items-center justify-center transition-colors">
-                        <Info className="w-3.5 h-3.5" />
-                      </div>
-                      <span>About Valley Reigns</span>
-                    </button>
-
                     {/* Messaging Preference Toggle Switch */}
                     {currentUser && (
-                      <div className="px-3.5 py-2.5 bg-slate-50/50 border border-slate-100 rounded-2xl mx-1 my-1 flex items-center justify-between">
-                        <div className="flex flex-col text-left">
-                          <span className="text-[10px] font-bold text-slate-700">Messaging Pipeline</span>
-                          <span className="text-[8px] font-mono font-medium text-slate-400">
-                            {currentUser.messagingPreference === "in-app" ? "In-App Mode" : "WhatsApp Mode"}
-                          </span>
-                        </div>
-                        <button
-                          onClick={async () => {
-                            const nextPref = currentUser.messagingPreference === "in-app" ? "whatsapp" : "in-app";
-                            if (updateUserPreference) {
-                              await updateUserPreference(nextPref);
-                            }
-                          }}
-                          className={`w-10 h-5 rounded-full p-0.5 transition-colors focus:outline-none flex items-center cursor-pointer ${
-                            currentUser.messagingPreference === "in-app" ? "bg-[#0F5132]" : "bg-slate-300"
-                          }`}
-                        >
-                          <div
-                            className={`w-4 h-4 rounded-full bg-white shadow-sm transform duration-200 ${
-                              currentUser.messagingPreference === "in-app" ? "translate-x-5" : "translate-x-0"
+                      <div className="px-1.5 py-1">
+                        <div className="px-3 py-2 bg-slate-50/50 border border-slate-100 rounded-2xl mx-1 mb-1 flex items-center justify-between">
+                          <div className="flex flex-col text-left">
+                            <span className="text-[10px] font-bold text-slate-700">Messaging Pipeline</span>
+                            <span className="text-[8px] font-mono font-medium text-slate-400">
+                              {currentUser.messagingPreference === "in-app" ? "In-App Mode" : "WhatsApp Mode"}
+                            </span>
+                          </div>
+                          <button
+                            onClick={async () => {
+                              const nextPref = currentUser.messagingPreference === "in-app" ? "whatsapp" : "in-app";
+                              if (updateUserPreference) {
+                                await updateUserPreference(nextPref);
+                              }
+                            }}
+                            className={`w-10 h-5 rounded-full p-0.5 transition-colors focus:outline-none flex items-center cursor-pointer ${
+                              currentUser.messagingPreference === "in-app" ? "bg-[#0F5132]" : "bg-slate-300"
                             }`}
-                          />
-                        </button>
+                          >
+                            <div
+                              className={`w-4 h-4 rounded-full bg-white shadow-sm transform duration-200 ${
+                                currentUser.messagingPreference === "in-app" ? "translate-x-5" : "translate-x-0"
+                              }`}
+                            />
+                          </button>
+                        </div>
                       </div>
                     )}
 
                     {/* Push Notifications Toggle Switch */}
                     {currentUser && (
-                      <div className="px-3.5 py-2.5 bg-slate-50/50 border border-slate-100 rounded-2xl mx-1 my-1 flex items-center justify-between">
-                        <div className="flex flex-col text-left">
-                          <span className="text-[10px] font-bold text-slate-700">Push Notifications</span>
-                          <span className="text-[8px] font-mono font-medium text-slate-400">
-                            {pushNotificationsEnabled
-                              ? (localStorage.getItem("push_notifications_simulated") === "true" ? "ACTIVE (SIMULATED)" : "ACTIVE")
-                              : "DISABLED"}
-                          </span>
-                        </div>
-                        <button
-                          onClick={handleTogglePushNotifications}
-                          className={`w-10 h-5 rounded-full p-0.5 transition-colors focus:outline-none flex items-center cursor-pointer ${
-                            pushNotificationsEnabled
-                              ? "bg-[#0F5132]"
-                              : "bg-slate-300"
-                          }`}
-                        >
-                          <div
-                            className={`w-4 h-4 rounded-full bg-white shadow-sm transform duration-200 ${
-                              pushNotificationsEnabled ? "translate-x-5" : "translate-x-0"
+                      <div className="px-1.5 py-1">
+                        <div className="px-3 py-2 bg-slate-50/50 border border-slate-100 rounded-2xl mx-1 mb-1 flex items-center justify-between">
+                          <div className="flex flex-col text-left">
+                            <span className="text-[10px] font-bold text-slate-700">Push Notifications</span>
+                            <span className="text-[8px] font-mono font-medium text-slate-400">
+                              {pushNotificationsEnabled
+                                ? (localStorage.getItem("push_notifications_simulated") === "true" ? "ACTIVE (SIMULATED)" : "ACTIVE")
+                                : "DISABLED"}
+                            </span>
+                          </div>
+                          <button
+                            onClick={handleTogglePushNotifications}
+                            className={`w-10 h-5 rounded-full p-0.5 transition-colors focus:outline-none flex items-center cursor-pointer ${
+                              pushNotificationsEnabled
+                                ? "bg-[#0F5132]"
+                                : "bg-slate-300"
                             }`}
-                          />
-                        </button>
+                          >
+                            <div
+                              className={`w-4 h-4 rounded-full bg-white shadow-sm transform duration-200 ${
+                                pushNotificationsEnabled ? "translate-x-5" : "translate-x-0"
+                              }`}
+                            />
+                          </button>
+                        </div>
                       </div>
                     )}
 
-                    {!isInstalled && (
-                      <button
+                    <div className="border-t border-slate-100 my-1.5 mx-1"></div>
+
+                    <div className="px-1.5 py-1">
+                      <motion.button
+                        whileHover={{ scale: 1.02, x: 2 }}
+                        whileTap={{ scale: 0.98 }}
                         onClick={() => {
                           setProfilePopupOpen(false);
-                          window.dispatchEvent(new CustomEvent("trigger-pwa-install"));
+                          logout();
                         }}
-                        className="w-full text-left px-3.5 py-2 hover:bg-emerald-50/60 text-xs font-bold text-slate-600 hover:text-[#0F5132] transition-all rounded-xl flex items-center gap-3 cursor-pointer group border-0 bg-transparent"
+                        className="w-full text-left px-3.5 py-2 hover:bg-rose-50/65 text-xs font-bold text-rose-600 transition-all rounded-xl flex items-center gap-3 cursor-pointer group border-0 bg-transparent"
                       >
-                        <div className="w-7 h-7 rounded-lg bg-slate-50 group-hover:bg-[#0F5132]/10 text-slate-400 group-hover:text-[#0F5132] flex items-center justify-center transition-colors">
-                          <Download className="w-3.5 h-3.5" />
+                        <div className="w-7 h-7 rounded-lg bg-rose-50 text-rose-500 group-hover:bg-rose-500 group-hover:text-white flex items-center justify-center transition-colors">
+                          <LogOut className="w-3.5 h-3.5" />
                         </div>
-                        <span>Install App</span>
-                      </button>
-                    )}
-
-                    <div className="border-t border-slate-100 my-1.5"></div>
-
-                    <button
-                      onClick={() => {
-                        setProfilePopupOpen(false);
-                        logout();
-                      }}
-                      className="w-full text-left px-3.5 py-2 hover:bg-rose-50/65 text-xs font-bold text-rose-600 transition-all rounded-xl flex items-center gap-3 cursor-pointer group border-0 bg-transparent"
-                    >
-                      <div className="w-7 h-7 rounded-lg bg-rose-50 text-rose-500 group-hover:bg-rose-500 group-hover:text-white flex items-center justify-center transition-colors">
-                        <LogOut className="w-3.5 h-3.5" />
-                      </div>
-                      <span>Sign Out</span>
-                    </button>
+                        <span>Sign Out</span>
+                      </motion.button>
+                    </div>
                   </motion.div>
                 </>
               )}
@@ -650,7 +517,7 @@ export const Header: React.FC = () => {
             <Briefcase className="w-4.5 h-4.5 text-white" />
           </div>
           <div>
-            <span className="text-base sm:text-lg font-serif italic font-extrabold tracking-wide text-[#0B3C49] group-hover:text-[#0F5132] transition-colors">
+            <span className="text-base sm:text-lg font-display font-black tracking-tight text-[#0B3C49] group-hover:text-[#0F5132] transition-colors">
               Valley Reigns
             </span>
           </div>
@@ -738,7 +605,7 @@ export const Header: React.FC = () => {
               </div>
               <button
                 onClick={() => logout()}
-                className="w-9 h-9 flex items-center justify-center text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all cursor-pointer border border-transparent hover:border-rose-100"
+                className="w-9 h-9 flex items-center justify-center text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all cursor-pointer border border-transparent hover:border-rose-100 hover:scale-105 active:scale-95"
                 title="Log Out"
               >
                 <LogOut className="w-4 h-4" />
@@ -747,7 +614,7 @@ export const Header: React.FC = () => {
           ) : (
             <button
               onClick={() => window.dispatchEvent(new CustomEvent("open-auth-modal"))}
-              className="px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold shadow-sm transition-all flex items-center gap-2 cursor-pointer"
+              className="px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 hover:border-slate-300 rounded-xl text-xs font-bold shadow-sm transition-all flex items-center gap-2 cursor-pointer hover:scale-[1.03] active:scale-97"
             >
               <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24">
                 <path
@@ -781,7 +648,7 @@ export const Header: React.FC = () => {
           )}
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="p-2 text-[#0B3C49] hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+            className="p-2 text-[#0B3C49] hover:bg-slate-100 rounded-xl transition-all cursor-pointer hover:scale-105 active:scale-95"
             aria-label="Toggle Menu"
           >
             {mobileMenuOpen ? <X className="w-7 h-7" /> : <Menu className="w-7 h-7" />}
@@ -815,13 +682,22 @@ export const Header: React.FC = () => {
               </button>
 
               {currentUser?.role === "staff" && (
-                <Link
-                  to="/staff"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="block px-4 py-2.5 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-50"
-                >
-                  Recruiter Dashboard
-                </Link>
+                <>
+                  <Link
+                    to="/staff"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="block px-4 py-2.5 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-50"
+                  >
+                    Recruiter Dashboard
+                  </Link>
+                  <Link
+                    to="/staff?tab=report"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="block px-4 py-2.5 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-50"
+                  >
+                    Daily Staff Report
+                  </Link>
+                </>
               )}
 
               {currentUser?.role === "admin" && (

@@ -87,6 +87,27 @@ service cloud.firestore {
         && sub.createdAt is int;
     }
 
+    // Validation Blueprint for Daily Report
+    function isValidDailyReport(report) {
+      return report.keys().hasAll(['id', 'uid', 'staffName', 'date', 'timestamp', 'newReachOuts', 'resumptions', 'cvsCollected', 'candidatesRegistered', 'addressesGiven', 'challenges', 'plansTomorrow', 'chatsClearedConfirmed', 'targetReachOutsMet', 'targetAddressesMet', 'targetOnTimeMet'])
+        && report.id is string
+        && report.uid is string
+        && report.staffName is string
+        && report.date is string
+        && report.timestamp is int
+        && report.newReachOuts is int
+        && report.resumptions is int
+        && report.cvsCollected is int
+        && report.candidatesRegistered is int
+        && report.addressesGiven is int
+        && report.challenges is string
+        && report.plansTomorrow is string
+        && report.chatsClearedConfirmed is bool
+        && report.targetReachOutsMet is bool
+        && report.targetAddressesMet is bool
+        && report.targetOnTimeMet is bool;
+    }
+
     // ==========================================
     // Jobs Collection Rules
     // ==========================================
@@ -151,6 +172,17 @@ service cloud.firestore {
     // ==========================================
     match /system_notifications/{notificationId} {
       allow read, write: if true;
+    }
+
+    // ==========================================
+    // Daily Reports Rules
+    // ==========================================
+    match /daily_reports/{reportId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if isSignedIn() && isValidId(reportId) && isValidDailyReport(request.resource.data);
+      allow update: if isSignedIn() && isValidId(reportId) && isValidDailyReport(request.resource.data);
+      allow delete: if isAdmin();
     }
   }
 }

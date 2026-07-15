@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Job, UserProfile, Conversation, DailyStat } from "../types";
+import { Job, UserProfile, Conversation, DailyStat, StaffDailyReport } from "../types";
 import { 
   getStaffProfiles, 
   toggleStaffJobPosting, 
@@ -7,7 +7,9 @@ import {
   forceReassignConversation,
   updateConversationStatus,
   getStaffStatuses,
-  getDailyStats
+  getDailyStats,
+  subscribeToDailyReports,
+  getAllUserProfiles
 } from "../lib/services";
 import { 
   BarChart3, 
@@ -28,10 +30,18 @@ import {
   CheckCircle2,
   Calendar,
   Bell,
-  Briefcase
+  Briefcase,
+  ClipboardList,
+  Search,
+  MessageSquare,
+  LayoutGrid,
+  List,
+  Filter
 } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "motion/react";
+import { JobManagement } from "./JobManagement";
+import { AdminPostJobPage } from "./AdminPostJobPage";
 import { 
   ResponsiveContainer, 
   LineChart, 
@@ -61,27 +71,34 @@ const RecruiterDropdown: React.FC<{
   onSelect: (uid: string, displayName: string) => void;
   placeholder: string;
   label: string;
-}> = ({ currentOwnerId, staffList, getActiveChatsCount, onSelect, placeholder, label }) => {
+  onOpenChange?: (open: boolean) => void;
+}> = ({ currentOwnerId, staffList, getActiveChatsCount, onSelect, placeholder, label, onOpenChange }) => {
   const [isOpen, setIsOpen] = useState(false);
 
   const filteredStaff = currentOwnerId 
     ? staffList.filter(s => s.uid !== currentOwnerId)
     : staffList;
 
+  const toggleDropdown = () => {
+    const nextState = !isOpen;
+    setIsOpen(nextState);
+    if (onOpenChange) onOpenChange(nextState);
+  };
+
   return (
-    <div className="relative space-y-1 text-left w-full select-none">
-      <label className="text-[9px] font-mono font-bold text-slate-400 uppercase tracking-wider block">
+    <div className={`relative space-y-1 text-left w-full select-none ${isOpen ? "z-50" : "z-10"}`}>
+      <label className="text-[9px] font-mono font-extrabold text-slate-400 uppercase tracking-wider block">
         {label}
       </label>
       
       {/* Trigger Button */}
       <button
         type="button"
-        onClick={() => setIsOpen(!isOpen)}
-        className="w-full text-[10px] font-sans font-bold px-3 py-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 hover:border-slate-300 rounded-xl text-slate-700 flex items-center justify-between transition-all cursor-pointer shadow-sm select-none"
+        onClick={toggleDropdown}
+        className="w-full text-[10px] font-sans font-extrabold px-3 py-2.5 bg-white hover:bg-emerald-50/20 border border-emerald-800/30 hover:border-emerald-800/60 rounded-xl text-slate-850 flex items-center justify-between transition-all cursor-pointer shadow-sm select-none"
       >
         <span className="truncate">{placeholder}</span>
-        <span className="text-[10px] text-slate-400 shrink-0 ml-1">▼</span>
+        <span className="text-[9px] text-[#0B3C2D] shrink-0 ml-1">▼</span>
       </button>
 
       {/* Dropdown Menu Overlay */}
@@ -89,11 +106,14 @@ const RecruiterDropdown: React.FC<{
         <>
           {/* Backdrop layer to click-out */}
           <div 
-            onClick={() => setIsOpen(false)}
+            onClick={() => {
+              setIsOpen(false);
+              if (onOpenChange) onOpenChange(false);
+            }}
             className="fixed inset-0 z-30"
           />
           
-          <div className="absolute left-0 right-0 mt-1.5 bg-white border border-slate-200/90 rounded-2xl shadow-xl z-40 max-h-48 overflow-y-auto py-1.5 animate-fadeIn">
+          <div className="absolute left-0 right-0 mt-1.5 bg-white border border-emerald-800/30 rounded-2xl shadow-xl z-40 max-h-48 overflow-y-auto py-1.5 animate-fadeIn">
             {filteredStaff.length === 0 ? (
               <div className="px-3.5 py-2.5 text-[10px] text-slate-400 italic font-medium">
                 No other recruiters available
@@ -108,11 +128,12 @@ const RecruiterDropdown: React.FC<{
                     onClick={() => {
                       onSelect(staff.uid, staff.displayName);
                       setIsOpen(false);
+                      if (onOpenChange) onOpenChange(false);
                     }}
-                    className="w-full text-left px-3.5 py-2 text-[10px] font-sans font-bold text-slate-700 hover:bg-[#0F5132]/[0.04] hover:text-[#0F5132] transition-all flex items-center justify-between border-b border-slate-50 last:border-b-0 cursor-pointer"
+                    className="w-full text-left px-3.5 py-2 text-[10px] font-sans font-black text-slate-800 hover:bg-emerald-50 hover:text-[#0B3C2D] transition-all flex items-center justify-between border-b border-slate-50 last:border-b-0 cursor-pointer"
                   >
                     <span className="truncate">{staff.displayName}</span>
-                    <span className="text-[8px] font-mono bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded font-extrabold shrink-0 uppercase tracking-wider">
+                    <span className="text-[8px] font-mono bg-white text-[#0B3C2D] border border-emerald-200 px-1.5 py-0.5 rounded font-black shrink-0 uppercase tracking-wider">
                       {activeCount} active
                     </span>
                   </button>
@@ -128,13 +149,93 @@ const RecruiterDropdown: React.FC<{
 
 export const AdminPanel: React.FC<AdminPanelProps> = ({ jobsList }) => {
   // Navigation State
-  const [activeView, setActiveView] = useState<"overview" | "staff" | "routing">("overview");
+  const [activeView, setActiveView] = useState<"overview" | "staff" | "routing" | "reports" | "jobs" | "post-job">("overview");
+  const location = useLocation();
+
+  useEffect(() => {
+    const handleHomeClick = () => {
+      setActiveView("overview");
+    };
+    window.addEventListener("admin-home-click", handleHomeClick);
+    return () => window.removeEventListener("admin-home-click", handleHomeClick);
+  }, []);
+
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    const viewParam = searchParams.get("view");
+    if (viewParam === "overview") {
+      setActiveView("overview");
+    } else if (viewParam === "routing") {
+      setActiveView("routing");
+    } else if (viewParam === "jobs") {
+      setActiveView("jobs");
+    } else if (viewParam === "staff") {
+      setActiveView("staff");
+    } else if (viewParam === "reports") {
+      setActiveView("reports");
+    } else if (viewParam === "post-job") {
+      setActiveView("post-job");
+    }
+  }, [location.search]);
 
   // Global State
   const [staffList, setStaffList] = useState<UserProfile[]>([]);
+  const [seekerCount, setSeekerCount] = useState<number>(0);
   const [staffStatuses, setStaffStatuses] = useState<Record<string, "online" | "offline">>({});
   const [conversations, setConversations] = useState<Record<string, Conversation>>({});
   const [dailyStatsList, setDailyStatsList] = useState<DailyStat[]>([]);
+  const [dailyReports, setDailyReports] = useState<StaffDailyReport[]>([]);
+
+  // Responsive state for mobile chart abbreviations
+  const [isMobile, setIsMobile] = useState(false);
+  const [staffViewMode, setStaffViewMode] = useState<"list" | "card">("list");
+  
+  // Search & Filter state for Staff Management
+  const [staffSearchQuery, setStaffSearchQuery] = useState("");
+  const [staffStatusFilter, setStaffStatusFilter] = useState<"all" | "busy" | "available" | "online" | "offline">("all");
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 640);
+    };
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  useEffect(() => {
+    if (window.innerWidth < 1024) {
+      setStaffViewMode("card");
+    } else {
+      setStaffViewMode("list");
+    }
+  }, []);
+
+  const legendFormatter = (value: string) => {
+    if (isMobile) {
+      switch (value) {
+        case "Job Impressions": return "IMP";
+        case "Sent Requests": return "SNT";
+        case "Claimed Requests": return "CLM";
+        case "Finished Chats": return "FIN";
+        case "Abandoned Tickets": return "ABD";
+        default: return value;
+      }
+    }
+    return value;
+  };
+  
+  // Local UI States for Reports
+  const [expandedReportId, setExpandedReportId] = useState<string | null>(null);
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  const [selectedReportsDate, setSelectedReportsDate] = useState<string>(() => {
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  });
+  const [reportsSearchQuery, setReportsSearchQuery] = useState("");
   
   // Loading & Feedback States
   const [loading, setLoading] = useState(true);
@@ -144,6 +245,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ jobsList }) => {
   
   // Local UI States
   const [expandedPendingChatId, setExpandedPendingChatId] = useState<string | null>(null);
+  const [activeDropdownChatId, setActiveDropdownChatId] = useState<string | null>(null);
   const [routingTab, setRoutingTab] = useState<"pending" | "ongoing" | "finished" | "abandoned">("pending");
   const [chartFilter, setChartFilter] = useState<"daily" | "weekly" | "monthly" | "yearly">("daily");
 
@@ -155,6 +257,17 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ jobsList }) => {
     setStaffList(list);
     const statuses = await getStaffStatuses();
     setStaffStatuses(statuses);
+  };
+
+  // Load seeker count
+  const loadSeekers = async () => {
+    try {
+      const allUsers = await getAllUserProfiles();
+      const seekers = allUsers.filter(u => u.role === "seeker");
+      setSeekerCount(seekers.length);
+    } catch (e) {
+      console.warn("Failed to load seekers count", e);
+    }
   };
 
   // Load chart stats from Firestore
@@ -187,8 +300,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ jobsList }) => {
   useEffect(() => {
     const initData = async () => {
       setLoading(true);
-      await loadStaff();
-      await loadChartStats();
+      await Promise.all([
+        loadStaff(),
+        loadSeekers(),
+        loadChartStats()
+      ]);
       setLoading(false);
     };
     initData();
@@ -212,6 +328,18 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ jobsList }) => {
     };
   }, []);
 
+  // Subscribe to daily reports real-time stream
+  useEffect(() => {
+    const unsubscribe = subscribeToDailyReports((data) => {
+      setDailyReports(data || []);
+    });
+    return () => {
+      if (typeof unsubscribe === "function") {
+        unsubscribe();
+      }
+    };
+  }, []);
+
   // Total calculations
   const totalImpressions = jobsList.reduce((acc, job) => acc + job.impressions, 0);
   
@@ -220,6 +348,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ jobsList }) => {
   const ongoingChats = conversationsList.filter(c => c.status === "ongoing");
   const finishedChats = conversationsList.filter(c => c.status === "finished");
   const abandonedChats = conversationsList.filter(c => c.status === "abandoned");
+
+  const todayDateStr = (() => {
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  })();
+  const todayReportsCount = dailyReports.filter(r => r.date === todayDateStr).length;
 
   // Toggle staff "Can Post Jobs" privilege directly in Firestore
   const handleTogglePermission = async (uid: string, currentVal: boolean) => {
@@ -376,8 +513,34 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ jobsList }) => {
     return null;
   };
 
+  const filteredStaffList = staffList.filter((staff) => {
+    const matchesSearch = 
+      (staff.displayName || "").toLowerCase().includes(staffSearchQuery.toLowerCase()) ||
+      (staff.email || "").toLowerCase().includes(staffSearchQuery.toLowerCase());
+    
+    if (!matchesSearch) return false;
+
+    const isOnline = isStaffOnline(staff.uid);
+    const activeChats = getActiveChatsCount(staff.uid);
+    const isBusy = activeChats >= 2;
+    const isAvailable = isOnline && activeChats < 2;
+
+    switch (staffStatusFilter) {
+      case "online":
+        return isOnline;
+      case "offline":
+        return !isOnline;
+      case "busy":
+        return isBusy;
+      case "available":
+        return isAvailable;
+      default:
+        return true;
+    }
+  });
+
   return (
-    <div className="space-y-8 select-text">
+    <div className={`space-y-8 select-text ${activeView === "overview" ? "pt-6 sm:pt-8" : "pt-1"}`}>
       {/* Toast notifications */}
       <AnimatePresence>
         {actionSuccess && (
@@ -413,144 +576,173 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ jobsList }) => {
             className="space-y-8"
           >
             {/* 1. KPI Grid Dashboard */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6">
               {/* Card 1: Job Impressions */}
-              <div className="bg-white border border-slate-200/60 rounded-3xl p-6 sm:p-8 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.02)] flex items-start justify-between">
+              <div className="bg-white border border-emerald-800 hover:border-emerald-600 rounded-3xl p-4 sm:p-6 shadow-none hover:shadow-[0_12px_30px_rgba(15,81,50,0.06)] hover:-translate-y-0.5 transition-all duration-300 flex items-start justify-between col-span-1">
                 <div className="space-y-2">
-                  <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-widest block leading-none">
-                    Aggregate Discovery
-                  </span>
-                  <h4 className="text-3xl font-mono font-bold text-slate-900 tracking-tight">
+                  <p className="text-xs font-sans text-slate-500 font-semibold leading-tight">
+                    Job Views
+                  </p>
+                  <h4 className="text-2xl sm:text-3xl font-mono font-bold text-slate-900 tracking-tight">
                     {totalImpressions}
                   </h4>
-                  <p className="text-xs font-sans text-slate-500 font-semibold leading-none">
-                    Seeker Job Impressions
-                  </p>
                 </div>
-                <div className="w-12 h-12 bg-emerald-50 rounded-2xl flex items-center justify-center text-[#0F5132]">
-                  <Eye className="w-6 h-6" />
-                </div>
+                <button
+                  onClick={() => setActiveView("jobs")}
+                  className="w-10 h-10 sm:w-12 sm:h-12 bg-[#0B3D2E] hover:bg-[#06241B] active:scale-95 border border-[#051E16] text-emerald-100 rounded-2xl flex items-center justify-center shrink-0 cursor-pointer transition-all hover:shadow-sm"
+                  title="Manage Job Listings"
+                >
+                  <Eye className="w-5 h-5 sm:w-6 sm:h-6" />
+                </button>
               </div>
 
               {/* Card 2: Active Recruiter Pool */}
-              <div className="bg-white border border-slate-200/60 rounded-3xl p-6 sm:p-8 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.02)] flex items-start justify-between">
-                <div className="space-y-2">
-                  <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-widest block leading-none">
-                    Operational Pool
-                  </span>
-                  <h4 className="text-3xl font-mono font-bold text-slate-900 tracking-tight">
+              <div className="bg-[#0B3C2D] border border-emerald-900 hover:border-emerald-800 rounded-3xl p-4 sm:p-6 shadow-none hover:shadow-[0_12px_30px_rgba(11,60,45,0.2)] hover:-translate-y-0.5 transition-all duration-300 flex items-start justify-between col-span-1 relative overflow-hidden">
+                {/* Subtle vector graphics / green pattern */}
+                <div className="absolute inset-0 pointer-events-none opacity-15">
+                  <svg width="100%" height="100%" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="90%" cy="20%" r="80" stroke="currentColor" strokeWidth="1.5" className="text-emerald-400" />
+                    <circle cx="95%" cy="25%" r="120" stroke="currentColor" strokeWidth="1" className="text-emerald-500" strokeDasharray="4 4" />
+                    <path d="M-20,120 C40,60 120,150 220,100" stroke="currentColor" strokeWidth="1.5" className="text-emerald-300" />
+                    <path d="M-10,130 C50,70 130,160 230,110" stroke="currentColor" strokeWidth="1" className="text-emerald-600" />
+                  </svg>
+                </div>
+
+                <div className="space-y-2 relative z-10">
+                  <p className="text-xs font-sans text-emerald-200/80 font-semibold leading-tight">
+                    Staffs
+                  </p>
+                  <h4 className="text-2xl sm:text-3xl font-mono font-bold text-white tracking-tight">
                     {staffList.length}
                   </h4>
-                  <p className="text-xs font-sans text-slate-500 font-semibold leading-none">
-                    Registered Recruiters
-                  </p>
                 </div>
-                <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600">
-                  <Users className="w-6 h-6" />
-                </div>
+                <button
+                  onClick={() => setActiveView("staff")}
+                  className="w-10 h-10 sm:w-12 sm:h-12 bg-emerald-200 hover:bg-emerald-300 active:scale-95 border border-emerald-300 text-[#0B3C2D] rounded-2xl flex items-center justify-center shrink-0 cursor-pointer transition-all hover:shadow-sm relative z-10"
+                  title="Manage Staff"
+                >
+                  <Users className="w-5 h-5 sm:w-6 sm:h-6" />
+                </button>
               </div>
 
               {/* Card 3: SLA Compliance / Abandoned Chats */}
-              <div className="bg-white border border-slate-200/60 rounded-3xl p-6 sm:p-8 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.02)] flex items-start justify-between">
-                <div className="space-y-2">
-                  <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-widest block leading-none">
-                    SLA Compliance
-                  </span>
-                  <h4 className="text-3xl font-mono font-bold text-slate-900 tracking-tight">
-                    {abandonedChats.length}
-                  </h4>
-                  <p className="text-xs font-sans text-slate-500 font-semibold leading-none">
-                    Abandoned Tickets
+              <div className="bg-[#0B3C2D] border border-emerald-900 hover:border-emerald-800 rounded-3xl p-4 sm:p-6 shadow-none hover:shadow-[0_12px_30px_rgba(11,60,45,0.2)] hover:-translate-y-0.5 transition-all duration-300 flex items-start justify-between col-span-2 md:col-span-2 relative overflow-hidden">
+                {/* Subtle vector graphics / green pattern representing communication/chats */}
+                <div className="absolute inset-0 pointer-events-none opacity-15">
+                  <svg width="100%" height="100%" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M-10,30 Q80,10 170,50 T350,20" stroke="currentColor" strokeWidth="1.5" className="text-emerald-400" />
+                    <path d="M-10,40 Q80,20 170,60 T350,30" stroke="currentColor" strokeWidth="1" className="text-emerald-500" strokeDasharray="3 3" />
+                    <path d="M20,100 Q110,80 200,120 T380,90" stroke="currentColor" strokeWidth="1.5" className="text-emerald-300" />
+                    <circle cx="15%" cy="75%" r="40" stroke="currentColor" strokeWidth="1.2" className="text-emerald-600" strokeDasharray="2 2" />
+                  </svg>
+                </div>
+
+                <div className="space-y-2 flex-1 min-w-0 mr-1 relative z-10">
+                  <p className="text-xs font-sans text-emerald-200/80 font-semibold leading-tight">
+                    Chats
                   </p>
+                  <h4 className="text-2xl sm:text-3xl font-mono font-bold text-white tracking-tight">
+                    {conversationsList.length}
+                  </h4>
+                  <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 mt-2 text-[10px] sm:text-[11px] font-sans font-extrabold tracking-tight">
+                    <span className="text-amber-800 bg-white px-1.5 py-0.5 rounded-lg border border-amber-200/50" title="Pending">
+                      Pending: {pendingChats.length}
+                    </span>
+                    <span className="text-blue-800 bg-white px-1.5 py-0.5 rounded-lg border border-blue-200/50" title="Ongoing">
+                      Ongoing: {ongoingChats.length}
+                    </span>
+                    <span className="text-emerald-800 bg-white px-1.5 py-0.5 rounded-lg border border-emerald-200/50" title="Finished">
+                      Finished: {finishedChats.length}
+                    </span>
+                    <span className="text-rose-800 bg-white px-1.5 py-0.5 rounded-lg border border-rose-200/50" title="Abandoned">
+                      Abandoned: {abandonedChats.length}
+                    </span>
+                  </div>
                 </div>
-                <div className="w-12 h-12 bg-rose-50 rounded-2xl flex items-center justify-center text-rose-600">
-                  <AlertTriangle className="w-6 h-6" />
-                </div>
+                <button
+                  onClick={() => setActiveView("routing")}
+                  className="w-10 h-10 sm:w-12 sm:h-12 bg-emerald-200 hover:bg-emerald-300 active:scale-95 border border-emerald-300 text-[#0B3C2D] rounded-2xl flex items-center justify-center shrink-0 cursor-pointer transition-all hover:shadow-sm relative z-10"
+                  title="Manage Ticket Routing"
+                >
+                  <MessageSquare className="w-5 h-5 sm:w-6 sm:h-6" />
+                </button>
               </div>
             </div>
 
             {/* 2. Bento Navigation Quick Links (Directly after SLA Compliance card) */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              {/* Card 1: Staff Management */}
+            <div className="grid grid-cols-4 gap-2 sm:gap-4">
+              {/* Card 1: Staffs */}
               <button
                 onClick={() => setActiveView("staff")}
-                className="group text-left bg-white border border-slate-200/60 hover:border-purple-200 rounded-2xl p-4 shadow-sm hover:shadow-md cursor-pointer transition-all duration-300 flex items-center gap-3"
+                className="group flex flex-col items-center justify-center p-2 sm:p-4 rounded-xl sm:rounded-2xl cursor-pointer transition-all duration-300 ease-out select-none border border-purple-900 hover:border-purple-950 text-center space-y-1 sm:space-y-2 bg-purple-50/20 hover:bg-purple-50/70 shadow-[0_15px_35px_-5px_rgba(0,0,0,0.05)] hover:shadow-[0_30px_50px_-10px_rgba(0,0,0,0.12)] hover:-translate-y-1 hover:scale-[1.03]"
               >
-                <div className="w-10 h-10 bg-purple-50 group-hover:bg-purple-100 rounded-xl flex items-center justify-center text-purple-600 shrink-0 transition-colors duration-300">
-                  <Users className="w-5 h-5" />
+                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center bg-purple-900 text-purple-100 group-hover:bg-purple-950 transition-all duration-300 ease-out shrink-0 group-hover:scale-110">
+                   <Users className="w-4 h-4 sm:w-5 sm:h-5" />
                 </div>
-                <div className="min-w-0">
-                  <h4 className="text-xs font-sans font-bold text-slate-900 group-hover:text-purple-700 transition-colors truncate">
-                    Staff Management
-                  </h4>
-                </div>
+                <span className="text-[10px] sm:text-xs font-sans font-extrabold tracking-tight text-purple-900 group-hover:text-purple-950 transition-colors block leading-tight">
+                  Staffs
+                </span>
               </button>
 
-              {/* Card 2: Ticket Routing Board */}
+              {/* Card 2: Chats */}
               <button
                 onClick={() => setActiveView("routing")}
-                className="group text-left bg-white border border-slate-200/60 hover:border-emerald-200 rounded-2xl p-4 shadow-sm hover:shadow-md cursor-pointer transition-all duration-300 flex items-center gap-3"
+                className="group flex flex-col items-center justify-center p-2 sm:p-4 rounded-xl sm:rounded-2xl cursor-pointer transition-all duration-300 ease-out select-none border border-emerald-900 hover:border-emerald-950 text-center space-y-1 sm:space-y-2 bg-emerald-50/20 hover:bg-emerald-50/70 shadow-[0_15px_35px_-5px_rgba(0,0,0,0.05)] hover:shadow-[0_30px_50px_-10px_rgba(0,0,0,0.12)] hover:-translate-y-1 hover:scale-[1.03]"
               >
-                <div className="w-10 h-10 bg-emerald-50 group-hover:bg-emerald-100 rounded-xl flex items-center justify-center text-[#0F5132] shrink-0 transition-colors duration-300">
-                  <BarChart3 className="w-5 h-5" />
+                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center bg-emerald-900 text-emerald-100 group-hover:bg-emerald-950 transition-all duration-300 ease-out shrink-0 group-hover:scale-110">
+                   <BarChart3 className="w-4 h-4 sm:w-5 sm:h-5" />
                 </div>
-                <div className="min-w-0">
-                  <h4 className="text-xs font-sans font-bold text-slate-900 group-hover:text-emerald-700 transition-colors truncate">
-                    Ticket Routing Board
-                  </h4>
-                </div>
+                <span className="text-[10px] sm:text-xs font-sans font-extrabold tracking-tight text-emerald-900 group-hover:text-emerald-950 transition-colors block leading-tight">
+                  Chats
+                </span>
               </button>
 
-              {/* Card 3: Job Management */}
-              <Link
-                to="/admin/manage-jobs"
-                className="group text-left bg-white border border-slate-200/60 hover:border-blue-200 rounded-2xl p-4 shadow-sm hover:shadow-md cursor-pointer transition-all duration-300 flex items-center gap-3"
+              {/* Card 3: Jobs */}
+              <button
+                onClick={() => setActiveView("jobs")}
+                className="group flex flex-col items-center justify-center p-2 sm:p-4 rounded-xl sm:rounded-2xl cursor-pointer transition-all duration-300 ease-out select-none border border-blue-900 hover:border-blue-950 text-center space-y-1 sm:space-y-2 bg-blue-50/20 hover:bg-blue-50/70 shadow-[0_15px_35px_-5px_rgba(0,0,0,0.05)] hover:shadow-[0_30px_50px_-10px_rgba(0,0,0,0.12)] hover:-translate-y-1 hover:scale-[1.03]"
               >
-                <div className="w-10 h-10 bg-blue-50 group-hover:bg-blue-100 rounded-xl flex items-center justify-center text-blue-600 shrink-0 transition-colors duration-300">
-                  <Briefcase className="w-5 h-5" />
+                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center bg-blue-900 text-blue-100 group-hover:bg-blue-950 transition-all duration-300 ease-out shrink-0 group-hover:scale-110">
+                   <Briefcase className="w-4 h-4 sm:w-5 sm:h-5" />
                 </div>
-                <div className="min-w-0">
-                  <h4 className="text-xs font-sans font-bold text-slate-900 group-hover:text-blue-700 transition-colors truncate">
-                    Job Management
-                  </h4>
-                </div>
-              </Link>
+                <span className="text-[10px] sm:text-xs font-sans font-extrabold tracking-tight text-blue-900 group-hover:text-blue-950 transition-colors block leading-tight">
+                  Jobs
+                </span>
+              </button>
 
-              {/* Card 4: System Alerts */}
-              <Link
-                to="/admin/notifications"
-                className="group text-left bg-white border border-slate-200/60 hover:border-rose-200 rounded-2xl p-4 shadow-sm hover:shadow-md cursor-pointer transition-all duration-300 flex items-center gap-3"
+              {/* Card 4: Reports */}
+              <button
+                onClick={() => setActiveView("reports")}
+                className="group flex flex-col items-center justify-center p-2 sm:p-4 rounded-xl sm:rounded-2xl cursor-pointer transition-all duration-300 ease-out select-none border border-emerald-900 hover:border-emerald-950 text-center space-y-1 sm:space-y-2 bg-emerald-50/20 hover:bg-emerald-50/70 shadow-[0_15px_35px_-5px_rgba(0,0,0,0.05)] hover:shadow-[0_30px_50px_-10px_rgba(0,0,0,0.12)] hover:-translate-y-1 hover:scale-[1.03]"
               >
-                <div className="w-10 h-10 bg-rose-50 group-hover:bg-rose-100 rounded-xl flex items-center justify-center text-rose-600 shrink-0 transition-colors duration-300">
-                  <Bell className="w-5 h-5" />
+                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center bg-emerald-900 text-emerald-100 group-hover:bg-emerald-950 transition-all duration-300 ease-out shrink-0 group-hover:scale-110">
+                   <ClipboardList className="w-4 h-4 sm:w-5 sm:h-5" />
                 </div>
-                <div className="min-w-0">
-                  <h4 className="text-xs font-sans font-bold text-slate-900 group-hover:text-rose-700 transition-colors truncate">
-                    System Alerts
-                  </h4>
+                <div className="text-center">
+                  <span className="text-[10px] sm:text-xs font-sans font-extrabold tracking-tight text-emerald-900 group-hover:text-emerald-950 transition-colors block leading-tight">
+                    Reports
+                  </span>
+                  <p className="text-[8px] sm:text-[9px] font-mono font-bold text-emerald-800 uppercase tracking-wider block leading-none mt-0.5 sm:mt-1">
+                    {todayReportsCount} Submitted
+                  </p>
                 </div>
-              </Link>
-            </div>
-
-            {/* 3. Real-Time Timeline Performance Chart */}
-            <div className="bg-white border border-slate-200/60 rounded-3xl p-6 sm:p-8 shadow-[0_4px_25px_-5px_rgba(0,0,0,0.02)] space-y-6">
+              </button>
+            </div>            {/* 3. Real-Time Timeline Performance Chart */}
+            <div className="bg-white border border-emerald-800 rounded-3xl pt-3.5 pb-6 px-6 sm:pt-4 sm:pb-8 sm:px-8 shadow-none space-y-6">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-50 pb-5">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-slate-50 border border-slate-100 rounded-xl flex items-center justify-center text-slate-600">
+                  <div className="w-10 h-10 bg-[#0B3C2D] border border-emerald-900 rounded-xl flex items-center justify-center text-emerald-200">
                     <TrendingUp className="w-5 h-5" />
                   </div>
                   <div>
                     <h3 className="text-base font-sans font-extrabold text-slate-900 tracking-tight leading-none">
-                      Operational Traffic Timeline
+                      Traffic Chart
                     </h3>
-                    <span className="text-[10px] font-mono text-slate-400 font-bold uppercase tracking-wider block mt-1">
-                      Job Impressions & Message Traffic Seeding (June 20th 2026 Start)
-                    </span>
                   </div>
                 </div>
-
+ 
                 {/* Switcher Filter tabs */}
-                <div className="flex gap-1 bg-slate-50 border border-slate-100 p-1.5 rounded-2xl w-full sm:w-auto overflow-x-auto shrink-0">
+                <div className="flex gap-1 bg-[#0B3C2D] border border-emerald-950 p-1.5 rounded-2xl w-full sm:w-auto overflow-x-auto shrink-0">
                   {(["daily", "weekly", "monthly", "yearly"] as const).map((filter) => {
                     const isActive = chartFilter === filter;
                     return (
@@ -559,8 +751,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ jobsList }) => {
                         onClick={() => setChartFilter(filter)}
                         className={`px-3.5 py-1.5 rounded-xl text-[10px] font-extrabold tracking-tight cursor-pointer uppercase transition-all whitespace-nowrap ${
                           isActive 
-                            ? "bg-white text-[#0F5132] shadow-sm border border-slate-150 font-black" 
-                            : "text-slate-400 hover:text-slate-700"
+                            ? "bg-white text-[#0B3C2D] shadow-sm border border-transparent font-black" 
+                            : "text-emerald-100/80 hover:text-white"
                         }`}
                       >
                         {filter}
@@ -607,6 +799,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ jobsList }) => {
                         height={36} 
                         iconType="circle"
                         iconSize={6}
+                        formatter={legendFormatter}
                         wrapperStyle={{ fontSize: "10px", fontWeight: 700, fontFamily: "var(--font-sans)", textTransform: "uppercase", letterSpacing: "0.05em" }}
                       />
                       
@@ -683,150 +876,322 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ jobsList }) => {
             <div className="flex items-center justify-between">
               <button
                 onClick={() => setActiveView("overview")}
-                className="px-4 py-2 border border-slate-200 rounded-xl bg-white hover:bg-slate-50 text-slate-600 hover:text-slate-800 text-xs font-bold transition-all flex items-center gap-2 cursor-pointer shadow-sm"
+                className="px-4 py-2 border border-emerald-800 rounded-xl bg-white hover:bg-emerald-50/20 text-[#0B3C2D] hover:text-[#06241B] text-xs font-extrabold transition-all flex items-center gap-2 cursor-pointer shadow-[0_4px_12px_rgba(0,0,0,0.03)] hover:-translate-y-0.5"
               >
-                <ArrowLeft className="w-4 h-4" /> Back to Console Overview
+                <ArrowLeft className="w-4 h-4" /> Go Back
               </button>
-              <div className="flex items-center gap-1.5 bg-purple-50 border border-purple-100 text-purple-800 px-3 py-1.5 rounded-xl text-[10px] font-mono font-bold uppercase tracking-wider">
+              <div className="flex items-center gap-1.5 bg-[#0B3C2D] border border-emerald-900 text-emerald-200 px-3 py-1.5 rounded-xl text-[10px] font-mono font-bold uppercase tracking-wider">
                 <Sparkles className="w-3.5 h-3.5" /> Staff View Panel
               </div>
             </div>
 
-            {/* Staff Management Table view */}
-            <div className="bg-white border border-slate-200/60 rounded-3xl shadow-sm overflow-hidden">
+            {/* Staff Management Table/Card view */}
+            <div className="bg-white border border-emerald-800 rounded-3xl shadow-[0_15px_35px_-5px_rgba(0,0,0,0.05)] overflow-hidden">
               <div className="p-6 sm:p-8 border-b border-slate-100 flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-purple-50 rounded-xl flex items-center justify-center text-purple-600">
+                  <div className="w-10 h-10 bg-[#0B3C2D] border border-emerald-900 rounded-xl flex items-center justify-center text-emerald-200">
                     <Settings className="w-5 h-5" />
                   </div>
                   <div>
                     <h3 className="text-base font-sans font-extrabold text-slate-900 tracking-tight leading-none">
                       Staff Management
                     </h3>
-                    <span className="text-[10px] font-mono text-slate-400 font-bold uppercase tracking-wider block mt-1">
-                      Configure permissions, monitor statuses, and track available requests.
-                    </span>
                   </div>
                 </div>
 
-                <button
-                  onClick={async () => {
-                    setIsRefreshingStaff(true);
-                    await loadStaff();
-                    setTimeout(() => setIsRefreshingStaff(false), 800);
-                  }}
-                  className="p-2 hover:bg-slate-50 border border-slate-150 rounded-xl text-slate-500 hover:text-slate-800 transition-colors cursor-pointer bg-white"
-                  title="Refresh profiles"
-                >
-                  <RefreshCw className={`w-4 h-4 ${isRefreshingStaff ? "animate-spin" : ""}`} />
-                </button>
+                <div className="flex items-center gap-2 shrink-0">
+                  {/* View mode toggle */}
+                  <div className="flex items-center bg-[#0B3C2D] border border-emerald-950 rounded-xl p-0.5">
+                    <button
+                      onClick={() => setStaffViewMode("list")}
+                      className={`p-1.5 rounded-lg transition-all cursor-pointer ${
+                        staffViewMode === "list" 
+                          ? "bg-white text-[#0B3C2D] shadow-sm border border-transparent" 
+                          : "text-emerald-100/80 hover:text-white"
+                      }`}
+                      title="List View"
+                    >
+                      <List className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => setStaffViewMode("card")}
+                      className={`p-1.5 rounded-lg transition-all cursor-pointer ${
+                        staffViewMode === "card" 
+                          ? "bg-white text-[#0B3C2D] shadow-sm border border-transparent" 
+                          : "text-emerald-100/80 hover:text-white"
+                      }`}
+                      title="Card View"
+                    >
+                      <LayoutGrid className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+
+                  <button
+                    onClick={async () => {
+                      setIsRefreshingStaff(true);
+                      await loadStaff();
+                      setTimeout(() => setIsRefreshingStaff(false), 800);
+                    }}
+                    className="p-2 hover:bg-emerald-50 border border-emerald-800 rounded-xl text-emerald-800 hover:text-[#0B3C2D] transition-colors cursor-pointer bg-white"
+                    title="Refresh profiles"
+                  >
+                    <RefreshCw className={`w-4 h-4 ${isRefreshingStaff ? "animate-spin" : ""}`} />
+                  </button>
+                </div>
               </div>
 
-              {/* Table details */}
-              <div className="overflow-x-auto min-w-full">
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="bg-slate-50/55 border-b border-slate-100">
-                      <th className="px-6 py-3.5 text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider">
-                        Recruiter Identity
-                      </th>
-                      <th className="px-6 py-3.5 text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider">
-                        System Email
-                      </th>
-                      <th className="px-6 py-3.5 text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider">
-                        Security Role
-                      </th>
-                      <th className="px-6 py-3.5 text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider text-center">
-                        Availability
-                      </th>
-                      <th className="px-6 py-3.5 text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider text-center">
-                        Available Requests
-                      </th>
-                      <th className="px-6 py-3.5 text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider text-center">
-                        Active Chats
-                      </th>
-                      <th className="px-6 py-3.5 text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider text-center">
-                        Job Creation Privilege
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {staffList.length === 0 ? (
-                      <tr>
-                        <td colSpan={7} className="px-6 py-10 text-center text-xs font-mono text-slate-400 italic">
-                          No operational staff records retrieved
-                        </td>
+              {/* Search & Filter Bar */}
+              <div className="p-4 sm:px-8 sm:py-5 bg-[#0B3C2D]/[0.02] border-b border-emerald-800/20 flex flex-col lg:flex-row items-stretch lg:items-center gap-4">
+                {/* Search input */}
+                <div className="relative flex-1">
+                  <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-emerald-800/60">
+                    <Search className="w-4 h-4" />
+                  </span>
+                  <input
+                    type="text"
+                    value={staffSearchQuery}
+                    onChange={(e) => setStaffSearchQuery(e.target.value)}
+                    placeholder="Search staff by name or email..."
+                    className="w-full pl-10 pr-4 py-2.5 bg-white border border-emerald-800/30 rounded-2xl text-xs font-sans font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/35 transition-all shadow-xs"
+                  />
+                </div>
+
+                {/* Status Filters */}
+                <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap overflow-x-auto max-w-full">
+                  <span className="text-[10px] font-mono font-extrabold uppercase tracking-wider text-[#0B3C2D] flex items-center gap-1.5 mr-1 shrink-0 bg-white border border-emerald-800/20 px-2.5 py-1.5 rounded-xl">
+                    <Filter className="w-3 h-3" /> Status:
+                  </span>
+                  <div className="flex gap-1 bg-[#0B3C2D] border border-emerald-950 p-1 rounded-2xl overflow-x-auto max-w-full shrink-0">
+                    {(["all", "busy", "available", "online", "offline"] as const).map((filter) => {
+                      const label = {
+                        all: "All Staff",
+                        busy: "Busy",
+                        available: "Available",
+                        online: "Online",
+                        offline: "Offline",
+                      }[filter];
+
+                      const isActive = staffStatusFilter === filter;
+
+                      return (
+                        <button
+                          key={filter}
+                          onClick={() => setStaffStatusFilter(filter)}
+                          className={`px-3 py-1.5 rounded-xl text-[10px] font-extrabold tracking-tight cursor-pointer uppercase transition-all whitespace-nowrap ${
+                            isActive 
+                              ? "bg-white text-[#0B3C2D] shadow-sm border border-transparent font-black" 
+                              : "text-emerald-100/80 hover:text-white"
+                          }`}
+                        >
+                          {label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              {/* Table details / Card View details */}
+              {staffViewMode === "list" ? (
+                <div className="overflow-x-auto min-w-full">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-[#0B3C2D] text-emerald-100 border-b border-emerald-950">
+                        <th className="px-6 py-4 text-[10px] font-mono font-extrabold uppercase tracking-wider">
+                          Recruiter Identity
+                        </th>
+                        <th className="px-6 py-4 text-[10px] font-mono font-extrabold uppercase tracking-wider">
+                          System Email
+                        </th>
+                        <th className="px-6 py-4 text-[10px] font-mono font-extrabold uppercase tracking-wider">
+                          Security Role
+                        </th>
+                        <th className="px-6 py-4 text-[10px] font-mono font-extrabold uppercase tracking-wider text-center">
+                          Availability
+                        </th>
+                        <th className="px-6 py-4 text-[10px] font-mono font-extrabold uppercase tracking-wider text-center">
+                          Available Requests
+                        </th>
+                        <th className="px-6 py-4 text-[10px] font-mono font-extrabold uppercase tracking-wider text-center">
+                          Active Chats
+                        </th>
+                        <th className="px-6 py-4 text-[10px] font-mono font-extrabold uppercase tracking-wider text-center">
+                          Job Creation Privilege
+                        </th>
                       </tr>
-                    ) : (
-                      staffList.map((staff) => {
+                    </thead>
+                    <tbody className="divide-y divide-emerald-800/10">
+                      {filteredStaffList.length === 0 ? (
+                        <tr>
+                          <td colSpan={7} className="px-6 py-10 text-center text-xs font-mono text-slate-400 italic">
+                            No operational staff records found matching search or filter criteria
+                          </td>
+                        </tr>
+                      ) : (
+                        filteredStaffList.map((staff) => {
+                          const unclaimedCount = getUnclaimedRoutedChatsCount(staff.uid);
+                          return (
+                            <tr key={staff.uid} className="hover:bg-emerald-50/10 transition-colors">
+                              <td className="px-6 py-4.5 font-sans text-xs font-extrabold text-slate-900">
+                                {staff.displayName}
+                              </td>
+                              <td className="px-6 py-4.5 font-mono text-xs text-slate-500">
+                                {staff.email}
+                              </td>
+                              <td className="px-6 py-4.5">
+                                <span className="px-2 py-0.5 bg-white text-blue-800 border border-blue-200 rounded text-[9px] font-mono font-black uppercase">
+                                  {staff.role}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4.5 text-center">
+                                {isStaffOnline(staff.uid) ? (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-white text-[#0B3C2D] border border-emerald-200 rounded text-[9px] font-mono font-black">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                    Online
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-white text-slate-500 border border-slate-200 rounded text-[9px] font-mono font-black">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+                                    Offline
+                                  </span>
+                                )}
+                              </td>
+                              {/* Available request pending unclaimed counts */}
+                              <td className="px-6 py-4.5 text-center">
+                                <span className={`inline-flex items-center justify-center font-mono text-[10px] font-bold px-2.5 py-1 rounded-xl bg-white border ${unclaimedCount > 0 ? "text-amber-800 border-amber-200" : "text-slate-400 border-slate-200"}`}>
+                                  {unclaimedCount} unclaimed
+                                </span>
+                              </td>
+                              <td className="px-6 py-4.5 text-center font-mono text-xs font-bold text-[#0B3C2D]">
+                                {getActiveChatsCount(staff.uid)} chats
+                              </td>
+                              <td className="px-6 py-4.5">
+                                <div className="flex items-center justify-center gap-2">
+                                  <button
+                                    onClick={() => handleTogglePermission(staff.uid, staff.canPostJobs)}
+                                    className="focus:outline-none cursor-pointer border-0 bg-transparent p-0"
+                                    title={`Toggle canPostJobs for ${staff.displayName}`}
+                                  >
+                                    {staff.canPostJobs ? (
+                                      <div className="w-11 h-6 bg-[#0B3C2D] border border-emerald-950 rounded-full flex items-center justify-end p-0.5 transition-all">
+                                        <div className="w-5 h-5 bg-white rounded-full shadow-md"></div>
+                                      </div>
+                                    ) : (
+                                      <div className="w-11 h-6 bg-slate-200 border border-slate-300 rounded-full flex items-center justify-start p-0.5 transition-all">
+                                        <div className="w-5 h-5 bg-white rounded-full shadow-md"></div>
+                                      </div>
+                                    )}
+                                  </button>
+                                  <span className={`text-[10px] font-mono font-bold uppercase min-w-[32px] ${staff.canPostJobs ? "text-emerald-700 font-black" : "text-slate-400"}`}>
+                                    {staff.canPostJobs ? "Active" : "Locked"}
+                                  </span>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="p-6">
+                  {filteredStaffList.length === 0 ? (
+                    <div className="py-10 text-center text-xs font-mono text-slate-400 italic bg-emerald-50/5 border border-dashed border-emerald-800/30 rounded-2xl">
+                      No operational staff records found matching search or filter criteria
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {filteredStaffList.map((staff) => {
                         const unclaimedCount = getUnclaimedRoutedChatsCount(staff.uid);
+                        const activeChats = getActiveChatsCount(staff.uid);
+                        const isOnline = isStaffOnline(staff.uid);
+                        
                         return (
-                          <tr key={staff.uid} className="hover:bg-slate-50/30 transition-colors">
-                            <td className="px-6 py-4.5 font-sans text-xs font-extrabold text-slate-900">
-                              {staff.displayName}
-                            </td>
-                            <td className="px-6 py-4.5 font-mono text-xs text-slate-500">
-                              {staff.email}
-                            </td>
-                            <td className="px-6 py-4.5">
-                              <span className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded text-[10px] font-mono font-bold uppercase">
-                                {staff.role}
-                              </span>
-                            </td>
-                            <td className="px-6 py-4.5 text-center">
-                              {isStaffOnline(staff.uid) ? (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded text-[10px] font-mono font-bold">
-                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                                  Online
-                                </span>
-                              ) : (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-slate-50 text-slate-500 rounded text-[10px] font-mono font-bold">
-                                  <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
-                                  Offline
-                                </span>
-                              )}
-                            </td>
-                            {/* Available request pending unclaimed counts */}
-                            <td className="px-6 py-4.5 text-center">
-                              <span className={`inline-flex items-center justify-center font-mono text-xs font-bold px-2.5 py-1 rounded-xl ${unclaimedCount > 0 ? "bg-amber-50 text-amber-800 border border-amber-100/50" : "bg-slate-50 text-slate-400"}`}>
-                                {unclaimedCount} unclaimed
-                              </span>
-                            </td>
-                            <td className="px-6 py-4.5 text-center font-mono text-xs font-bold text-slate-700">
-                              {getActiveChatsCount(staff.uid)} chats
-                            </td>
-                            <td className="px-6 py-4.5">
-                              <div className="flex items-center justify-center gap-2">
+                          <div 
+                            key={staff.uid} 
+                            className="bg-white border border-emerald-800/30 rounded-2xl p-5 flex flex-col justify-between transition-all hover:bg-emerald-50/[0.02] hover:shadow-[0_15px_30px_-5px_rgba(0,0,0,0.03)] hover:border-emerald-800/80"
+                          >
+                            <div className="space-y-4">
+                              {/* Header: Name and Status */}
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="space-y-1 min-w-0">
+                                  <h4 className="font-sans font-extrabold text-sm text-slate-900 tracking-tight truncate">
+                                    {staff.displayName}
+                                  </h4>
+                                  <p className="font-mono text-[10px] text-slate-400 truncate" title={staff.email}>
+                                    {staff.email}
+                                  </p>
+                                </div>
+                                <div className="flex flex-col items-end gap-1.5 shrink-0">
+                                  <span className="px-2 py-0.5 bg-white text-blue-800 border border-blue-200 rounded text-[9px] font-mono font-black uppercase">
+                                    {staff.role}
+                                  </span>
+                                  {isOnline ? (
+                                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-white text-[#0B3C2D] border border-emerald-200 rounded text-[9px] font-mono font-black">
+                                      <span className="w-1 h-1 rounded-full bg-emerald-500"></span>
+                                      Online
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-white text-slate-400 border border-slate-200 rounded text-[9px] font-mono font-black">
+                                      <span className="w-1 h-1 rounded-full bg-slate-400"></span>
+                                      Offline
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+ 
+                              {/* Stats section */}
+                              <div className="grid grid-cols-2 gap-3 pt-3 border-t border-emerald-800/10">
+                                <div className="bg-white border border-emerald-800/20 p-2.5 rounded-xl text-center space-y-1 shadow-xs">
+                                  <p className="text-[9px] font-mono font-bold text-slate-400 uppercase tracking-wider">Unclaimed</p>
+                                  <p className={`font-mono text-xs font-bold ${unclaimedCount > 0 ? "text-amber-700" : "text-slate-500"}`}>
+                                    {unclaimedCount} unclaimed
+                                  </p>
+                                </div>
+                                <div className="bg-white border border-emerald-800/20 p-2.5 rounded-xl text-center space-y-1 shadow-xs">
+                                  <p className="text-[9px] font-mono font-bold text-slate-400 uppercase tracking-wider">Active Chats</p>
+                                  <p className="font-mono text-xs font-bold text-[#0B3C2D]">
+                                    {activeChats} chats
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+ 
+                            {/* Toggle button bottom panel */}
+                            <div className="flex items-center justify-between mt-4 pt-3 border-t border-emerald-800/10">
+                              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400">Job Privilege</span>
+                              <div className="flex items-center gap-2">
                                 <button
                                   onClick={() => handleTogglePermission(staff.uid, staff.canPostJobs)}
                                   className="focus:outline-none cursor-pointer border-0 bg-transparent p-0"
                                   title={`Toggle canPostJobs for ${staff.displayName}`}
                                 >
                                   {staff.canPostJobs ? (
-                                    <div className="w-11 h-6 bg-emerald-600 rounded-full flex items-center justify-end p-0.5 transition-all">
-                                      <div className="w-5 h-5 bg-white rounded-full shadow-md"></div>
+                                    <div className="w-10 h-5 bg-[#0B3C2D] border border-emerald-950 rounded-full flex items-center justify-end p-0.5 transition-all">
+                                      <div className="w-4 h-4 bg-white rounded-full shadow-sm"></div>
                                     </div>
                                   ) : (
-                                    <div className="w-11 h-6 bg-slate-200 rounded-full flex items-center justify-start p-0.5 transition-all">
-                                      <div className="w-5 h-5 bg-white rounded-full shadow-md"></div>
+                                    <div className="w-10 h-5 bg-slate-200 border border-slate-300 rounded-full flex items-center justify-start p-0.5 transition-all">
+                                      <div className="w-4 h-4 bg-white rounded-full shadow-sm"></div>
                                     </div>
                                   )}
                                 </button>
-                                <span className={`text-[10px] font-mono font-bold uppercase min-w-[32px] ${staff.canPostJobs ? "text-emerald-600" : "text-slate-400"}`}>
+                                <span className={`text-[10px] font-mono font-bold uppercase min-w-[32px] ${staff.canPostJobs ? "text-emerald-700 font-black" : "text-slate-400"}`}>
                                   {staff.canPostJobs ? "Active" : "Locked"}
                                 </span>
                               </div>
-                            </td>
-                          </tr>
+                            </div>
+                          </div>
                         );
-                      })
-                    )}
-                  </tbody>
-                </table>
-              </div>
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </motion.div>
-        ) : (
+        ) : activeView === "routing" ? (
           <motion.div
             key="routing"
             initial={{ opacity: 0, y: 15 }}
@@ -839,30 +1204,27 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ jobsList }) => {
             <div className="flex items-center justify-between">
               <button
                 onClick={() => setActiveView("overview")}
-                className="px-4 py-2 border border-slate-200 rounded-xl bg-white hover:bg-slate-50 text-slate-600 hover:text-slate-800 text-xs font-bold transition-all flex items-center gap-2 cursor-pointer shadow-sm"
+                className="px-4 py-2 border border-emerald-800 rounded-xl bg-white hover:bg-emerald-50/20 text-[#0B3C2D] hover:text-[#06241B] text-xs font-extrabold transition-all flex items-center gap-2 cursor-pointer shadow-[0_4px_12px_rgba(0,0,0,0.03)] hover:-translate-y-0.5"
               >
-                <ArrowLeft className="w-4 h-4" /> Back to Console Overview
+                <ArrowLeft className="w-4 h-4" /> Go Back
               </button>
-              <div className="flex items-center gap-1.5 bg-emerald-50 border border-emerald-100 text-emerald-800 px-3 py-1.5 rounded-xl text-[10px] font-mono font-bold uppercase tracking-wider">
+              <div className="flex items-center gap-1.5 bg-[#0B3C2D] border border-emerald-900 text-emerald-200 px-3 py-1.5 rounded-xl text-[10px] font-mono font-bold uppercase tracking-wider">
                 <BarChart3 className="w-3.5 h-3.5" /> Ticket Routing Board
               </div>
             </div>
 
             {/* Custom Board Card Panel with Top Switched Tabs */}
-            <div className="bg-white border border-slate-200/60 rounded-3xl p-6 sm:p-8 shadow-[0_4px_25px_-5px_rgba(0,0,0,0.02)] space-y-6">
+            <div className="bg-white border border-emerald-800 rounded-3xl p-6 sm:p-8 shadow-[0_15px_35px_-5px_rgba(0,0,0,0.05)] space-y-6">
               
               {/* Kanban Switcher Tab list aligned side-by-side */}
-              <div className="flex flex-col gap-4 border-b border-slate-100 pb-4">
+              <div className="flex flex-col gap-4 border-b border-emerald-800/10 pb-4">
                 <div>
                   <h3 className="text-base font-sans font-extrabold text-slate-900 tracking-tight leading-none">
-                    Ticket Routing Queues
+                    Manage Chats
                   </h3>
-                  <span className="text-[10px] font-mono text-slate-400 font-bold uppercase tracking-wider block mt-1">
-                    Toggle side-by-side queues to manually transfer, claims, or force release tickets.
-                  </span>
                 </div>
 
-                <div className="flex gap-2 bg-slate-50 border border-slate-100 p-1.5 rounded-2xl w-full overflow-x-auto shrink-0 scrollbar-none">
+                <div className="flex gap-2 bg-[#0B3C2D] border border-emerald-950 p-1.5 rounded-2xl w-full overflow-x-auto shrink-0 scrollbar-none">
                   {(["pending", "ongoing", "finished", "abandoned"] as const).map((tab) => {
                     const count = {
                       pending: pendingChats.length,
@@ -872,17 +1234,17 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ jobsList }) => {
                     }[tab];
 
                     const label = {
-                      pending: "Pending Queue",
-                      ongoing: "Ongoing Live",
+                      pending: "Pending",
+                      ongoing: "Ongoing",
                       finished: "Finished",
                       abandoned: "Abandoned"
                     }[tab];
 
                     const badgeColors = {
-                      pending: "bg-amber-100 text-amber-800 border-amber-200",
-                      ongoing: "bg-blue-100 text-blue-800 border-blue-200",
-                      finished: "bg-emerald-100 text-[#0F5132] border-emerald-200",
-                      abandoned: "bg-rose-100 text-rose-800 border-rose-200"
+                      pending: "bg-white text-amber-900 border-amber-200",
+                      ongoing: "bg-white text-blue-900 border-blue-200",
+                      finished: "bg-white text-[#0B3C2D] border-emerald-200",
+                      abandoned: "bg-white text-rose-900 border-rose-200"
                     }[tab];
 
                     const icon = {
@@ -899,13 +1261,23 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ jobsList }) => {
                         onClick={() => setRoutingTab(tab)}
                         className={`flex items-center gap-2.5 px-4 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer flex-1 justify-center ${
                           isActive 
-                            ? "bg-white text-slate-900 shadow-sm border border-slate-150 font-extrabold" 
-                            : "text-slate-400 hover:text-slate-700"
+                            ? "bg-white text-[#0B3C2D] shadow-sm border border-transparent font-black" 
+                            : "text-emerald-100/80 hover:text-white"
                         }`}
                       >
                         {icon}
                         <span>{label}</span>
-                        <span className={`px-2 py-0.5 border text-[10px] font-mono font-bold rounded-full ${badgeColors}`}>
+                        <span className={`px-2 py-0.5 border text-[10px] font-mono font-bold rounded-full transition-all ${
+                          isActive 
+                            ? tab === "pending"
+                              ? "bg-amber-950 text-white border-transparent"
+                              : tab === "ongoing"
+                              ? "bg-blue-950 text-white border-transparent"
+                              : tab === "finished"
+                              ? "bg-emerald-950 text-white border-transparent"
+                              : "bg-rose-950 text-white border-transparent"
+                            : badgeColors
+                        }`}>
                           {count}
                         </span>
                       </button>
@@ -923,7 +1295,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ jobsList }) => {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -10 }}
                     transition={{ duration: 0.2 }}
-                    className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5"
+                    className="grid grid-cols-1 gap-0 w-full"
                   >
                     {routingTab === "pending" && (
                       pendingChats.length === 0 ? (
@@ -934,51 +1306,67 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ jobsList }) => {
                       ) : (
                         pendingChats.map((c) => {
                           const isExpanded = expandedPendingChatId === c.chatId;
+                          const isDropdownActive = activeDropdownChatId === c.chatId;
                           return (
                             <div 
                               key={c.chatId} 
-                              className={`p-4 bg-white border rounded-2xl shadow-sm space-y-3.5 transition-all ${isExpanded ? 'border-amber-300 bg-amber-50/5' : 'border-slate-200/60 hover:border-slate-300'}`}
+                              className={`p-6 bg-white rounded-none border-y border-[#0F5132] space-y-4 transition-all duration-300 relative w-full ${
+                                isDropdownActive 
+                                  ? 'z-40 bg-[#FAFDFB]' 
+                                  : isExpanded 
+                                  ? 'z-30 bg-[#FAFDFB]' 
+                                  : 'z-10'
+                              }`}
                             >
+                              {/* Vector graphic pattern background design */}
+                              <div className="absolute inset-0 pointer-events-none opacity-[0.03] text-[#0F5132]">
+                                <svg width="100%" height="100%" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                  <circle cx="85%" cy="15%" r="50" stroke="currentColor" strokeWidth="1.2" />
+                                  <circle cx="90%" cy="20%" r="80" stroke="currentColor" strokeWidth="1" strokeDasharray="3 3" />
+                                  <path d="M-10,80 C30,40 80,100 150,60" stroke="currentColor" strokeWidth="1.2" />
+                                </svg>
+                              </div>
+
                               {/* Clickable Header for details */}
                               <div 
                                 onClick={() => setExpandedPendingChatId(isExpanded ? null : c.chatId)}
-                                className="cursor-pointer space-y-2 select-none hover:opacity-85"
+                                className="cursor-pointer space-y-2.5 select-none hover:opacity-90 relative z-10"
                                 title="Click to view assigned recruiters"
                               >
                                 <div className="flex items-center justify-between gap-1">
                                   <span className="text-xs font-mono font-bold text-slate-800">
                                     {c.customerPhone}
                                   </span>
-                                  <span className="text-[9px] font-mono font-bold px-2 py-0.5 bg-amber-50 text-amber-700 rounded-md border border-amber-100">
+                                  <span className="text-[9px] font-mono font-bold px-2.5 py-1 bg-amber-950 text-amber-200 rounded-lg border border-amber-900/40 shrink-0 shadow-sm">
                                     {c.sharedWith?.length || 0} routed
                                   </span>
                                 </div>
                                 <div className="flex items-center justify-between">
-                                  <p className="text-xs font-sans font-extrabold text-slate-700 leading-none">
+                                  <p className="text-sm font-sans font-black text-black leading-snug">
                                     {c.jobTitle}
                                   </p>
-                                  <span className="text-[8px] font-mono font-bold text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100">
+                                  <span className="text-[8px] font-mono font-bold text-white bg-[#0F5132] hover:bg-[#0B3C2D] px-2.5 py-1 rounded shadow-sm">
                                     {isExpanded ? "▲ Hide Staff" : "▼ See Staff"}
                                   </span>
                                 </div>
                               </div>
 
                               {isExpanded && (
-                                <div className="pt-2.5 border-t border-dashed border-slate-200 space-y-2">
+                                <div className="pt-2.5 border-t border-dashed border-slate-100 space-y-2 relative z-10">
                                   <span className="text-[9px] font-mono text-slate-400 font-bold uppercase tracking-wider block text-left">
                                     Routed recruiters:
                                   </span>
-                                  <div className="space-y-1.5 bg-slate-50/50 p-2.5 rounded-xl border border-slate-100">
+                                  <div className="space-y-1.5 bg-slate-50 p-2.5 rounded-xl border border-slate-200/60">
                                     {c.sharedWith && c.sharedWith.length > 0 ? (
                                       c.sharedWith.map((uid) => {
                                         const staffMember = staffList.find(s => s.uid === uid);
                                         const isOnline = isStaffOnline(uid);
                                         return (
-                                          <div key={uid} className="flex items-center justify-between text-[10px] text-slate-600 font-sans font-semibold">
+                                          <div key={uid} className="flex items-center justify-between text-[10px] text-slate-600 font-sans font-bold">
                                             <span className="truncate max-w-[130px]">
                                               {staffMember ? staffMember.displayName : `Recruiter (${uid.substring(0, 8)})`}
                                             </span>
-                                            <span className={`text-[8px] font-mono font-bold uppercase px-1.5 py-0.5 rounded shrink-0 ${isOnline ? "bg-emerald-50 text-emerald-700 border border-emerald-100" : "bg-slate-200 text-slate-500"}`}>
+                                            <span className={`text-[8px] font-mono font-bold uppercase px-1.5 py-0.5 rounded shrink-0 ${isOnline ? "bg-emerald-50 text-[#0F5132] border border-[#0F5132]/20" : "bg-slate-100 text-slate-500 border border-slate-200"}`}>
                                               {isOnline ? "Online" : "Offline"}
                                             </span>
                                           </div>
@@ -991,20 +1379,20 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ jobsList }) => {
                                 </div>
                               )}
 
-                              <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
-                                <span className="text-[9px] font-mono text-amber-600 font-bold uppercase tracking-wider block">
+                              <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-2 relative z-10">
+                                <span className="text-[9px] font-mono font-black px-2.5 py-1 bg-amber-950 text-amber-200 rounded-lg border border-amber-900/40 shadow-sm uppercase tracking-wider block">
                                   Awaiting Claim
                                 </span>
                                 <button
                                   onClick={() => handleMarkAbandoned(c.chatId)}
-                                  className="text-[9px] font-sans font-bold text-red-500 hover:text-red-700 hover:underline cursor-pointer border-0 bg-transparent"
+                                  className="text-[9px] font-mono font-bold px-2.5 py-1 bg-rose-950 text-rose-200 hover:bg-rose-900/80 border border-rose-900/40 rounded-lg uppercase tracking-wider transition-all cursor-pointer shadow-sm"
                                 >
-                                  SLA Abandon
+                                  Mark Abandoned
                                 </button>
                               </div>
 
                               {/* Manual Assign Selector */}
-                              <div className="pt-3 border-t border-slate-100">
+                              <div className={`pt-3 border-t border-slate-100 relative ${isDropdownActive ? 'z-30' : 'z-10'}`}>
                                 <RecruiterDropdown
                                   staffList={staffList}
                                   getActiveChatsCount={getActiveChatsCount}
@@ -1013,6 +1401,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ jobsList }) => {
                                     setActionSuccess(`Chat manually assigned to ${displayName}`);
                                     setTimeout(() => setActionSuccess(null), 3000);
                                   }}
+                                  onOpenChange={(isOpen) => setActiveDropdownChatId(isOpen ? c.chatId : null)}
                                   placeholder="-- Assign Recruiter --"
                                   label="Manual Route Assignment"
                                 />
@@ -1030,52 +1419,72 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ jobsList }) => {
                           <span>No Live Ongoing Discussions Ongoing</span>
                         </div>
                       ) : (
-                        ongoingChats.map((c) => (
-                          <div key={c.chatId} className="p-4 bg-white border border-slate-200/60 rounded-2xl shadow-sm space-y-3">
-                            <div className="flex items-center justify-between gap-1">
-                              <span className="text-xs font-mono font-bold text-slate-800">
-                                {c.customerPhone}
-                              </span>
-                            </div>
-                            <p className="text-xs font-sans font-extrabold text-slate-700 leading-none">
-                              {c.jobTitle}
-                            </p>
-                            <div className="flex items-center gap-1.5 bg-blue-50/80 text-blue-800 px-3 py-2 rounded-xl text-[10px] font-sans font-bold border border-blue-100/50">
-                              <Users className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                              <span className="truncate">
-                                Claimed: <strong className="font-extrabold text-blue-900">{c.assignedToName || "System Agent"}</strong>
-                              </span>
-                            </div>
-                            
-                            {/* Transfer Route Selector */}
-                            <div className="pt-1.5">
-                              <RecruiterDropdown
-                                currentOwnerId={c.assignedTo}
-                                staffList={staffList}
-                                getActiveChatsCount={getActiveChatsCount}
-                                onSelect={async (targetUid, displayName) => {
-                                  await forceReassignConversation(c.chatId, targetUid, displayName);
-                                  setActionSuccess(`Chat transferred to ${displayName}`);
-                                  setTimeout(() => setActionSuccess(null), 3000);
-                                }}
-                                placeholder="-- Transfer to Recruiter --"
-                                label="Reallocate Conversation"
-                              />
-                            </div>
+                        ongoingChats.map((c) => {
+                          const isDropdownActive = activeDropdownChatId === c.chatId;
+                          return (
+                            <div 
+                              key={c.chatId} 
+                              className={`p-6 bg-white rounded-none border-y border-[#0F5132] space-y-4 transition-all duration-300 relative w-full ${
+                                isDropdownActive 
+                                  ? 'z-40 bg-[#FAFDFB]' 
+                                  : 'z-10'
+                              }`}
+                            >
+                              {/* Vector graphic pattern background design */}
+                              <div className="absolute inset-0 pointer-events-none opacity-[0.03] text-[#0F5132]">
+                                <svg width="100%" height="100%" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                  <circle cx="85%" cy="15%" r="50" stroke="currentColor" strokeWidth="1.2" />
+                                  <circle cx="90%" cy="20%" r="80" stroke="currentColor" strokeWidth="1" strokeDasharray="3 3" />
+                                  <path d="M-10,80 C30,40 80,100 150,60" stroke="currentColor" strokeWidth="1.2" />
+                                </svg>
+                              </div>
 
-                            {/* Reset route back to pending */}
-                            <div className="pt-3 border-t border-slate-100">
-                              <button
-                                onClick={() => handleForceReassign(c.chatId)}
-                                className="w-full py-2 bg-red-50 hover:bg-red-100 text-red-600 text-[10px] font-mono font-bold rounded-xl flex items-center justify-center gap-1.5 transition-colors cursor-pointer border-0"
-                                title="Clear assignee and reset status"
-                              >
-                                <UserMinus className="w-3.5 h-3.5" />
-                                Release back to Pending
-                              </button>
+                              <div className="flex items-center justify-between gap-1 relative z-10">
+                                <span className="text-xs font-mono font-bold text-slate-800">
+                                  {c.customerPhone}
+                                </span>
+                              </div>
+                              <p className="text-sm font-sans font-black text-black leading-snug relative z-10">
+                                {c.jobTitle}
+                              </p>
+                              <div className="flex items-center gap-1.5 bg-blue-950 text-blue-200 px-3 py-2 rounded-xl text-[10px] font-sans font-bold border border-blue-900/40 shadow-sm relative z-10">
+                                <Users className="w-3.5 h-3.5 text-blue-300 shrink-0" />
+                                <span className="truncate">
+                                  Owner: <strong className="font-extrabold text-blue-100">{c.assignedToName || "System Agent"}</strong>
+                                </span>
+                              </div>
+                              
+                              {/* Transfer Route Selector */}
+                              <div className={`pt-1.5 relative ${isDropdownActive ? 'z-30' : 'z-10'}`}>
+                                <RecruiterDropdown
+                                  currentOwnerId={c.assignedTo}
+                                  staffList={staffList}
+                                  getActiveChatsCount={getActiveChatsCount}
+                                  onSelect={async (targetUid, displayName) => {
+                                    await forceReassignConversation(c.chatId, targetUid, displayName);
+                                    setActionSuccess(`Chat transferred to ${displayName}`);
+                                    setTimeout(() => setActionSuccess(null), 3000);
+                                  }}
+                                  onOpenChange={(isOpen) => setActiveDropdownChatId(isOpen ? c.chatId : null)}
+                                  placeholder="-- Transfer to Recruiter --"
+                                  label="Reallocate Conversation"
+                                />
+                              </div>
+
+                              {/* Reset route back to pending */}
+                              <div className="pt-3 border-t border-slate-100 relative z-0">
+                                <button
+                                  onClick={() => handleForceReassign(c.chatId)}
+                                  className="w-full py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-600 text-[10px] font-mono font-bold rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer border border-rose-200/50"
+                                  title="Clear assignee and reset status"
+                                >
+                                  <UserMinus className="w-3.5 h-3.5" />
+                                  Release back to Pending
+                                </button>
+                              </div>
                             </div>
-                          </div>
-                        ))
+                          );
+                        })
                       )
                     )}
 
@@ -1087,18 +1496,27 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ jobsList }) => {
                         </div>
                       ) : (
                         finishedChats.map((c) => (
-                          <div key={c.chatId} className="p-4 bg-white border border-slate-200/60 rounded-2xl shadow-sm space-y-3 opacity-80">
-                            <div className="flex items-center justify-between gap-1">
+                          <div key={c.chatId} className="p-6 bg-white rounded-none border-y border-[#0F5132] space-y-4 relative transition-all duration-300 z-10 w-full">
+                            {/* Vector graphic pattern background design */}
+                            <div className="absolute inset-0 pointer-events-none opacity-[0.03] text-[#0F5132]">
+                              <svg width="100%" height="100%" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <circle cx="85%" cy="15%" r="50" stroke="currentColor" strokeWidth="1.2" />
+                                <circle cx="90%" cy="20%" r="80" stroke="currentColor" strokeWidth="1" strokeDasharray="3 3" />
+                                <path d="M-10,80 C30,40 80,100 150,60" stroke="currentColor" strokeWidth="1.2" />
+                              </svg>
+                            </div>
+
+                            <div className="flex items-center justify-between gap-1 relative z-10">
                               <span className="text-xs font-mono font-bold text-slate-800">
                                 {c.customerPhone}
                               </span>
                             </div>
-                            <p className="text-xs font-sans font-extrabold text-slate-700 leading-none">
+                            <p className="text-sm font-sans font-black text-black leading-snug relative z-10">
                               {c.jobTitle}
                             </p>
-                            <div className="pt-2.5 border-t border-slate-100 flex items-center justify-between gap-1 text-[10px] font-mono text-emerald-600 font-bold">
+                            <div className="pt-2.5 border-t border-slate-100 flex items-center justify-between gap-1 text-[10px] font-mono text-emerald-200 font-bold bg-emerald-950 px-2.5 py-1.5 rounded-xl border border-emerald-900/40 shadow-sm relative z-10 w-full">
                               <span>✓ ARCHIVED SESSION</span>
-                              <span className="text-slate-400 font-sans font-medium">By: {c.assignedToName || "System"}</span>
+                              <span className="text-emerald-300 font-sans font-semibold text-[9px]">By: {c.assignedToName || "System"}</span>
                             </div>
                           </div>
                         ))
@@ -1113,20 +1531,29 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ jobsList }) => {
                         </div>
                       ) : (
                         abandonedChats.map((c) => (
-                          <div key={c.chatId} className="p-4 bg-white border border-slate-200/60 rounded-2xl shadow-sm space-y-3 opacity-80">
-                            <div className="flex items-center justify-between gap-1">
+                          <div key={c.chatId} className="p-6 bg-white rounded-none border-y border-[#0F5132] space-y-4 relative transition-all duration-300 z-10 w-full">
+                            {/* Vector graphic pattern background design */}
+                            <div className="absolute inset-0 pointer-events-none opacity-[0.03] text-[#0F5132]">
+                              <svg width="100%" height="100%" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <circle cx="85%" cy="15%" r="50" stroke="currentColor" strokeWidth="1.2" />
+                                <circle cx="90%" cy="20%" r="80" stroke="currentColor" strokeWidth="1" strokeDasharray="3 3" />
+                                <path d="M-10,80 C30,40 80,100 150,60" stroke="currentColor" strokeWidth="1.2" />
+                              </svg>
+                            </div>
+
+                            <div className="flex items-center justify-between gap-1 relative z-10">
                               <span className="text-xs font-mono font-bold text-slate-800">
                                 {c.customerPhone}
                               </span>
                             </div>
-                            <p className="text-xs font-sans font-extrabold text-slate-700 leading-none">
+                            <p className="text-sm font-sans font-black text-black leading-snug relative z-10">
                               {c.jobTitle}
                             </p>
-                            <div className="pt-3 border-t border-slate-100 flex justify-between items-center text-[10px] font-mono text-red-600 font-semibold">
-                              <span className="flex items-center gap-1">✖ ABANDONED TICKET</span>
+                            <div className="pt-3 border-t border-slate-100 flex flex-row items-center justify-between gap-2 relative z-10">
+                              <span className="flex items-center gap-1 text-[10px] font-mono text-rose-200 font-bold bg-rose-950 px-2.5 py-1.5 rounded-xl border border-rose-900/40 shadow-sm">✖ ABANDONED TICKET</span>
                               <button
                                 onClick={() => handleForceReassign(c.chatId)}
-                                className="text-slate-500 hover:text-slate-800 underline flex items-center gap-1 cursor-pointer border-0 bg-transparent text-[10px] font-sans font-bold"
+                                className="text-rose-600 hover:text-rose-800 flex items-center gap-1 cursor-pointer border-0 bg-transparent text-[10px] font-sans font-bold hover:underline"
                               >
                                 Reset Queue <ArrowRight className="w-3.5 h-3.5" />
                               </button>
@@ -1140,6 +1567,399 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ jobsList }) => {
               </div>
             </div>
           </motion.div>
+        ) : activeView === "reports" ? (() => {
+          const reportsByDate = dailyReports.filter(r => r.date === selectedReportsDate);
+          
+          const totalReachOuts = reportsByDate.reduce((sum, r) => sum + (Number(r.newReachOuts) || 0), 0);
+          const totalAddressesGiven = reportsByDate.reduce((sum, r) => sum + (Number(r.addressesGiven) || 0), 0);
+          
+          const reachOutsMetCount = reportsByDate.filter(r => r.targetReachOutsMet).length;
+          const reachOutsMetPercent = staffList.length > 0
+            ? Math.round((reachOutsMetCount / staffList.length) * 100)
+            : 0;
+
+          const addressLogsMetCount = reportsByDate.filter(r => r.targetAddressesMet).length;
+          const addressLogsMetPercent = staffList.length > 0
+            ? Math.round((addressLogsMetCount / staffList.length) * 100)
+            : 0;
+
+          const onTimeMetCount = reportsByDate.filter(r => r.targetOnTimeMet).length;
+          const onTimeMetPercent = staffList.length > 0
+            ? Math.round((onTimeMetCount / staffList.length) * 100)
+            : 0;
+
+          const getStaffEmail = (uid: string) => {
+            const staff = staffList.find(s => s.uid === uid);
+            return staff ? staff.email : "";
+          };
+
+          const filteredReportsList = reportsByDate.filter(report => {
+            const staffEmail = getStaffEmail(report.uid).toLowerCase();
+            const staffName = (report.staffName || "").toLowerCase();
+            const q = reportsSearchQuery.toLowerCase();
+            return staffName.includes(q) || staffEmail.includes(q);
+          });
+
+          return (
+            <motion.div
+              key="reports"
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -15 }}
+              transition={{ duration: 0.25 }}
+              className="space-y-6 text-left"
+            >
+              {/* Header with Back Button */}
+              <div className="flex items-center justify-between">
+                <button
+                  onClick={() => setActiveView("overview")}
+                  className="px-4 py-2 border border-emerald-800 rounded-xl bg-white hover:bg-emerald-50/20 text-[#0B3C2D] hover:text-[#06241B] text-xs font-extrabold transition-all flex items-center gap-2 cursor-pointer shadow-[0_4px_12px_rgba(0,0,0,0.03)] hover:-translate-y-0.5"
+                >
+                  <ArrowLeft className="w-4 h-4" /> Go Back
+                </button>
+                <div className="flex items-center gap-1.5 bg-[#0B3C2D] border border-emerald-900 text-emerald-200 px-3 py-1.5 rounded-xl text-[10px] font-mono font-bold uppercase tracking-wider">
+                  <ClipboardList className="w-3.5 h-3.5" /> Staff Daily Reports Hub
+                </div>
+              </div>
+
+              {/* Date & Name Filter Controls */}
+              <div className="relative overflow-hidden flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-gradient-to-r from-[#0B3C2D] via-[#0B4030] to-[#052119] border border-emerald-900/60 rounded-3xl p-5 shadow-[0_15px_35px_-5px_rgba(0,0,0,0.05)]">
+                {/* Background vector graphics */}
+                <div className="absolute inset-0 pointer-events-none opacity-[0.12]">
+                  <svg width="100%" height="100%" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="10%" cy="50%" r="60" stroke="currentColor" strokeWidth="1" className="text-emerald-400" />
+                    <circle cx="90%" cy="30%" r="50" stroke="currentColor" strokeWidth="1" className="text-emerald-300" strokeDasharray="3 3" />
+                  </svg>
+                </div>
+
+                <div className="relative w-full sm:w-80 z-10">
+                  <Search className="absolute left-3.5 top-3 w-4 h-4 text-[#0B3C2D]" />
+                  <input
+                    type="text"
+                    placeholder="Search by staff name or email..."
+                    value={reportsSearchQuery}
+                    onChange={(e) => setReportsSearchQuery(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2.5 border border-emerald-800/30 hover:border-emerald-800/60 focus:border-emerald-800 focus:ring-0 rounded-2xl bg-white/85 hover:bg-white/95 focus:bg-white focus:outline-none text-xs font-extrabold text-[#0B3C2D] transition-all placeholder:text-emerald-950/75"
+                  />
+                </div>
+
+                <div className="flex flex-row items-center gap-3 self-stretch sm:self-auto shrink-0 z-10">
+                  <span className="text-xs font-black text-emerald-100 flex items-center gap-1.5 whitespace-nowrap">
+                    <Calendar className="w-4 h-4 text-emerald-300" /> Select Date:
+                  </span>
+                  <input
+                    type="date"
+                    value={selectedReportsDate}
+                    onChange={(e) => setSelectedReportsDate(e.target.value)}
+                    className="px-4 py-2.5 border border-emerald-800/30 hover:border-emerald-800/60 rounded-2xl bg-white/85 hover:bg-white/95 focus:bg-white text-xs font-extrabold text-[#0B3C2D] focus:outline-none transition-all cursor-pointer min-w-[140px] w-full sm:w-52"
+                  />
+                </div>
+              </div>
+
+              {/* Reports Metric Panel */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                {/* Total logs card */}
+                <div className="bg-[#0B3C2D] border border-emerald-900 rounded-3xl p-5 shadow-[0_15px_35px_-5px_rgba(0,0,0,0.05)] relative overflow-hidden">
+                  <div className="absolute inset-0 pointer-events-none opacity-[0.08]">
+                    <svg width="100%" height="100%" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <circle cx="85%" cy="15%" r="40" stroke="currentColor" strokeWidth="1" className="text-emerald-400" />
+                    </svg>
+                  </div>
+                  <span className="text-[10px] font-sans font-extrabold text-emerald-200 uppercase tracking-wider block leading-none">Reports</span>
+                  <p className="text-3xl font-mono font-black text-white leading-none mt-2">{reportsByDate.length} / {staffList.length}</p>
+                  <p className="text-[10px] text-emerald-300 font-sans font-bold mt-2">Continuous audits</p>
+                </div>
+
+                {/* Reach outs card */}
+                <div className="bg-white border border-emerald-800/20 rounded-3xl p-5 shadow-[0_15px_35px_-5px_rgba(0,0,0,0.05)] relative overflow-hidden">
+                  <span className="text-[10px] font-sans font-extrabold text-slate-500 uppercase tracking-wider block leading-none">Reach-outs</span>
+                  <div className="flex items-center gap-2 mt-2">
+                    <span className="text-xs sm:text-sm font-mono font-black text-[#0B3C2D] bg-emerald-50 px-2 py-1 rounded-lg border border-emerald-100 shadow-[0_1px_2px_rgba(0,0,0,0.02)]" title="Total reach-outs sent">
+                      {totalReachOuts}
+                    </span>
+                    <p className="text-3xl font-mono font-black text-[#0B3C2D] leading-none">
+                      {reachOutsMetPercent}%
+                    </p>
+                  </div>
+                  <div className="h-1 bg-emerald-100 rounded-full overflow-hidden mt-3.5">
+                    <div className="h-full bg-[#0B3C2D]" style={{ width: `${reachOutsMetPercent}%` }} />
+                  </div>
+                </div>
+
+                {/* Address logs card */}
+                <div className="bg-white border border-emerald-800/20 rounded-3xl p-5 shadow-[0_15px_35px_-5px_rgba(0,0,0,0.05)] relative overflow-hidden">
+                  <span className="text-[10px] font-sans font-extrabold text-slate-500 uppercase tracking-wider block leading-none">Address Sent</span>
+                  <div className="flex items-center gap-2 mt-2">
+                    <span className="text-xs sm:text-sm font-mono font-black text-[#0B3C2D] bg-emerald-50 px-2 py-1 rounded-lg border border-emerald-100 shadow-[0_1px_2px_rgba(0,0,0,0.02)]" title="Total addresses sent">
+                      {totalAddressesGiven}
+                    </span>
+                    <p className="text-3xl font-mono font-black text-[#0B3C2D] leading-none">
+                      {addressLogsMetPercent}%
+                    </p>
+                  </div>
+                  <div className="h-1 bg-emerald-100 rounded-full overflow-hidden mt-3.5">
+                    <div className="h-full bg-[#0B3C2D]" style={{ width: `${addressLogsMetPercent}%` }} />
+                  </div>
+                </div>
+
+                {/* SLA punctuality card */}
+                <div className="bg-white border border-emerald-800/20 rounded-3xl p-5 shadow-[0_15px_35px_-5px_rgba(0,0,0,0.05)] relative overflow-hidden">
+                  <span className="text-[10px] font-sans font-extrabold text-slate-500 uppercase tracking-wider block leading-none">Staff Punctuality</span>
+                  <p className="text-3xl font-mono font-black text-[#0B3C2D] leading-none mt-2">
+                    {onTimeMetPercent}%
+                  </p>
+                  <p className="text-[10px] text-emerald-800/80 font-sans font-bold mt-2">Before 9:00 PM</p>
+                </div>
+              </div>
+
+              {/* Activity Logs Feed Container */}
+              <div className="bg-white border border-emerald-800 rounded-3xl p-6 sm:p-8 space-y-6 shadow-[0_15px_35px_-5px_rgba(0,0,0,0.05)]">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-[#0B3C2D] border border-emerald-900 rounded-xl flex items-center justify-center text-emerald-200 shrink-0 shadow-sm">
+                    <ClipboardList className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-sans font-extrabold text-slate-900 tracking-tight leading-none">
+                      Activity Logs Feed
+                    </h3>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  {filteredReportsList.length === 0 ? (
+                    <div className="text-center py-12 text-xs font-sans font-bold text-slate-400 italic">
+                      No Daily Report logs currently match the selected filters.
+                    </div>
+                  ) : (
+                    filteredReportsList.map((report) => {
+                      const isExpanded = expandedReportId === report.id;
+                      const staffEmail = getStaffEmail(report.uid);
+                      return (
+                        <div 
+                          key={report.id} 
+                          className={`border rounded-2xl overflow-hidden transition-all duration-300 ${
+                            isExpanded ? "border-emerald-800 bg-emerald-50/10 shadow-sm" : "border-slate-200 hover:border-emerald-800/40 bg-white"
+                          }`}
+                        >
+                          {/* Header Trigger */}
+                          <div 
+                            onClick={() => setExpandedReportId(isExpanded ? null : report.id)}
+                            className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 cursor-pointer select-none"
+                          >
+                            <div className="space-y-1.5 text-left">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <h4 className="text-sm font-black text-[#0B3C2D] font-sans">
+                                  {report.staffName}
+                                </h4>
+                                {staffEmail && (
+                                  <span className="text-xs font-extrabold text-emerald-900 bg-emerald-50 border border-emerald-100 px-2.5 py-0.5 rounded-full">
+                                    {staffEmail}
+                                  </span>
+                                )}
+                                <span className="text-xs font-mono bg-[#0B3C2D] text-white px-2.5 py-0.5 rounded-full font-extrabold">
+                                  {report.date}
+                                </span>
+                                {report.targetOnTimeMet ? (
+                                  <span className="text-[10px] font-mono bg-white text-emerald-800 px-2 py-0.5 rounded-lg border border-emerald-200 font-black shadow-sm">
+                                    ✓ ON-TIME SLA
+                                  </span>
+                                ) : (
+                                  <span className="text-[10px] font-mono bg-white text-amber-800 px-2 py-0.5 rounded-lg border border-amber-200 font-black shadow-sm">
+                                    PAST 9PM LIMIT
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-xs text-slate-500 font-mono font-medium">
+                                Registered at {new Date(report.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              </p>
+                            </div>
+
+                            <div className="flex items-center gap-4 justify-between sm:justify-end shrink-0">
+                              <div className="flex gap-2.5 text-xs font-mono text-slate-600 font-extrabold">
+                                <span>Outreach: <strong className={report.targetReachOutsMet ? "text-emerald-800 font-black" : "text-amber-800 font-black"}>{report.newReachOuts}</strong></span>
+                                <span>•</span>
+                                <span>Addresses: <strong className={report.targetAddressesMet ? "text-emerald-800 font-black" : "text-amber-800 font-black"}>{report.addressesGiven}</strong></span>
+                              </div>
+                              <span className="text-xs font-black text-emerald-800 hover:text-[#0B3C2D] flex items-center gap-1">
+                                {isExpanded ? "▲ Collapse" : "▼ Expand Detail"}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Expanded detail */}
+                          {isExpanded && (
+                            <div className="p-5 border-t border-dashed border-emerald-800/20 text-left space-y-6 bg-emerald-50/[0.02]">
+                              
+                              {/* Stats Receipt Grid */}
+                              <div>
+                                <span className="text-[10px] font-mono text-slate-400 font-extrabold uppercase tracking-widest block mb-2.5">
+                                  Performance Checklist Receipts
+                                </span>
+                                <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                                  <div className="bg-white p-3.5 rounded-2xl border border-slate-200 space-y-1 shadow-sm">
+                                    <span className="text-[10px] font-mono text-slate-400 uppercase font-bold">Reach-Outs</span>
+                                    <p className="text-base font-mono font-black text-slate-900">{report.newReachOuts}</p>
+                                    <span className={`text-[10px] font-mono font-black ${report.targetReachOutsMet ? "text-emerald-800" : "text-amber-800"}`}>
+                                      {report.targetReachOutsMet ? "Target Met (20+)" : "Unmet Target (<20)"}
+                                    </span>
+                                  </div>
+
+                                  <div className="bg-white p-3.5 rounded-2xl border border-slate-200 space-y-1 shadow-sm">
+                                    <span className="text-[10px] font-mono text-slate-400 uppercase font-bold">Addresses Given</span>
+                                    <p className="text-base font-mono font-black text-slate-900">{report.addressesGiven}</p>
+                                    <span className={`text-[10px] font-mono font-black ${report.targetAddressesMet ? "text-emerald-800" : "text-amber-800"}`}>
+                                      {report.targetAddressesMet ? "Target Met (4+)" : "Unmet Target (<4)"}
+                                    </span>
+                                  </div>
+
+                                  <div className="bg-white p-3.5 rounded-2xl border border-slate-200 space-y-1 shadow-sm">
+                                    <span className="text-[10px] font-mono text-slate-400 uppercase font-bold">Registered</span>
+                                    <p className="text-base font-mono font-black text-slate-900">{report.candidatesRegistered}</p>
+                                    <span className="text-[10px] text-slate-500 font-extrabold">Candidates</span>
+                                  </div>
+
+                                  <div className="bg-white p-3.5 rounded-2xl border border-slate-200 space-y-1 shadow-sm">
+                                    <span className="text-[10px] font-mono text-slate-400 uppercase font-bold">CVs Collected</span>
+                                    <p className="text-base font-mono font-black text-slate-900">{report.cvsCollected}</p>
+                                    <span className="text-[10px] text-slate-500 font-extrabold">Total resumes</span>
+                                  </div>
+
+                                  <div className="bg-white p-3.5 rounded-2xl border border-slate-200 space-y-1 shadow-sm">
+                                    <span className="text-[10px] font-mono text-slate-400 uppercase font-bold">Resumptions</span>
+                                    <p className="text-base font-mono font-black text-slate-900">{report.resumptions}</p>
+                                    <span className="text-[10px] text-slate-500 font-extrabold">Assigned starts</span>
+                                  </div>
+
+                                  <div className="bg-white p-3.5 rounded-2xl border border-slate-200 space-y-1 shadow-sm">
+                                    <span className="text-[10px] font-mono text-slate-400 uppercase font-bold">Commission Ret.</span>
+                                    <p className="text-base font-mono font-black text-slate-900">{report.commissionRetrieved || "None"}</p>
+                                    <span className="text-[10px] text-slate-500 font-extrabold">Revenue collection</span>
+                                  </div>
+
+                                  <div className="bg-white p-3.5 rounded-2xl border border-slate-200 space-y-1 shadow-sm">
+                                    <span className="text-[10px] font-mono text-slate-400 uppercase font-bold">Flyers Made</span>
+                                    <p className="text-base font-mono font-black text-slate-900">{report.flyersMade}</p>
+                                    <span className="text-[10px] text-slate-500 font-extrabold">Graphics count</span>
+                                  </div>
+
+                                  <div className="bg-white p-3.5 rounded-2xl border border-slate-200 space-y-1 shadow-sm">
+                                    <span className="text-[10px] font-mono text-slate-400 uppercase font-bold">Videos Made</span>
+                                    <p className="text-base font-mono font-black text-slate-900">{report.videosMade}</p>
+                                    <span className="text-[10px] text-slate-500 font-extrabold">Reels/Promos</span>
+                                  </div>
+
+                                  <div className="bg-white p-3.5 rounded-2xl border border-slate-200 space-y-1 shadow-sm">
+                                    <span className="text-[10px] font-mono text-slate-400 uppercase font-bold">Jobs Gotten</span>
+                                    <p className="text-base font-mono font-black text-slate-900">{report.jobsGotten}</p>
+                                    <span className="text-[10px] text-slate-500 font-extrabold">Direct placements</span>
+                                  </div>
+
+                                  <div className="bg-white p-3.5 rounded-2xl border border-slate-200 space-y-1 shadow-sm">
+                                    <span className="text-[10px] font-mono text-slate-400 uppercase font-bold">Client Relations</span>
+                                    <p className="text-base font-sans font-black text-slate-900 truncate" title={report.newJobsGottenClientRelations}>
+                                      {report.newJobsGottenClientRelations || "None"}
+                                    </p>
+                                    <span className="text-[10px] text-slate-500 font-extrabold block truncate">Relations logs</span>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Qualitative Feedbacks */}
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="bg-amber-50/50 border border-amber-200/80 p-4 rounded-2xl space-y-1.5">
+                                  <span className="text-xs font-mono font-black text-amber-950 uppercase tracking-wider block">Challenges Encountered</span>
+                                  <p className="text-sm text-slate-850 leading-relaxed font-sans font-extrabold">
+                                    {report.challenges || "No major challenges logged."}
+                                  </p>
+                                </div>
+
+                                <div className="bg-blue-50/50 border border-blue-200/80 p-4 rounded-2xl space-y-1.5">
+                                  <span className="text-xs font-mono font-black text-blue-950 uppercase tracking-wider block">Plans for Tomorrow</span>
+                                  <p className="text-sm text-slate-850 leading-relaxed font-sans font-extrabold">
+                                    {report.plansTomorrow || "Continue recruitment operations."}
+                                  </p>
+                                </div>
+                              </div>
+
+                              {/* Verification and proof */}
+                              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4.5 bg-slate-50 border border-slate-200 rounded-2xl shadow-sm">
+                                <div className="space-y-1 text-left">
+                                  <span className="text-xs font-mono font-black text-slate-900 uppercase tracking-widest block">Sign-off Checklist Status</span>
+                                  <div className="flex items-center gap-1.5 text-sm font-extrabold text-[#0B3C2D]">
+                                    <CheckCircle2 className="w-5 h-5 text-emerald-800 shrink-0" />
+                                    <span>Chats are fully cleared and proof submitted before sign-off</span>
+                                  </div>
+                                </div>
+
+                                {report.chatsClearedProofUrl && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setLightboxUrl(report.chatsClearedProofUrl)}
+                                    className="px-4 py-2.5 bg-[#0B3C2D] hover:bg-[#06241B] text-emerald-100 text-xs font-sans font-black rounded-xl shadow-md flex items-center gap-1.5 cursor-pointer transition-all shrink-0 active:scale-95 border-0"
+                                  >
+                                    <Eye className="w-4 h-4" /> View Proof Screenshot
+                                  </button>
+                                )}
+                              </div>
+
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          );
+        })() : activeView === "jobs" ? (
+          <motion.div
+            key="jobs"
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -15 }}
+            transition={{ duration: 0.25 }}
+          >
+            <JobManagement 
+              onBack={() => setActiveView("overview")} 
+              onPostJob={() => setActiveView("post-job")} 
+            />
+          </motion.div>
+        ) : activeView === "post-job" ? (
+          <motion.div
+            key="post-job"
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -15 }}
+            transition={{ duration: 0.25 }}
+          >
+            <AdminPostJobPage 
+              onBack={() => setActiveView("jobs")} 
+              onJobAdded={() => setActiveView("jobs")} 
+            />
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
+
+      {/* Lightbox Modal */}
+      <AnimatePresence>
+        {lightboxUrl && (
+          <div 
+            onClick={() => setLightboxUrl(null)}
+            className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex flex-col items-center justify-center p-4 cursor-zoom-out"
+          >
+            <div className="relative max-w-4xl max-h-[85vh] overflow-hidden rounded-2xl bg-slate-900 border border-white/10 shadow-2xl">
+              <img 
+                src={lightboxUrl} 
+                alt="High-resolution Proof" 
+                className="max-h-[80vh] w-auto object-contain"
+                referrerPolicy="no-referrer"
+              />
+              <div className="p-3 bg-slate-900 text-center text-xs text-slate-400 font-mono">
+                Click anywhere to close full screen verification
+              </div>
+            </div>
+          </div>
         )}
       </AnimatePresence>
     </div>
