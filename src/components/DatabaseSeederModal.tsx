@@ -436,11 +436,11 @@ export const DatabaseSeederModal: React.FC<{ inline?: boolean }> = ({ inline = f
         {/* Header without X button */}
         <div className="px-6 pt-6 pb-4 bg-slate-50/50 border-b border-slate-100 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="w-9 h-9 rounded-xl bg-emerald-500/10 flex items-center justify-center text-[#0F5132]">
+            <div className="w-9 h-9 rounded-xl bg-blue-500/10 flex items-center justify-center text-[#1E88E5]">
               <Database className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="font-serif italic font-extrabold text-[#0B3C49] leading-tight text-base">
+              <h3 className="font-serif italic font-extrabold text-[#1e3a8a] leading-tight text-base">
                 Workspace Seeder
               </h3>
               <p className="text-[10px] text-slate-400 font-mono tracking-wider uppercase">
@@ -472,10 +472,10 @@ export const DatabaseSeederModal: React.FC<{ inline?: boolean }> = ({ inline = f
                     </div>
                   )}
                   {step.status === "running" && (
-                    <Loader2 className="w-4.5 h-4.5 text-emerald-600 animate-spin" />
+                    <Loader2 className="w-4.5 h-4.5 text-blue-600 animate-spin" />
                   )}
                   {step.status === "success" && (
-                    <CheckCircle2 className="w-4.5 h-4.5 text-emerald-600 fill-emerald-50" />
+                    <CheckCircle2 className="w-4.5 h-4.5 text-blue-600 fill-emerald-50" />
                   )}
                   {step.status === "error" && (
                     <AlertCircle className="w-4.5 h-4.5 text-rose-500" />
@@ -500,7 +500,7 @@ export const DatabaseSeederModal: React.FC<{ inline?: boolean }> = ({ inline = f
             <motion.div 
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              className="p-3 bg-emerald-50 border border-emerald-100 rounded-xl text-xs text-emerald-800 font-medium text-center"
+              className="p-3 bg-blue-50 border border-blue-100 rounded-xl text-xs text-blue-800 font-medium text-center"
             >
               🎉 {successMessage}
             </motion.div>
@@ -512,7 +512,7 @@ export const DatabaseSeederModal: React.FC<{ inline?: boolean }> = ({ inline = f
               <button
                 onClick={() => executeSeeding(false)}
                 disabled={isSeeding || isSeedingStaff}
-                className="flex-grow py-3 px-4 bg-[#0F5132] hover:bg-[#0c4027] text-white hover:text-emerald-50 text-xs font-bold rounded-xl flex items-center justify-center gap-2 shadow-md transition-all active:translate-y-[1px] disabled:opacity-50 cursor-pointer font-sans border-0 text-center"
+                className="flex-grow py-3 px-4 bg-[#1E88E5] hover:bg-[#1565C0] text-white hover:text-blue-50 text-xs font-bold rounded-xl flex items-center justify-center gap-2 shadow-md transition-all active:translate-y-[1px] disabled:opacity-50 cursor-pointer font-sans border-0 text-center"
               >
                 {isSeeding ? (
                   <>
@@ -571,7 +571,7 @@ export const DatabaseSeederModal: React.FC<{ inline?: boolean }> = ({ inline = f
       <div className="fixed bottom-4 left-4 z-50">
         <button
           onClick={() => setIsOpen(true)}
-          className="flex items-center gap-1.5 px-4 py-2.5 bg-[#0F5132] text-white hover:bg-[#0c4027] text-xs font-mono font-bold rounded-full shadow-lg border border-emerald-700/50 cursor-pointer hover:scale-105 active:scale-95 transition-all"
+          className="flex items-center gap-1.5 px-4 py-2.5 bg-[#1E88E5] text-white hover:bg-[#1565C0] text-xs font-mono font-bold rounded-full shadow-lg border border-blue-700/50 cursor-pointer hover:scale-105 active:scale-95 transition-all"
         >
           <Database className="w-3.5 h-3.5" />
           <span>Database Seeder</span>
@@ -602,11 +602,11 @@ export const DatabaseSeederModal: React.FC<{ inline?: boolean }> = ({ inline = f
               {/* Header */}
               <div className="px-6 pt-6 pb-4 bg-slate-50/50 border-b border-slate-100 flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <div className="w-9 h-9 rounded-xl bg-emerald-500/10 flex items-center justify-center text-[#0F5132]">
+                  <div className="w-9 h-9 rounded-xl bg-blue-500/10 flex items-center justify-center text-[#1E88E5]">
                     <Database className="w-5 h-5" />
                   </div>
                   <div>
-                    <h3 className="font-serif italic font-extrabold text-[#0B3C49] leading-tight">
+                    <h3 className="font-serif italic font-extrabold text-[#1e3a8a] leading-tight">
                       Workspace Seeder
                     </h3>
                     <p className="text-[10px] text-slate-400 font-mono tracking-wider uppercase">
@@ -646,10 +646,10 @@ export const DatabaseSeederModal: React.FC<{ inline?: boolean }> = ({ inline = f
                           </div>
                         )}
                         {step.status === "running" && (
-                          <Loader2 className="w-4.5 h-4.5 text-emerald-600 animate-spin" />
+                          <Loader2 className="w-4.5 h-4.5 text-blue-600 animate-spin" />
                         )}
                         {step.status === "success" && (
-                          <CheckCircle2 className="w-4.5 h-4.5 text-emerald-600 fill-emerald-50" />
+                          <CheckCircle2 className="w-4.5 h-4.5 text-blue-600 fill-emerald-50" />
                         )}
                         {step.status === "error" && (
                           <AlertCircle className="w-4.5 h-4.5 text-rose-500" />
@@ -674,7 +674,7 @@ export const DatabaseSeederModal: React.FC<{ inline?: boolean }> = ({ inline = f
                   <motion.div 
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="p-3 bg-emerald-50 border border-emerald-100 rounded-xl text-xs text-emerald-800 font-medium text-center"
+                    className="p-3 bg-blue-50 border border-blue-100 rounded-xl text-xs text-blue-800 font-medium text-center"
                   >
                     🎉 {successMessage}
                   </motion.div>
@@ -686,7 +686,7 @@ export const DatabaseSeederModal: React.FC<{ inline?: boolean }> = ({ inline = f
                     <button
                       onClick={() => executeSeeding(false)}
                       disabled={isSeeding || isSeedingStaff}
-                      className="flex-1 py-3 px-4 bg-[#0F5132] hover:bg-[#0c4027] text-white hover:text-emerald-50 text-xs font-bold rounded-xl flex items-center justify-center gap-2 shadow-md transition-all active:translate-y-[1px] disabled:opacity-50 cursor-pointer font-sans border-0"
+                      className="flex-1 py-3 px-4 bg-[#1E88E5] hover:bg-[#1565C0] text-white hover:text-blue-50 text-xs font-bold rounded-xl flex items-center justify-center gap-2 shadow-md transition-all active:translate-y-[1px] disabled:opacity-50 cursor-pointer font-sans border-0"
                     >
                       {isSeeding ? (
                         <>

@@ -353,10 +353,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({ forcedOpen = false, onClos
             {/* Elegant Header section */}
             <div className="px-6 pt-6 pb-4 flex items-center justify-between border-b border-slate-100 bg-slate-50/50">
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-[#0F5132]/10 flex items-center justify-center text-[#0F5132]">
+                <div className="w-8 h-8 rounded-lg bg-[#1E88E5]/10 flex items-center justify-center text-[#1E88E5]">
                   <Shield className="w-4 h-4" />
                 </div>
-                <span className="font-serif italic font-bold text-sm text-[#0B3C49]">
+                <span className="font-serif italic font-bold text-sm text-[#1e3a8a]">
                   Valley Reigns
                 </span>
               </div>
@@ -390,10 +390,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({ forcedOpen = false, onClos
                       className="cursor-pointer select-none"
                       title="Hold for 5s to reveal Developer Preview Mode"
                     >
-                      <div className="w-16 h-16 rounded-full bg-[#0F5132]/10 text-[#0F5132] flex items-center justify-center mx-auto mb-2 transition-all active:scale-95 duration-200">
+                      <div className="w-16 h-16 rounded-full bg-[#1E88E5]/10 text-[#1E88E5] flex items-center justify-center mx-auto mb-2 transition-all active:scale-95 duration-200">
                         <Mail className="w-8 h-8 animate-bounce" />
                       </div>
-                      <h3 className="text-xl font-display font-extrabold text-[#0B3C49]">
+                      <h3 className="text-xl font-display font-extrabold text-[#1e3a8a]">
                         {emailLinkError ? "Secure Bypass Active" : "Login Link Sent!"}
                       </h3>
                     </div>
@@ -404,7 +404,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ forcedOpen = false, onClos
                         </span>
                       ) : (
                         <span>
-                          This email was registered with Google OAuth and has no set password in our database. We have sent a secure, passwordless magic login link to <strong className="text-slate-800">{emailInput}</strong>. <strong className="text-[#0B3C49] font-extrabold block mt-2">If you do not receive the link shortly, please check your Spam or Junk email folder!</strong>
+                          This email was registered with Google OAuth and has no set password in our database. We have sent a secure, passwordless magic login link to <strong className="text-slate-800">{emailInput}</strong>. <strong className="text-[#1e3a8a] font-extrabold block mt-2">If you do not receive the link shortly, please check your Spam or Junk email folder!</strong>
                         </span>
                       )}
                     </p>
@@ -419,8 +419,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({ forcedOpen = false, onClos
                     )}
                     
                     {showHifiPreview && (
-                      <div className="p-4 bg-emerald-50/50 border border-emerald-100 rounded-2xl space-y-3 mt-4">
-                        <span className="block text-[10px] font-mono font-bold text-emerald-800 uppercase tracking-wider">
+                      <div className="p-4 bg-blue-50/50 border border-blue-100 rounded-2xl space-y-3 mt-4">
+                        <span className="block text-[10px] font-mono font-bold text-blue-800 uppercase tracking-wider">
                           ✨ High-Fidelity Preview Mode
                         </span>
                         <p className="text-[10px] text-slate-500 leading-snug">
@@ -429,7 +429,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ forcedOpen = false, onClos
                         <button
                           type="button"
                           onClick={handleSimulateMagicLink}
-                          className="w-full py-2.5 px-4 bg-[#0F5132] hover:bg-[#0c4027] text-white rounded-xl font-bold text-xs shadow-md shadow-emerald-900/10 transition-all flex items-center justify-center gap-2 cursor-pointer border-0"
+                          className="w-full py-2.5 px-4 bg-[#1E88E5] hover:bg-[#1565C0] text-white rounded-xl font-bold text-xs shadow-md shadow-blue-900/10 transition-all flex items-center justify-center gap-2 cursor-pointer border-0"
                         >
                           <CheckCircle className="w-4 h-4" />
                           <span>Simulate Email Link Login</span>
@@ -458,7 +458,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ forcedOpen = false, onClos
                     className="space-y-4"
                   >
                     <div className="space-y-1">
-                      <h3 className="text-xl font-display font-extrabold tracking-tight text-[#0B3C49]">
+                      <h3 className="text-xl font-display font-extrabold tracking-tight text-[#1e3a8a]">
                         Welcome Back!
                       </h3>
                       <p className="text-xs text-slate-500">
@@ -477,7 +477,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ forcedOpen = false, onClos
                             setEmailError("");
                             setShowEmailForm(true);
                           }}
-                          className="w-full py-3 px-4 bg-[#0F5132] hover:bg-[#0c4027] text-white rounded-xl font-bold text-xs shadow-md shadow-[#0F5132]/10 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                          className="w-full py-3 px-4 bg-[#1E88E5] hover:bg-[#1565C0] text-white rounded-xl font-bold text-xs shadow-md shadow-[#1E88E5]/10 transition-all flex items-center justify-center gap-2 cursor-pointer"
                         >
                           <Mail className="w-4 h-4" />
                           <span>Sign in with Email</span>
@@ -524,7 +524,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ forcedOpen = false, onClos
                             onPointerUp={handleSignupLinkPointerUp}
                             onPointerLeave={handleSignupLinkPointerCancel}
                             onPointerCancel={handleSignupLinkPointerCancel}
-                            className="text-[10px] text-[#0F5132] font-bold hover:underline cursor-pointer select-none"
+                            className="text-[10px] text-[#1E88E5] font-bold hover:underline cursor-pointer select-none"
                           >
                             {signupRole === "staff" ? "Create Staff Account" : "Create New Account"}
                           </button>
@@ -535,7 +535,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ forcedOpen = false, onClos
                           <button
                             type="button"
                             onClick={() => setShowDemoPortals(!showDemoPortals)}
-                            className="text-[9px] font-mono font-bold text-slate-400 hover:text-[#0F5132] transition-colors cursor-pointer"
+                            className="text-[9px] font-mono font-bold text-slate-400 hover:text-[#1E88E5] transition-colors cursor-pointer"
                           >
                             {showDemoPortals ? "Hide Demo Quick-Login Portals" : "Trouble with Google Auth/Email Link? Click to reveal Quick-Login"}
                           </button>
@@ -574,7 +574,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ forcedOpen = false, onClos
                                 placeholder="e.g. admin@valleyreigns.com"
                                 value={emailInput}
                                 onChange={(e) => setEmailInput(e.target.value)}
-                                className="w-full pl-9 pr-4 py-2.5 bg-slate-50 border border-slate-200/80 rounded-xl text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none hover:border-[#0F5132]/60 focus:border-[#0F5132] focus:bg-white focus:ring-4 focus:ring-[#0F5132]/10 transition-all focus:scale-[1.01] shadow-sm"
+                                className="w-full pl-9 pr-4 py-2.5 bg-slate-50 border border-slate-200/80 rounded-xl text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none hover:border-[#1E88E5]/60 focus:border-[#1E88E5] focus:bg-white focus:ring-4 focus:ring-[#1E88E5]/10 transition-all focus:scale-[1.01] shadow-sm"
                               />
                             </div>
                           </div>
@@ -596,7 +596,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ forcedOpen = false, onClos
                                 placeholder="••••••••"
                                 value={passwordInput}
                                 onChange={(e) => setPasswordInput(e.target.value)}
-                                className="w-full pl-9 pr-10 py-2.5 bg-slate-50 border border-slate-200/80 rounded-xl text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none hover:border-[#0F5132]/60 focus:border-[#0F5132] focus:bg-white focus:ring-4 focus:ring-[#0F5132]/10 transition-all focus:scale-[1.01] shadow-sm"
+                                className="w-full pl-9 pr-10 py-2.5 bg-slate-50 border border-slate-200/80 rounded-xl text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none hover:border-[#1E88E5]/60 focus:border-[#1E88E5] focus:bg-white focus:ring-4 focus:ring-[#1E88E5]/10 transition-all focus:scale-[1.01] shadow-sm"
                               />
                               <button
                                 type="button"
@@ -612,7 +612,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ forcedOpen = false, onClos
                             whileHover={{ scale: 1.02 }}
                             whileTap={{ scale: 0.98 }}
                             type="submit"
-                            className="w-full py-2.5 px-4 bg-[#0F5132] hover:bg-[#0c4027] text-white rounded-xl font-bold text-xs shadow-md shadow-[#0F5132]/10 transition-all flex items-center justify-center gap-2 cursor-pointer mt-1"
+                            className="w-full py-2.5 px-4 bg-[#1E88E5] hover:bg-[#1565C0] text-white rounded-xl font-bold text-xs shadow-md shadow-[#1E88E5]/10 transition-all flex items-center justify-center gap-2 cursor-pointer mt-1"
                           >
                             <LogIn className="w-3.5 h-3.5" />
                             <span>Sign In with Email</span>
@@ -629,7 +629,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ forcedOpen = false, onClos
                             onPointerUp={handleSignupLinkPointerUp}
                             onPointerLeave={handleSignupLinkPointerCancel}
                             onPointerCancel={handleSignupLinkPointerCancel}
-                            className="text-[10px] text-[#0F5132] font-bold hover:underline cursor-pointer select-none"
+                            className="text-[10px] text-[#1E88E5] font-bold hover:underline cursor-pointer select-none"
                           >
                             {signupRole === "staff" ? "Create Staff Account" : "Create New Account"}
                           </button>
@@ -642,9 +642,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({ forcedOpen = false, onClos
                       <motion.div
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
-                        className="bg-[#FAFDFB] border border-emerald-100 rounded-2xl p-3.5 space-y-3 mt-2 max-h-[320px] overflow-y-auto"
+                        className="bg-[#FAFDFB] border border-blue-100 rounded-2xl p-3.5 space-y-3 mt-2 max-h-[320px] overflow-y-auto"
                       >
-                        <span className="text-[9px] font-mono font-bold text-emerald-700 uppercase tracking-wider block text-center border-b border-emerald-50/60 pb-1.5">
+                        <span className="text-[9px] font-mono font-bold text-blue-700 uppercase tracking-wider block text-center border-b border-blue-50/60 pb-1.5">
                           ⚡ Quick-Login Testing Portals
                         </span>
 
@@ -662,9 +662,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({ forcedOpen = false, onClos
                                   handleClose();
                                 }).catch(() => setIsProcessing(false));
                               }}
-                              className="p-2 bg-[#0F5132]/5 hover:bg-[#0F5132]/10 rounded-xl text-left border border-emerald-600/10 cursor-pointer transition-colors"
+                              className="p-2 bg-[#1E88E5]/5 hover:bg-[#1E88E5]/10 rounded-xl text-left border border-blue-600/10 cursor-pointer transition-colors"
                             >
-                              <span className="block text-[9px] font-bold text-[#0F5132]">Admin Portal</span>
+                              <span className="block text-[9px] font-bold text-[#1E88E5]">Admin Portal</span>
                               <span className="block text-[8px] text-slate-500 font-mono">admin@valleyreigns.com</span>
                             </button>
 
@@ -779,7 +779,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ forcedOpen = false, onClos
                         onPointerUp={handleSignupLinkPointerUp}
                         onPointerLeave={handleSignupLinkPointerCancel}
                         onPointerCancel={handleSignupLinkPointerCancel}
-                        className="text-lg font-display font-bold text-[#0B3C49] select-none cursor-pointer hover:opacity-90"
+                        className="text-lg font-display font-bold text-[#1e3a8a] select-none cursor-pointer hover:opacity-90"
                         title="Click and hold for 5s to create recruiter staff account"
                       >
                         {signupRole === "staff" ? "Create Staff Account" : "Create an Account"}
@@ -803,7 +803,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ forcedOpen = false, onClos
                           value={signupName}
                           onChange={(e) => setSignupName(e.target.value)}
                           required
-                          className="w-full px-4 py-2 border border-slate-200/80 rounded-xl text-sm font-sans font-medium focus:outline-none hover:border-[#0F5132]/60 focus:border-[#0F5132] focus:bg-white focus:ring-4 focus:ring-[#0F5132]/10 transition-all focus:scale-[1.01]"
+                          className="w-full px-4 py-2 border border-slate-200/80 rounded-xl text-sm font-sans font-medium focus:outline-none hover:border-[#1E88E5]/60 focus:border-[#1E88E5] focus:bg-white focus:ring-4 focus:ring-[#1E88E5]/10 transition-all focus:scale-[1.01]"
                         />
                       </div>
 
@@ -817,7 +817,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ forcedOpen = false, onClos
                           value={signupEmail}
                           onChange={(e) => setSignupEmail(e.target.value)}
                           required
-                          className="w-full px-4 py-2 border border-slate-200/80 rounded-xl text-sm font-sans font-medium focus:outline-none hover:border-[#0F5132]/60 focus:border-[#0F5132] focus:bg-white focus:ring-4 focus:ring-[#0F5132]/10 transition-all focus:scale-[1.01]"
+                          className="w-full px-4 py-2 border border-slate-200/80 rounded-xl text-sm font-sans font-medium focus:outline-none hover:border-[#1E88E5]/60 focus:border-[#1E88E5] focus:bg-white focus:ring-4 focus:ring-[#1E88E5]/10 transition-all focus:scale-[1.01]"
                         />
                       </div>
 
@@ -835,7 +835,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ forcedOpen = false, onClos
                             placeholder="••••••••"
                             value={signupPassword}
                             onChange={(e) => setSignupPassword(e.target.value)}
-                            className="w-full pl-9 pr-10 py-2 border border-slate-200/80 rounded-xl text-sm font-sans font-medium focus:outline-none hover:border-[#0F5132]/60 focus:border-[#0F5132] focus:bg-white focus:ring-4 focus:ring-[#0F5132]/10 transition-all focus:scale-[1.01]"
+                            className="w-full pl-9 pr-10 py-2 border border-slate-200/80 rounded-xl text-sm font-sans font-medium focus:outline-none hover:border-[#1E88E5]/60 focus:border-[#1E88E5] focus:bg-white focus:ring-4 focus:ring-[#1E88E5]/10 transition-all focus:scale-[1.01]"
                           />
                           <button
                             type="button"
@@ -861,7 +861,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ forcedOpen = false, onClos
                             placeholder="••••••••"
                             value={confirmPassword}
                             onChange={(e) => setConfirmPassword(e.target.value)}
-                            className="w-full pl-9 pr-10 py-2 border border-slate-200/80 rounded-xl text-sm font-sans font-medium focus:outline-none hover:border-[#0F5132]/60 focus:border-[#0F5132] focus:bg-white focus:ring-4 focus:ring-[#0F5132]/10 transition-all focus:scale-[1.01]"
+                            className="w-full pl-9 pr-10 py-2 border border-slate-200/80 rounded-xl text-sm font-sans font-medium focus:outline-none hover:border-[#1E88E5]/60 focus:border-[#1E88E5] focus:bg-white focus:ring-4 focus:ring-[#1E88E5]/10 transition-all focus:scale-[1.01]"
                           />
                           <button
                             type="button"
@@ -881,7 +881,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ forcedOpen = false, onClos
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
                         type="submit"
-                        className="w-full py-3 bg-[#0F5132] hover:bg-[#0c4027] text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm cursor-pointer transition-colors mt-2"
+                        className="w-full py-3 bg-[#1E88E5] hover:bg-[#1565C0] text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm cursor-pointer transition-colors mt-2"
                       >
                         <UserPlus className="w-3.5 h-3.5" />
                         <span>{signupRole === "staff" ? "Create Staff Account" : "Register & Log In"}</span>
@@ -903,9 +903,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({ forcedOpen = false, onClos
                 >
                   <div className="relative flex items-center justify-center mb-4">
                     {/* Outer pulsing ring */}
-                    <div className="absolute w-16 h-16 rounded-full border-2 border-emerald-500/20 animate-ping" />
+                    <div className="absolute w-16 h-16 rounded-full border-2 border-blue-500/20 animate-ping" />
                     {/* Spinning active ring */}
-                    <div className="w-12 h-12 rounded-full border-4 border-emerald-100 border-t-[#0F5132] animate-spin" />
+                    <div className="w-12 h-12 rounded-full border-4 border-blue-100 border-t-[#1E88E5] animate-spin" />
                   </div>
                   
                   <motion.h4
@@ -920,7 +920,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ forcedOpen = false, onClos
                     initial={{ opacity: 0, y: 5 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.3 }}
-                    className="text-[10px] font-mono text-[#0F5132] uppercase tracking-wider mt-1"
+                    className="text-[10px] font-mono text-[#1E88E5] uppercase tracking-wider mt-1"
                   >
                     Please wait while we sync your secure session
                   </motion.p>

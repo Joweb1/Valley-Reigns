@@ -1,21 +1,14 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
-  <!-- Background -->
-  <rect width="512" height="512" rx="128" fill="#0F5132"/>
+  <!-- Background with no border radius -->
+  <rect width="512" height="512" fill="#FFFFFF"/>
   
-  <!-- Crown / Network Bridge Pattern -->
-  <g transform="translate(106, 120)" fill="none" stroke="#FFFFFF" stroke-width="24" stroke-linecap="round" stroke-linejoin="round">
-    <!-- Crown peak and base -->
-    <path d="M 30 180 L 70 80 L 150 140 L 250 80 L 270 180 Z" fill="#20c997" fill-opacity="0.2" stroke="#FFFFFF" stroke-width="24" />
-    
-    <!-- Briefcase base / Bridge connection -->
-    <rect x="50" y="200" width="200" height="120" rx="20" stroke="#FFFFFF" stroke-width="24" />
-    <path d="M 110 200 L 110 170 C 110 150, 190 150, 190 170 L 190 200" stroke="#FFFFFF" stroke-width="24" />
-    
-    <!-- Dots for communication network routing -->
-    <circle cx="30" cy="180" r="16" fill="#20c997" stroke="#FFFFFF" stroke-width="6" />
-    <circle cx="70" cy="80" r="16" fill="#20c997" stroke="#FFFFFF" stroke-width="6" />
-    <circle cx="150" cy="140" r="16" fill="#20c997" stroke="#FFFFFF" stroke-width="6" />
-    <circle cx="250" cy="80" r="16" fill="#20c997" stroke="#FFFFFF" stroke-width="6" />
-    <circle cx="270" cy="180" r="16" fill="#20c997" stroke="#FFFFFF" stroke-width="6" />
-  </g>
+  <!-- Stylized Brand Icon Shapes -->
+  <!-- Blue Circle (left) -->
+  <circle cx="160" cy="285" r="60" fill="#0084FF" />
+  
+  <!-- Black Triangle (bottom-center) -->
+  <polygon points="256,305 316,365 196,365" fill="#111111" />
+  
+  <!-- Black Tilted Capsule (right-top) -->
+  <rect x="180" y="180" width="240" height="80" rx="40" transform="rotate(40, 300, 220)" fill="#111111" />
 </svg>

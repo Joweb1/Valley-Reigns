@@ -143,13 +143,13 @@ export const WhatsAppConfigPage: React.FC = () => {
         <div className="flex flex-wrap items-center gap-3">
           <Link
             to="/admin"
-            className="px-4 py-2 border border-emerald-800 rounded-xl bg-white hover:bg-emerald-50/20 text-[#0B3C2D] hover:text-[#06241B] text-xs font-extrabold transition-all flex items-center gap-2 cursor-pointer shadow-[0_4px_12px_rgba(0,0,0,0.03)] hover:-translate-y-0.5 inline-flex shrink-0"
+            className="px-4 py-2 border border-blue-800 rounded-xl bg-white hover:bg-blue-50/20 text-[#111827] hover:text-[#1f2937] text-xs font-extrabold transition-all flex items-center gap-2 cursor-pointer shadow-[0_4px_12px_rgba(0,0,0,0.03)] hover:-translate-y-0.5 inline-flex shrink-0"
             title="Go Back"
             id="whatsapp_back_btn"
           >
             <ArrowLeft className="w-4 h-4" /> Go Back
           </Link>
-          <div className="flex items-center gap-1.5 bg-[#0B3C2D] border border-emerald-900 text-emerald-200 px-3 py-1.5 rounded-xl text-[10px] font-mono font-bold uppercase tracking-wider">
+          <div className="flex items-center gap-1.5 bg-black border border-neutral-800 text-blue-200 px-3 py-1.5 rounded-xl text-[10px] font-mono font-bold uppercase tracking-wider">
             <Settings className="w-3.5 h-3.5" /> WhatsApp Business Integration Settings
           </div>
         </div>
@@ -157,7 +157,7 @@ export const WhatsAppConfigPage: React.FC = () => {
 
       <div className="mb-6">
         <h1 className="text-lg sm:text-xl font-serif font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
-          <ShieldCheck className="w-5 h-5 text-[#0F5132]" />
+          <ShieldCheck className="w-5 h-5 text-[#1E88E5]" />
           WhatsApp Business Integration
         </h1>
         <p className="text-xs font-sans text-slate-500 mt-1">
@@ -174,7 +174,7 @@ export const WhatsAppConfigPage: React.FC = () => {
             exit={{ opacity: 0 }}
             className="bg-white border border-slate-100 rounded-3xl shadow-sm p-16 flex flex-col items-center justify-center space-y-4"
           >
-            <RefreshCw className="w-8 h-8 text-[#0F5132] animate-spin" />
+            <RefreshCw className="w-8 h-8 text-[#1E88E5] animate-spin" />
             <p className="text-xs font-medium text-slate-400 font-mono">Fetching WhatsApp configurations from cloud...</p>
           </motion.div>
         ) : (
@@ -189,7 +189,7 @@ export const WhatsAppConfigPage: React.FC = () => {
               <form onSubmit={handleSave} className="bg-white border border-slate-100 rounded-3xl shadow-sm p-6 space-y-6" id="whatsapp_config_form">
                 <div className="border-b border-slate-100 pb-4">
                   <h2 className="text-sm font-bold text-slate-800 flex items-center gap-2">
-                    <Settings className="w-4 h-4 text-emerald-600" />
+                    <Settings className="w-4 h-4 text-blue-600" />
                     API Credentials
                   </h2>
                   <p className="text-[10px] text-slate-400 font-sans mt-0.5">
@@ -201,11 +201,11 @@ export const WhatsAppConfigPage: React.FC = () => {
                   <div
                     className={`p-3.5 rounded-2xl text-xs font-medium flex items-center gap-2.5 ${
                       statusMessage.type === "success"
-                        ? "bg-emerald-50 text-[#0F5132] border border-emerald-100"
+                        ? "bg-blue-50 text-[#1E88E5] border border-blue-100"
                         : "bg-rose-50 text-rose-700 border border-rose-100"
                     }`}
                   >
-                    <div className={`w-1.5 h-1.5 rounded-full ${statusMessage.type === "success" ? "bg-emerald-600" : "bg-rose-600"}`} />
+                    <div className={`w-1.5 h-1.5 rounded-full ${statusMessage.type === "success" ? "bg-blue-600" : "bg-rose-600"}`} />
                     <span>{statusMessage.text}</span>
                   </div>
                 )}
@@ -222,7 +222,7 @@ export const WhatsAppConfigPage: React.FC = () => {
                       value={phoneNumberId}
                       onChange={(e) => setPhoneNumberId(e.target.value)}
                       placeholder="e.g. 109825438910"
-                      className="w-full px-3.5 py-2.5 bg-slate-50/50 border border-slate-200 hover:border-slate-300 focus:border-[#0F5132] focus:bg-white text-xs font-medium rounded-xl outline-none transition-all placeholder:text-slate-400"
+                      className="w-full px-3.5 py-2.5 bg-slate-50/50 border border-slate-200 hover:border-slate-300 focus:border-[#1E88E5] focus:bg-white text-xs font-medium rounded-xl outline-none transition-all placeholder:text-slate-400"
                       id="input_phone_number_id"
                     />
                   </div>
@@ -238,7 +238,7 @@ export const WhatsAppConfigPage: React.FC = () => {
                       value={businessAccountId}
                       onChange={(e) => setBusinessAccountId(e.target.value)}
                       placeholder="e.g. 29382173849"
-                      className="w-full px-3.5 py-2.5 bg-slate-50/50 border border-slate-200 hover:border-slate-300 focus:border-[#0F5132] focus:bg-white text-xs font-medium rounded-xl outline-none transition-all placeholder:text-slate-400"
+                      className="w-full px-3.5 py-2.5 bg-slate-50/50 border border-slate-200 hover:border-slate-300 focus:border-[#1E88E5] focus:bg-white text-xs font-medium rounded-xl outline-none transition-all placeholder:text-slate-400"
                       id="input_business_account_id"
                     />
                   </div>
@@ -271,7 +271,7 @@ export const WhatsAppConfigPage: React.FC = () => {
                       value={accessToken}
                       onChange={(e) => setAccessToken(e.target.value)}
                       placeholder="Enter Meta permanent system user access token..."
-                      className="w-full px-3.5 py-2.5 bg-slate-50/50 border border-slate-200 hover:border-slate-300 focus:border-[#0F5132] focus:bg-white text-xs font-mono rounded-xl outline-none transition-all placeholder:text-slate-400"
+                      className="w-full px-3.5 py-2.5 bg-slate-50/50 border border-slate-200 hover:border-slate-300 focus:border-[#1E88E5] focus:bg-white text-xs font-mono rounded-xl outline-none transition-all placeholder:text-slate-400"
                       id="input_access_token"
                     />
                   </div>
@@ -284,7 +284,7 @@ export const WhatsAppConfigPage: React.FC = () => {
                   <button
                     type="submit"
                     disabled={saving}
-                    className="px-5 py-2.5 bg-[#0F5132] hover:bg-[#0c4329] text-white text-xs font-bold rounded-xl flex items-center gap-2 shadow-sm hover:shadow hover:-translate-y-0.5 transition-all cursor-pointer disabled:opacity-50"
+                    className="px-5 py-2.5 bg-[#1E88E5] hover:bg-[#0c4329] text-white text-xs font-bold rounded-xl flex items-center gap-2 shadow-sm hover:shadow hover:-translate-y-0.5 transition-all cursor-pointer disabled:opacity-50"
                     id="save_whatsapp_config_btn"
                   >
                     {saving ? (
@@ -306,8 +306,8 @@ export const WhatsAppConfigPage: React.FC = () => {
               {/* Webhook Settings Box */}
               <div className="bg-slate-900 text-white rounded-3xl shadow-sm p-6 space-y-6">
                 <div>
-                  <h2 className="text-sm font-bold text-emerald-400 flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-emerald-400" />
+                  <h2 className="text-sm font-bold text-blue-400 flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-blue-400" />
                     Meta Webhook Bindings
                   </h2>
                   <p className="text-[10px] text-slate-400 font-sans mt-1">
@@ -320,7 +320,7 @@ export const WhatsAppConfigPage: React.FC = () => {
                   <div className="flex justify-between items-center text-[10px] font-bold text-slate-300">
                     <span>Callback URL</span>
                     {copiedUrl ? (
-                      <span className="text-emerald-400 flex items-center gap-1 font-sans">
+                      <span className="text-blue-400 flex items-center gap-1 font-sans">
                         <Check className="w-3 h-3" /> Copied
                       </span>
                     ) : (
@@ -344,7 +344,7 @@ export const WhatsAppConfigPage: React.FC = () => {
                     <span>Verify Token</span>
                     <div className="flex gap-2">
                       {copiedToken ? (
-                        <span className="text-emerald-400 flex items-center gap-1 font-sans">
+                        <span className="text-blue-400 flex items-center gap-1 font-sans">
                           <Check className="w-3 h-3" /> Copied
                         </span>
                       ) : (
@@ -365,7 +365,7 @@ export const WhatsAppConfigPage: React.FC = () => {
                       value={verifyToken}
                       onChange={(e) => setVerifyToken(e.target.value)}
                       placeholder="e.g. custom_verify_secret"
-                      className="flex-grow p-2 bg-slate-950 border border-slate-800 rounded-xl font-mono text-[10px] text-emerald-400 outline-none focus:border-emerald-500"
+                      className="flex-grow p-2 bg-slate-950 border border-slate-800 rounded-xl font-mono text-[10px] text-blue-400 outline-none focus:border-blue-500"
                     />
                     <button
                       type="button"
@@ -384,14 +384,14 @@ export const WhatsAppConfigPage: React.FC = () => {
               </div>
 
               {/* Step-by-Step Info Guide */}
-              <div className="bg-emerald-50/60 border border-emerald-100 rounded-3xl p-5 space-y-4 text-left">
-                <h3 className="text-xs font-bold text-[#0F5132] flex items-center gap-1.5">
-                  <HelpCircle className="w-4 h-4 text-[#0F5132]" />
+              <div className="bg-blue-50/60 border border-blue-100 rounded-3xl p-5 space-y-4 text-left">
+                <h3 className="text-xs font-bold text-[#1E88E5] flex items-center gap-1.5">
+                  <HelpCircle className="w-4 h-4 text-[#1E88E5]" />
                   Setup Steps Workflow
                 </h3>
                 <ol className="list-decimal list-inside text-[10px] text-slate-600 font-medium space-y-2.5">
                   <li>
-                    Register on <a href="https://developers.facebook.com" target="_blank" rel="noreferrer" className="text-emerald-700 hover:underline font-bold">Meta for Developers</a>.
+                    Register on <a href="https://developers.facebook.com" target="_blank" rel="noreferrer" className="text-blue-700 hover:underline font-bold">Meta for Developers</a>.
                   </li>
                   <li>
                     Create a Business App & add the <strong>WhatsApp</strong> product inside the dashboard.
@@ -400,13 +400,13 @@ export const WhatsAppConfigPage: React.FC = () => {
                     Extract the <strong>Phone Number ID</strong> and <strong>Business Account ID</strong> under WhatsApp Setup and copy them here.
                   </li>
                   <li>
-                    Go to Business Settings and create a <strong>System User</strong> with a permanent token containing permissions for <code className="bg-emerald-100 px-1 py-0.5 rounded font-mono text-[9px]">whatsapp_business_messaging</code>.
+                    Go to Business Settings and create a <strong>System User</strong> with a permanent token containing permissions for <code className="bg-blue-100 px-1 py-0.5 rounded font-mono text-[9px]">whatsapp_business_messaging</code>.
                   </li>
                   <li>
                     Paste the permanent token and your choice of <strong>Verify Token</strong> here and click Save.
                   </li>
                   <li>
-                    Finally, go back to the Meta App console &rarr; WhatsApp &rarr; Configuration. Bind the Webhook URL and Verify Token, then subscribe to the <code className="bg-emerald-100 px-1 py-0.5 rounded font-mono text-[9px]">messages</code> field.
+                    Finally, go back to the Meta App console &rarr; WhatsApp &rarr; Configuration. Bind the Webhook URL and Verify Token, then subscribe to the <code className="bg-blue-100 px-1 py-0.5 rounded font-mono text-[9px]">messages</code> field.
                   </li>
                 </ol>
               </div>

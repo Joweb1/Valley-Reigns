@@ -77,7 +77,7 @@ export const StaffManagement: React.FC<StaffManagementProps> = ({
       </div>
 
       {/* Staff Management Main Card Container */}
-      <div className="bg-white border border-slate-200/60 rounded-[32px] shadow-[0_8px_30px_rgba(15,81,50,0.03)] overflow-hidden">
+      <div className="bg-white border border-slate-200/60 rounded-[32px] shadow-[0_8px_30px_rgba(30, 136, 229, 0.03)] overflow-hidden">
         <div className="p-6 sm:p-8 border-b border-slate-100 flex items-center gap-3">
           <div className="w-10 h-10 bg-purple-50 rounded-xl flex items-center justify-center text-purple-600">
             <Settings className="w-5 h-5" />
@@ -158,8 +158,8 @@ export const StaffManagement: React.FC<StaffManagementProps> = ({
                       </td>
                       <td className="px-6 py-4.5 text-center">
                         {isStaffOnline(staff.uid) ? (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 text-emerald-700 rounded-full text-[10px] font-mono font-bold">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-blue-50 text-blue-700 rounded-full text-[10px] font-mono font-bold">
+                            <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
                             Online
                           </span>
                         ) : (
@@ -181,7 +181,7 @@ export const StaffManagement: React.FC<StaffManagementProps> = ({
                             Busy (Max)
                           </span>
                         ) : isStaffOnline(staff.uid) ? (
-                          <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded text-[10px] font-mono font-bold uppercase tracking-wider">
+                          <span className="px-2 py-0.5 bg-blue-100 text-blue-800 rounded text-[10px] font-mono font-bold uppercase tracking-wider">
                             Available
                           </span>
                         ) : (
@@ -198,7 +198,7 @@ export const StaffManagement: React.FC<StaffManagementProps> = ({
                             title={`Toggle canPostJobs for ${staff.displayName}`}
                           >
                             {staff.canPostJobs ? (
-                              <div className="w-11 h-6 bg-emerald-600 rounded-full flex items-center justify-end p-0.5 transition-all">
+                              <div className="w-11 h-6 bg-blue-600 rounded-full flex items-center justify-end p-0.5 transition-all">
                                 <div className="w-5 h-5 bg-white rounded-full shadow-md"></div>
                               </div>
                             ) : (
@@ -207,7 +207,7 @@ export const StaffManagement: React.FC<StaffManagementProps> = ({
                               </div>
                             )}
                           </button>
-                          <span className={`text-[10px] font-mono font-bold uppercase min-w-[32px] ${staff.canPostJobs ? "text-emerald-600" : "text-slate-400"}`}>
+                          <span className={`text-[10px] font-mono font-bold uppercase min-w-[32px] ${staff.canPostJobs ? "text-blue-600" : "text-slate-400"}`}>
                             {staff.canPostJobs ? "Active" : "Locked"}
                           </span>
                         </div>

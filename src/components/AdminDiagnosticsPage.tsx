@@ -15,15 +15,15 @@ export const AdminDiagnosticsPage: React.FC = () => {
           <div className="flex items-center gap-4">
             <Link
               to="/admin"
-              className="px-4 py-2 border border-emerald-800 rounded-xl bg-white hover:bg-emerald-50/20 text-[#0B3C2D] hover:text-[#06241B] text-xs font-extrabold transition-all flex items-center gap-2 cursor-pointer shadow-[0_4px_12px_rgba(0,0,0,0.03)] hover:-translate-y-0.5 inline-flex items-center"
+              className="px-4 py-2 border border-blue-800 rounded-xl bg-white hover:bg-blue-50/20 text-[#111827] hover:text-[#1f2937] text-xs font-extrabold transition-all flex items-center gap-2 cursor-pointer shadow-[0_4px_12px_rgba(0,0,0,0.03)] hover:-translate-y-0.5 inline-flex items-center"
               title="Go Back"
             >
               <ArrowLeft className="w-4 h-4" /> Go Back
             </Link>
             <div className="h-5 w-px bg-slate-200"></div>
             <div className="flex items-center gap-2">
-              <Cpu className="w-4 h-4 text-[#0F5132]" />
-              <span className="text-xs font-mono font-bold uppercase tracking-wider text-[#0B3C49] font-sans">
+              <Cpu className="w-4 h-4 text-[#1E88E5]" />
+              <span className="text-xs font-mono font-bold uppercase tracking-wider text-[#1e3a8a] font-sans">
                 Dev & System Center
               </span>
             </div>
@@ -42,7 +42,7 @@ export const AdminDiagnosticsPage: React.FC = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4 }}
           >
-            <h1 className="text-lg sm:text-xl font-serif italic font-extrabold text-[#0B3C49] leading-tight flex items-center gap-3">
+            <h1 className="text-lg sm:text-xl font-serif italic font-extrabold text-[#1e3a8a] leading-tight flex items-center gap-3">
               Diagnostics & Developer Tools
             </h1>
             <p className="text-xs text-slate-500 max-w-2xl mt-1 leading-relaxed">

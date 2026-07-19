@@ -54,14 +54,14 @@ export const WhatsAppSimulator: React.FC<{ inline?: boolean }> = ({ inline = fal
         {/* Header */}
         <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-4">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-emerald-50 rounded-xl flex items-center justify-center text-[#0F5132]">
+            <div className="w-8 h-8 bg-blue-50 rounded-xl flex items-center justify-center text-[#1E88E5]">
               <Sparkles className="w-4 h-4" />
             </div>
             <div>
               <h4 className="text-sm font-sans font-extrabold text-slate-900 tracking-tight leading-none">
                 WhatsApp Application Router
               </h4>
-              <span className="text-[10px] font-mono text-emerald-700 font-semibold tracking-wide uppercase">
+              <span className="text-[10px] font-mono text-blue-700 font-semibold tracking-wide uppercase">
                 Routing Pipeline
               </span>
             </div>
@@ -88,7 +88,7 @@ export const WhatsAppSimulator: React.FC<{ inline?: boolean }> = ({ inline = fal
                 value={customerPhone}
                 onChange={(e) => setCustomerPhone(e.target.value)}
                 placeholder="+1 (555) 000-0000"
-                className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 text-sm font-sans font-medium focus:border-[#0F5132] focus:outline-none"
+                className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 text-sm font-sans font-medium focus:border-[#1E88E5] focus:outline-none"
               />
             </div>
           </div>
@@ -101,7 +101,7 @@ export const WhatsAppSimulator: React.FC<{ inline?: boolean }> = ({ inline = fal
             <select
               value={selectedJobId}
               onChange={(e) => handleJobChange(e.target.value)}
-              className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-xs font-sans font-semibold focus:border-[#0F5132] focus:outline-none bg-slate-50"
+              className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-xs font-sans font-semibold focus:border-[#1E88E5] focus:outline-none bg-slate-50"
             >
               {jobs.map((j) => (
                 <option key={j.id} value={j.id}>
@@ -121,7 +121,7 @@ export const WhatsAppSimulator: React.FC<{ inline?: boolean }> = ({ inline = fal
               rows={3}
               value={messageText}
               onChange={(e) => setMessageText(e.target.value)}
-              className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-sans font-medium focus:border-[#0F5132] focus:outline-none resize-none"
+              className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-sans font-medium focus:border-[#1E88E5] focus:outline-none resize-none"
             />
           </div>
 
@@ -131,8 +131,8 @@ export const WhatsAppSimulator: React.FC<{ inline?: boolean }> = ({ inline = fal
             disabled={loading || success}
             className={`w-full py-3 rounded-xl text-xs font-sans font-extrabold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md border-0 ${
               success
-                ? "bg-emerald-600 text-white shadow-emerald-100"
-                : "bg-[#0F5132] hover:bg-[#0c4027] text-white shadow-emerald-900/10"
+                ? "bg-blue-600 text-white shadow-emerald-100"
+                : "bg-[#1E88E5] hover:bg-[#1565C0] text-white shadow-blue-900/10"
             }`}
           >
             {success ? (
@@ -151,7 +151,7 @@ export const WhatsAppSimulator: React.FC<{ inline?: boolean }> = ({ inline = fal
 
         {/* Note */}
         <div className="mt-4 pt-3 border-t border-slate-100 flex items-start gap-2 text-[10px] font-sans text-slate-400">
-          <HelpCircle className="w-4 h-4 text-[#0F5132] shrink-0" />
+          <HelpCircle className="w-4 h-4 text-[#1E88E5] shrink-0" />
           <span>
             Tip: Trigger a message here, switch to <strong>Staff Agent View</strong>, and watch the chat appear dynamically in the claiming queue!
           </span>
@@ -165,7 +165,7 @@ export const WhatsAppSimulator: React.FC<{ inline?: boolean }> = ({ inline = fal
       {/* Floating Button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="w-14 h-14 bg-[#0F5132] hover:bg-[#0c4027] text-white rounded-full shadow-lg shadow-emerald-950/30 flex items-center justify-center cursor-pointer transition-all hover:scale-105 active:scale-95 group border-2 border-emerald-400/20"
+        className="w-14 h-14 bg-[#1E88E5] hover:bg-[#1565C0] text-white rounded-full shadow-lg shadow-blue-950/30 flex items-center justify-center cursor-pointer transition-all hover:scale-105 active:scale-95 group border-2 border-blue-400/20"
         title="WhatsApp Conversation Router"
       >
         <MessageSquare className="w-6 h-6 animate-pulse group-hover:scale-110 transition-transform" />
@@ -189,14 +189,14 @@ export const WhatsAppSimulator: React.FC<{ inline?: boolean }> = ({ inline = fal
             {/* Header */}
             <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-4">
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 bg-emerald-50 rounded-xl flex items-center justify-center text-[#0F5132]">
+                <div className="w-8 h-8 bg-blue-50 rounded-xl flex items-center justify-center text-[#1E88E5]">
                   <Sparkles className="w-4 h-4" />
                 </div>
                 <div>
                   <h4 className="text-sm font-sans font-extrabold text-slate-900 tracking-tight leading-none">
                     WhatsApp Application Router
                   </h4>
-                  <span className="text-[10px] font-mono text-emerald-700 font-semibold tracking-wide uppercase">
+                  <span className="text-[10px] font-mono text-blue-700 font-semibold tracking-wide uppercase">
                     Routing Pipeline
                   </span>
                 </div>
@@ -229,7 +229,7 @@ export const WhatsAppSimulator: React.FC<{ inline?: boolean }> = ({ inline = fal
                     value={customerPhone}
                     onChange={(e) => setCustomerPhone(e.target.value)}
                     placeholder="+1 (555) 000-0000"
-                    className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 text-sm font-sans font-medium focus:border-[#0F5132] focus:outline-none"
+                    className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 text-sm font-sans font-medium focus:border-[#1E88E5] focus:outline-none"
                   />
                 </div>
               </div>
@@ -242,7 +242,7 @@ export const WhatsAppSimulator: React.FC<{ inline?: boolean }> = ({ inline = fal
                 <select
                   value={selectedJobId}
                   onChange={(e) => handleJobChange(e.target.value)}
-                  className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-xs font-sans font-semibold focus:border-[#0F5132] focus:outline-none bg-slate-50"
+                  className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-xs font-sans font-semibold focus:border-[#1E88E5] focus:outline-none bg-slate-50"
                 >
                   {jobs.map((j) => (
                     <option key={j.id} value={j.id}>
@@ -262,7 +262,7 @@ export const WhatsAppSimulator: React.FC<{ inline?: boolean }> = ({ inline = fal
                   rows={3}
                   value={messageText}
                   onChange={(e) => setMessageText(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-sans font-medium focus:border-[#0F5132] focus:outline-none resize-none"
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-sans font-medium focus:border-[#1E88E5] focus:outline-none resize-none"
                 />
               </div>
 
@@ -272,8 +272,8 @@ export const WhatsAppSimulator: React.FC<{ inline?: boolean }> = ({ inline = fal
                 disabled={loading || success}
                 className={`w-full py-3 rounded-xl text-xs font-sans font-extrabold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md ${
                   success
-                    ? "bg-emerald-600 text-white shadow-emerald-100"
-                    : "bg-[#0F5132] hover:bg-[#0c4027] text-white shadow-emerald-900/10"
+                    ? "bg-blue-600 text-white shadow-emerald-100"
+                    : "bg-[#1E88E5] hover:bg-[#1565C0] text-white shadow-blue-900/10"
                 }`}
               >
                 {success ? (
@@ -292,7 +292,7 @@ export const WhatsAppSimulator: React.FC<{ inline?: boolean }> = ({ inline = fal
 
             {/* Note */}
             <div className="mt-4 pt-3 border-t border-slate-100 flex items-start gap-2 text-[10px] font-sans text-slate-400">
-              <HelpCircle className="w-4 h-4 text-[#0F5132] shrink-0" />
+              <HelpCircle className="w-4 h-4 text-[#1E88E5] shrink-0" />
               <span>
                 Tip: Trigger a message here, switch to <strong>Staff Agent View</strong>, and watch the chat appear dynamically in the claiming queue!
               </span>

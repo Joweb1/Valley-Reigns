@@ -79,7 +79,7 @@ export const SeekerNotifications: React.FC = () => {
     switch (type) {
       case "conversation_started":
         return (
-          <div className="w-10 h-10 bg-emerald-50 border border-emerald-100 rounded-xl flex items-center justify-center text-emerald-600 shrink-0">
+          <div className="w-10 h-10 bg-blue-50 border border-blue-100 rounded-xl flex items-center justify-center text-blue-600 shrink-0">
             <MessageSquare className="w-5 h-5" />
           </div>
         );
@@ -104,7 +104,7 @@ export const SeekerNotifications: React.FC = () => {
         );
       case "new_job_posted":
         return (
-          <div className="w-10 h-10 bg-[#0B3C2D]/5 border border-emerald-600/10 rounded-xl flex items-center justify-center text-[#0F5132] shrink-0">
+          <div className="w-10 h-10 bg-[#111827]/5 border border-blue-600/10 rounded-xl flex items-center justify-center text-[#1E88E5] shrink-0">
             <Briefcase className="w-5 h-5" />
           </div>
         );
@@ -133,7 +133,7 @@ export const SeekerNotifications: React.FC = () => {
   return (
     <div id="seeker-notifications-view" className="min-h-screen bg-slate-50 pb-20 font-sans text-slate-800">
       {/* Upper Brand Header */}
-      <div className="bg-[#0B3C2D] text-white pt-8 pb-10 px-4 rounded-b-[36px] shadow-lg relative overflow-hidden">
+      <div className="bg-black text-white pt-8 pb-10 px-4 rounded-b-[36px] shadow-lg relative overflow-hidden border-b border-neutral-800/40">
         {/* Subtle decorative grid */}
         <div className="absolute inset-0 opacity-[0.04] pointer-events-none">
           <svg width="100%" height="100%" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -155,10 +155,10 @@ export const SeekerNotifications: React.FC = () => {
               <ArrowLeft className="w-5 h-5" />
             </motion.button>
             <div>
-              <span className="text-[10px] uppercase font-mono tracking-widest text-emerald-400 font-bold">
+              <span className="text-[10px] uppercase font-mono tracking-widest text-blue-400 font-bold">
                 Updates & activity
               </span>
-              <h1 className="text-2xl font-extrabold tracking-tight font-sans">
+              <h1 className="text-2xl font-black uppercase tracking-wider font-display text-white">
                 My Notifications
               </h1>
             </div>
@@ -170,7 +170,7 @@ export const SeekerNotifications: React.FC = () => {
                 whileHover={{ scale: 1.05, y: -1 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={handleMarkAllRead}
-                className="text-xs bg-emerald-500/25 hover:bg-emerald-500/40 text-emerald-300 font-bold px-3 py-1.5 rounded-full border border-emerald-400/20 transition-all cursor-pointer flex items-center gap-1.5"
+                className="text-xs bg-blue-500/25 hover:bg-blue-500/40 text-blue-300 font-bold px-3 py-1.5 rounded-full border border-blue-400/20 transition-all cursor-pointer flex items-center gap-1.5"
                 id="seeker-notif-mark-all-read-btn"
               >
                 <Check className="w-3.5 h-3.5" /> Mark all read
@@ -197,23 +197,23 @@ export const SeekerNotifications: React.FC = () => {
       <div className="max-w-xl mx-auto px-4 mt-6">
         {/* Guest user info Banner */}
         {!currentUser && (
-          <div className="bg-gradient-to-br from-emerald-950 to-emerald-900 border border-emerald-800 text-white rounded-2xl p-5 shadow-sm mb-6 flex gap-4 items-start relative overflow-hidden">
-            <div className="absolute right-0 top-0 translate-x-4 -translate-y-4 text-emerald-500/10 pointer-events-none">
+          <div className="bg-black border border-neutral-800 text-white rounded-2xl p-5 shadow-sm mb-6 flex gap-4 items-start relative overflow-hidden">
+            <div className="absolute right-0 top-0 translate-x-4 -translate-y-4 text-blue-500/10 pointer-events-none">
               <Sparkles className="w-32 h-32" />
             </div>
             <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center shrink-0 border border-white/10">
-              <Lock className="w-5 h-5 text-emerald-400" />
+              <Lock className="w-5 h-5 text-blue-400" />
             </div>
             <div className="space-y-1 relative z-10 text-left">
               <h4 className="text-sm font-bold font-sans">Want to track your inquiries?</h4>
-              <p className="text-xs text-emerald-200/90 leading-relaxed font-sans">
+              <p className="text-xs text-blue-200/90 leading-relaxed font-sans">
                 Sign in or register to receive instant notifications when our recruitment staff claim, transfer, or finish your chat applications!
               </p>
               <motion.button
                 whileHover={{ scale: 1.04 }}
                 whileTap={{ scale: 0.96 }}
                 onClick={() => window.dispatchEvent(new CustomEvent("open-auth-modal"))}
-                className="mt-3 text-xs bg-white text-emerald-950 font-extrabold px-4 py-1.5 rounded-xl hover:bg-emerald-50 cursor-pointer shadow-sm transition-all"
+                className="mt-3 text-xs bg-white text-slate-900 font-extrabold px-4 py-1.5 rounded-xl hover:bg-blue-50 cursor-pointer shadow-sm transition-all"
                 id="seeker-notif-signin-btn"
               >
                 Sign In / Join
@@ -272,12 +272,12 @@ export const SeekerNotifications: React.FC = () => {
                   className={`bg-white rounded-2xl p-4 border transition-all duration-200 flex gap-4 relative cursor-pointer text-left group hover:shadow-[0_8px_20px_rgba(0,0,0,0.04)] ${
                     notif.read 
                       ? "border-slate-100 opacity-80" 
-                      : "border-emerald-600/10 ring-1 ring-emerald-500/5 shadow-xs"
+                      : "border-blue-600/10 ring-1 ring-emerald-500/5 shadow-xs"
                   }`}
                 >
                   {/* Read dot indicator */}
                   {!notif.read && (
-                    <span className="absolute top-4 right-4 w-2 h-2 rounded-full bg-emerald-500 ring-4 ring-emerald-500/10" />
+                    <span className="absolute top-4 right-4 w-2 h-2 rounded-full bg-blue-500 ring-4 ring-emerald-500/10" />
                   )}
 
                   {/* Icon */}
@@ -290,7 +290,7 @@ export const SeekerNotifications: React.FC = () => {
                         {notif.title}
                       </h4>
                       {!notif.read && (
-                        <span className="inline-block px-1.5 py-0.5 bg-emerald-50 text-[9px] font-mono font-bold text-emerald-600 border border-emerald-500/10 rounded uppercase tracking-wider scale-90 origin-left">
+                        <span className="inline-block px-1.5 py-0.5 bg-blue-50 text-[9px] font-mono font-bold text-blue-600 border border-blue-500/10 rounded uppercase tracking-wider scale-90 origin-left">
                           New
                         </span>
                       )}
@@ -304,7 +304,7 @@ export const SeekerNotifications: React.FC = () => {
                       {notif.metadata?.jobTitle && (
                         <>
                           <span className="text-slate-200">•</span>
-                          <span className="text-emerald-600 hover:underline">
+                          <span className="text-blue-600 hover:underline">
                             {notif.metadata.jobTitle}
                           </span>
                         </>

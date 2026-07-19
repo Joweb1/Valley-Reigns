@@ -30,84 +30,12 @@ import {
 import { auth, db, rtdb } from "./firebase";
 export { auth, db, rtdb };
 import { Job, UserProfile, Conversation, ChatMessage, DailyStat, SystemNotification, StaffDailyReport } from "../types";
+import { SEEDED_JOBS_LIST } from "./defaultJobs";
 
 // ==========================================
 // SEED DATA FOR HIGH-FIDELITY PREVIEW
 // ==========================================
-const DEFAULT_JOBS: Job[] = [
-  {
-    id: "job-001",
-    title: "Lead WhatsApp Solutions Architect",
-    company: "Apex Tech Solutions",
-    category: "Tech",
-    salary: "$145,000 - $180,000",
-    location: "Remote",
-    type: "Full-time",
-    requirements: [
-      "5+ years of experience designing scalable API solutions and conversational engines.",
-      "Expertise in Meta Graph API, Webhooks, and secure authentication flows.",
-      "Hands-on skills with Node.js, TypeScript, and Firebase Services.",
-      "Strong background in customer journey maps and dialogue routing."
-    ],
-    description: "Lead the design and deployment of conversational recruitment routing architectures. You will construct high-throughput integrations linking WhatsApp Business with enterprise CRM databases.",
-    impressions: 42,
-    createdAt: Date.now() - 3600000 * 24 * 3 // 3 days ago
-  },
-  {
-    id: "job-002",
-    title: "Senior AI Integration Specialist",
-    company: "Verdant AI",
-    category: "AI & Analytics",
-    salary: "$165,000 - $210,000",
-    location: "San Francisco, CA",
-    type: "Full-time",
-    requirements: [
-      "Extensive experience with LLMs, prompt optimization, and serverless vector search engines.",
-      "Proficient in Python, TypeScript, and Docker.",
-      "Familiarity with streaming telemetry and rate-limiting protocols.",
-      "Masters in CS or equivalent industrial research experience."
-    ],
-    description: "Build contextual pipelines that route and process job descriptions through intelligence layers. Work on real-time conversational search systems that help match seekers with high-paying opportunities.",
-    impressions: 118,
-    createdAt: Date.now() - 3600000 * 12 // 12 hours ago
-  },
-  {
-    id: "job-003",
-    title: "Healthcare System Integration Lead",
-    company: "HealthLink Systems",
-    category: "Healthcare",
-    salary: "$130,000 - $160,000",
-    location: "Austin, TX (Hybrid)",
-    type: "Full-time",
-    requirements: [
-      "Experience deploying robust digital scheduling or clinic routing solutions.",
-      "Knowledge of HL7, HIPAA protocols, and medical data confidentiality.",
-      "Proficiency in modern JavaScript, React, and cloud architectures.",
-      "Excellent client-facing communications and workflow mapping."
-    ],
-    description: "Lead the migration of clinical staffing platforms to automated conversational networks. Build real-time alerts that match nursing staff to shift openings instantly over secure mobile lines.",
-    impressions: 29,
-    createdAt: Date.now() - 3600000 * 48 // 2 days ago
-  },
-  {
-    id: "job-004",
-    title: "Staff Fintech Infrastructure Engineer",
-    company: "Stellar Financial Corp",
-    category: "Finance",
-    salary: "$175,000 - $220,000",
-    location: "New York, NY",
-    type: "Contract",
-    requirements: [
-      "Deep expertise in PostgreSQL databases, indexing strategies, and transactional consistency.",
-      "Familiarity with PCI-DSS compliance and financial ledger architectures.",
-      "Experience with Kubernetes, AWS, and modern infrastructure telemetry.",
-      "Passion for secure, zero-trust cloud orchestration."
-    ],
-    description: "Scale high-performance ledger pipelines connecting banking clients to recruitment payouts. Architect robust databases handling hundreds of financial matches daily with perfect transactional isolation.",
-    impressions: 87,
-    createdAt: Date.now() - 3600000 * 6 // 6 hours ago
-  }
-];
+const DEFAULT_JOBS: Job[] = SEEDED_JOBS_LIST;
 
 const DEFAULT_CONVERSATIONS: Record<string, Conversation> = {
   "chat-101": {
@@ -238,7 +166,26 @@ class MemoryStorage {
     const savedUsers = localStorage.getItem("vr_users");
     const savedNotifications = localStorage.getItem("vr_system_notifications");
     const savedReports = localStorage.getItem("vr_daily_reports");
-    if (savedJobs) this.jobs = JSON.parse(savedJobs);
+    if (savedJobs) {
+      try {
+        const parsed = JSON.parse(savedJobs);
+        const existingIds = new Set(parsed.map((j: any) => j.id));
+        let mergedAny = false;
+        for (const job of DEFAULT_JOBS) {
+          if (!existingIds.has(job.id)) {
+            parsed.push(job);
+            mergedAny = true;
+          }
+        }
+        this.jobs = parsed;
+        if (mergedAny) {
+          localStorage.setItem("vr_jobs", JSON.stringify(this.jobs));
+        }
+      } catch (e) {
+        console.warn("Error parsing saved jobs, using defaults:", e);
+        this.jobs = [...DEFAULT_JOBS];
+      }
+    }
     if (savedConvs) this.conversations = JSON.parse(savedConvs);
     if (savedNotifications) {
       try {
@@ -361,19 +308,45 @@ export async function getJobs(): Promise<Job[]> {
   try {
     const collRef = collection(db, "jobs");
     const snapshot = await getDocs(collRef);
-    if (snapshot.empty) {
-      // Seed jobs in Firestore
-      for (const job of DEFAULT_JOBS) {
-        await setDoc(doc(db, "jobs", job.id), job);
-      }
-      return DEFAULT_JOBS;
-    }
+    
     const jobs = snapshot.docs.map(doc => doc.data() as Job);
+    const existingIds = new Set(jobs.map(j => j.id));
+    let seededAny = false;
+    
+    for (const job of DEFAULT_JOBS) {
+      if (!existingIds.has(job.id)) {
+        await setDoc(doc(db, "jobs", job.id), job);
+        jobs.push(job);
+        seededAny = true;
+      }
+    }
+    
+    if (seededAny) {
+      memoryStore.jobs = [...jobs];
+      memoryStore.save();
+    }
+    
     // Sort by creation time desc
     return jobs.sort((a, b) => b.createdAt - a.createdAt);
   } catch (error) {
     console.warn("Firestore getJobs failing, using resilient fallback:", error);
-    return [...memoryStore.jobs].sort((a, b) => b.createdAt - a.createdAt);
+    const localJobs = [...memoryStore.jobs];
+    const localIds = new Set(localJobs.map(j => j.id));
+    let localSeededAny = false;
+    
+    for (const job of DEFAULT_JOBS) {
+      if (!localIds.has(job.id)) {
+        localJobs.push(job);
+        localSeededAny = true;
+      }
+    }
+    
+    if (localSeededAny) {
+      memoryStore.jobs = localJobs;
+      memoryStore.save();
+    }
+    
+    return localJobs.sort((a, b) => b.createdAt - a.createdAt);
   }
 }
 

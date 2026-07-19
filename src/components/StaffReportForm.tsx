@@ -210,9 +210,9 @@ export const StaffReportForm: React.FC<{ onSuccess?: () => void }> = ({ onSucces
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="bg-white border border-emerald-100 rounded-[32px] p-8 text-center shadow-[0_24px_55px_-10px_rgba(15,81,50,0.08)] max-w-xl mx-auto space-y-6"
+        className="bg-white border border-blue-100 rounded-[32px] p-8 text-center shadow-[0_24px_55px_-10px_rgba(30, 136, 229, 0.08)] max-w-xl mx-auto space-y-6"
       >
-        <div className="w-16 h-16 bg-emerald-50 text-[#0F5132] rounded-2xl flex items-center justify-center mx-auto shadow-sm">
+        <div className="w-16 h-16 bg-blue-50 text-[#1E88E5] rounded-2xl flex items-center justify-center mx-auto shadow-sm">
           <CheckCircle2 className="w-8 h-8" />
         </div>
         <div className="space-y-2">
@@ -228,19 +228,19 @@ export const StaffReportForm: React.FC<{ onSuccess?: () => void }> = ({ onSucces
           <div className="grid grid-cols-1 gap-1.5 text-xs">
             <div className="flex items-center justify-between">
               <span className="text-slate-600">Minimum 20 reach-outs:</span>
-              <span className={`font-bold font-mono px-2 py-0.5 rounded text-[10px] ${targetReachOutsMet ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"}`}>
+              <span className={`font-bold font-mono px-2 py-0.5 rounded text-[10px] ${targetReachOutsMet ? "bg-blue-100 text-blue-800" : "bg-amber-100 text-amber-800"}`}>
                 {targetReachOutsMet ? "MET (✓)" : "UNMET"}
               </span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-slate-600">Minimum 4 addresses given:</span>
-              <span className={`font-bold font-mono px-2 py-0.5 rounded text-[10px] ${targetAddressesMet ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"}`}>
+              <span className={`font-bold font-mono px-2 py-0.5 rounded text-[10px] ${targetAddressesMet ? "bg-blue-100 text-blue-800" : "bg-amber-100 text-amber-800"}`}>
                 {targetAddressesMet ? "MET (✓)" : "UNMET"}
               </span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-slate-600">Submitted before 9:00 PM:</span>
-              <span className={`font-bold font-mono px-2 py-0.5 rounded text-[10px] ${targetOnTimeMet ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"}`}>
+              <span className={`font-bold font-mono px-2 py-0.5 rounded text-[10px] ${targetOnTimeMet ? "bg-blue-100 text-blue-800" : "bg-amber-100 text-amber-800"}`}>
                 {targetOnTimeMet ? `MET (${submitTimeStr})` : `UNMET (${submitTimeStr})`}
               </span>
             </div>
@@ -268,7 +268,7 @@ export const StaffReportForm: React.FC<{ onSuccess?: () => void }> = ({ onSucces
               setUploadProgress(0);
             }
           }}
-          className="px-6 py-2.5 bg-[#0F5132] hover:bg-[#0c4027] text-white text-xs font-bold rounded-xl transition-all cursor-pointer shadow-sm"
+          className="px-6 py-2.5 bg-[#1E88E5] hover:bg-[#1565C0] text-white text-xs font-bold rounded-xl transition-all cursor-pointer shadow-sm"
         >
           {existingReportForDate ? "Return to Report Form" : "Submit Another Report"}
         </button>
@@ -284,12 +284,12 @@ export const StaffReportForm: React.FC<{ onSuccess?: () => void }> = ({ onSucces
           <motion.div
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-emerald-50 border border-emerald-200/80 rounded-2xl p-4 flex items-center gap-3 text-left shadow-sm"
+            className="bg-blue-50 border border-blue-200/80 rounded-2xl p-4 flex items-center gap-3 text-left shadow-sm"
           >
-            <ShieldCheck className="w-5 h-5 text-emerald-600 shrink-0" />
+            <ShieldCheck className="w-5 h-5 text-blue-600 shrink-0" />
             <div>
-              <p className="text-xs font-bold text-emerald-900">Submitted Report (Read-Only Mode)</p>
-              <p className="text-[10px] text-emerald-700 mt-0.5">
+              <p className="text-xs font-bold text-slate-900">Submitted Report (Read-Only Mode)</p>
+              <p className="text-[10px] text-blue-700 mt-0.5">
                 You already submitted a daily report for this day ({date}). The fields are filled with the recorded metrics and cannot be edited.
               </p>
             </div>
@@ -329,19 +329,19 @@ export const StaffReportForm: React.FC<{ onSuccess?: () => void }> = ({ onSucces
         ) : null}
         
         {/* Top Header Card */}
-        <div className="bg-[#0B3C2D] border border-emerald-900 rounded-[32px] text-white p-6 sm:p-8 shadow-sm relative overflow-hidden flex flex-col md:flex-row md:items-center justify-between gap-6">
+        <div className="bg-[#0B1B3D] border border-[#0B1B3D]/40 rounded-[32px] text-white p-6 sm:p-8 shadow-sm relative overflow-hidden flex flex-col md:flex-row md:items-center justify-between gap-6">
           {/* Subtle vector graphics / green pattern representing communication/chats */}
-          <div className="absolute inset-0 pointer-events-none opacity-15">
+          <div className="absolute inset-0 pointer-events-none opacity-[0.55]">
             <svg width="100%" height="100%" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M-10,30 Q80,10 170,50 T350,20" stroke="currentColor" strokeWidth="1.5" className="text-emerald-400" />
-              <path d="M-10,40 Q80,20 170,60 T350,30" stroke="currentColor" strokeWidth="1" className="text-emerald-500" strokeDasharray="3 3" />
-              <path d="M20,100 Q110,80 200,120 T380,90" stroke="currentColor" strokeWidth="1.5" className="text-emerald-300" />
-              <circle cx="15%" cy="75%" r="40" stroke="currentColor" strokeWidth="1.2" className="text-emerald-600" strokeDasharray="2 2" />
+              <path d="M-10,30 Q80,10 170,50 T350,20" stroke="currentColor" strokeWidth="1.5" className="text-white/40" />
+              <path d="M-10,40 Q80,20 170,60 T350,30" stroke="currentColor" strokeWidth="1" className="text-white/30" strokeDasharray="3 3" />
+              <path d="M20,100 Q110,80 200,120 T380,90" stroke="currentColor" strokeWidth="1.5" className="text-white/35" />
+              <circle cx="15%" cy="75%" r="40" stroke="currentColor" strokeWidth="1.2" className="text-white/25" strokeDasharray="2 2" />
             </svg>
           </div>
 
           <div className="space-y-2 z-10 text-left">
-            <span className="bg-white/15 px-3 py-1 rounded-full text-[10px] font-bold font-mono uppercase tracking-wider">
+            <span className="bg-[#07132C] border border-white/10 px-3 py-1 rounded-full text-[10px] font-bold font-mono uppercase tracking-wider">
               Daily Staff Report Template
             </span>
             <p className="text-xs text-white/80 max-w-lg leading-relaxed pt-2">
@@ -350,9 +350,9 @@ export const StaffReportForm: React.FC<{ onSuccess?: () => void }> = ({ onSucces
           </div>
           
           <div className="flex gap-3 text-left">
-            <div className="bg-white/10 backdrop-blur-md border border-white/10 rounded-2xl p-3 flex flex-col justify-center min-w-[120px] font-mono">
+            <div className="bg-[#112A5C] border border-white/10 rounded-2xl p-3 flex flex-col justify-center min-w-[120px] font-mono">
               <span className="text-[9px] text-white/60 uppercase font-bold flex items-center gap-1">
-                <Calendar className="w-3 h-3 text-emerald-300" /> Report Date
+                <Calendar className="w-3 h-3 text-blue-300" /> Report Date
               </span>
               <input 
                 type="date"
@@ -368,9 +368,9 @@ export const StaffReportForm: React.FC<{ onSuccess?: () => void }> = ({ onSucces
               />
             </div>
             
-            <div className="bg-white/10 backdrop-blur-md border border-white/10 rounded-2xl p-3 flex flex-col justify-center min-w-[120px] font-mono">
+            <div className="bg-[#112A5C] border border-white/10 rounded-2xl p-3 flex flex-col justify-center min-w-[120px] font-mono">
               <span className="text-[9px] text-white/60 uppercase font-bold flex items-center gap-1">
-                <Clock className="w-3 h-3 text-emerald-300" /> Current Time
+                <Clock className="w-3 h-3 text-blue-300" /> Current Time
               </span>
               <span className="text-xs font-bold text-white mt-1">
                 {submitTimeStr}
@@ -382,16 +382,16 @@ export const StaffReportForm: React.FC<{ onSuccess?: () => void }> = ({ onSucces
         {/* Targets Monitoring Panel */}
         <div className="bg-white border border-slate-200/60 rounded-3xl p-6 shadow-sm text-left">
           <div className="flex items-center gap-2 mb-4">
-            <Sparkles className="w-5 h-5 text-emerald-600" />
+            <Sparkles className="w-5 h-5 text-blue-600" />
             <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Daily Target Checklist</h3>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             
             {/* Target 1 */}
-            <div className={`p-4 rounded-2xl border transition-all ${targetReachOutsMet ? "bg-emerald-50/50 border-emerald-200" : "bg-slate-50 border-slate-200/80"}`}>
+            <div className={`p-4 rounded-2xl border transition-all ${targetReachOutsMet ? "bg-blue-50/50 border-blue-200" : "bg-slate-50 border-slate-200/80"}`}>
               <div className="flex justify-between items-start">
                 <span className="text-[10px] font-mono text-slate-400 font-bold uppercase">1. Reach-outs Target</span>
-                <span className={`w-2 h-2 rounded-full ${targetReachOutsMet ? "bg-emerald-500 animate-pulse" : "bg-amber-400"}`} />
+                <span className={`w-2 h-2 rounded-full ${targetReachOutsMet ? "bg-blue-500 animate-pulse" : "bg-amber-400"}`} />
               </div>
               <p className="text-lg font-mono font-bold text-slate-800 mt-2">
                 {newReachOuts || 0} <span className="text-xs text-slate-400">/ 20</span>
@@ -402,10 +402,10 @@ export const StaffReportForm: React.FC<{ onSuccess?: () => void }> = ({ onSucces
             </div>
 
             {/* Target 2 */}
-            <div className={`p-4 rounded-2xl border transition-all ${targetAddressesMet ? "bg-emerald-50/50 border-emerald-200" : "bg-slate-50 border-slate-200/80"}`}>
+            <div className={`p-4 rounded-2xl border transition-all ${targetAddressesMet ? "bg-blue-50/50 border-blue-200" : "bg-slate-50 border-slate-200/80"}`}>
               <div className="flex justify-between items-start">
                 <span className="text-[10px] font-mono text-slate-400 font-bold uppercase">2. Address Target</span>
-                <span className={`w-2 h-2 rounded-full ${targetAddressesMet ? "bg-emerald-500 animate-pulse" : "bg-amber-400"}`} />
+                <span className={`w-2 h-2 rounded-full ${targetAddressesMet ? "bg-blue-500 animate-pulse" : "bg-amber-400"}`} />
               </div>
               <p className="text-lg font-mono font-bold text-slate-800 mt-2">
                 {addressesGiven || 0} <span className="text-xs text-slate-400">/ 4</span>
@@ -416,10 +416,10 @@ export const StaffReportForm: React.FC<{ onSuccess?: () => void }> = ({ onSucces
             </div>
 
             {/* Target 3 */}
-            <div className={`p-4 rounded-2xl border transition-all ${targetOnTimeMet ? "bg-emerald-50/50 border-emerald-200" : "bg-slate-50 border-slate-200/80"}`}>
+            <div className={`p-4 rounded-2xl border transition-all ${targetOnTimeMet ? "bg-blue-50/50 border-blue-200" : "bg-slate-50 border-slate-200/80"}`}>
               <div className="flex justify-between items-start">
                 <span className="text-[10px] font-mono text-slate-400 font-bold uppercase">3. SLA Deadline</span>
-                <span className={`w-2 h-2 rounded-full ${targetOnTimeMet ? "bg-emerald-500 animate-pulse" : "bg-amber-400"}`} />
+                <span className={`w-2 h-2 rounded-full ${targetOnTimeMet ? "bg-blue-500 animate-pulse" : "bg-amber-400"}`} />
               </div>
               <p className="text-lg font-mono font-bold text-slate-800 mt-2">
                 9:00 PM
@@ -435,7 +435,7 @@ export const StaffReportForm: React.FC<{ onSuccess?: () => void }> = ({ onSucces
         {/* Numerical Performance Metrics */}
         <div className="bg-white border border-slate-200/60 rounded-3xl p-6 sm:p-8 shadow-sm text-left">
           <div className="flex items-center gap-2 mb-6 border-b border-slate-100 pb-3">
-            <FileText className="w-5 h-5 text-emerald-600" />
+            <FileText className="w-5 h-5 text-blue-600" />
             <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Performance Metrics</h3>
           </div>
 
@@ -444,7 +444,7 @@ export const StaffReportForm: React.FC<{ onSuccess?: () => void }> = ({ onSucces
             {/* 1. Number of New Reach-Outs */}
             <div>
               <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5 mb-2 font-sans">
-                <PhoneCall className="w-3.5 h-3.5 text-emerald-600" /> Number of New Reach-Outs
+                <PhoneCall className="w-3.5 h-3.5 text-blue-600" /> Number of New Reach-Outs
               </label>
               <input
                 type="number"
@@ -456,7 +456,7 @@ export const StaffReportForm: React.FC<{ onSuccess?: () => void }> = ({ onSucces
                   const val = e.target.value;
                   setNewReachOuts(val === "" ? "" : Math.max(0, parseInt(val) || 0));
                 }}
-                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#0F5132]/20 focus:border-[#0F5132] text-xs font-mono disabled:bg-slate-50 disabled:text-slate-500 disabled:border-slate-100"
+                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#1E88E5]/20 focus:border-[#1E88E5] text-xs font-mono disabled:bg-slate-50 disabled:text-slate-500 disabled:border-slate-100"
               />
               <p className="text-[10px] text-slate-400 mt-1 font-mono">Targets: 20+ daily</p>
             </div>
@@ -476,7 +476,7 @@ export const StaffReportForm: React.FC<{ onSuccess?: () => void }> = ({ onSucces
                   const val = e.target.value;
                   setResumptions(val === "" ? "" : Math.max(0, parseInt(val) || 0));
                 }}
-                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#0F5132]/20 focus:border-[#0F5132] text-xs font-mono disabled:bg-slate-50 disabled:text-slate-500 disabled:border-slate-100"
+                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#1E88E5]/20 focus:border-[#1E88E5] text-xs font-mono disabled:bg-slate-50 disabled:text-slate-500 disabled:border-slate-100"
               />
             </div>
 
@@ -495,14 +495,14 @@ export const StaffReportForm: React.FC<{ onSuccess?: () => void }> = ({ onSucces
                   const val = e.target.value;
                   setCvsCollected(val === "" ? "" : Math.max(0, parseInt(val) || 0));
                 }}
-                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#0F5132]/20 focus:border-[#0F5132] text-xs font-mono disabled:bg-slate-50 disabled:text-slate-500 disabled:border-slate-100"
+                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#1E88E5]/20 focus:border-[#1E88E5] text-xs font-mono disabled:bg-slate-50 disabled:text-slate-500 disabled:border-slate-100"
               />
             </div>
 
             {/* 4. Number of Candidates Registered */}
             <div>
               <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5 mb-2">
-                <Users className="w-3.5 h-3.5 text-emerald-600" /> Number of Candidates Registered
+                <Users className="w-3.5 h-3.5 text-blue-600" /> Number of Candidates Registered
               </label>
               <input
                 type="number"
@@ -514,7 +514,7 @@ export const StaffReportForm: React.FC<{ onSuccess?: () => void }> = ({ onSucces
                   const val = e.target.value;
                   setCandidatesRegistered(val === "" ? "" : Math.max(0, parseInt(val) || 0));
                 }}
-                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#0F5132]/20 focus:border-[#0F5132] text-xs font-mono disabled:bg-slate-50 disabled:text-slate-500 disabled:border-slate-100"
+                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#1E88E5]/20 focus:border-[#1E88E5] text-xs font-mono disabled:bg-slate-50 disabled:text-slate-500 disabled:border-slate-100"
               />
               <p className="text-[10px] text-slate-400 mt-1 font-mono">Rule: Must register within 2 days</p>
             </div>
@@ -522,7 +522,7 @@ export const StaffReportForm: React.FC<{ onSuccess?: () => void }> = ({ onSucces
             {/* 5. Number of Addresses Given */}
             <div>
               <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5 mb-2">
-                <MapPin className="w-3.5 h-3.5 text-emerald-600" /> Number of Addresses Given
+                <MapPin className="w-3.5 h-3.5 text-blue-600" /> Number of Addresses Given
               </label>
               <input
                 type="number"
@@ -534,7 +534,7 @@ export const StaffReportForm: React.FC<{ onSuccess?: () => void }> = ({ onSucces
                   const val = e.target.value;
                   setAddressesGiven(val === "" ? "" : Math.max(0, parseInt(val) || 0));
                 }}
-                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#0F5132]/20 focus:border-[#0F5132] text-xs font-mono disabled:bg-slate-50 disabled:text-slate-500 disabled:border-slate-100"
+                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#1E88E5]/20 focus:border-[#1E88E5] text-xs font-mono disabled:bg-slate-50 disabled:text-slate-500 disabled:border-slate-100"
               />
               <p className="text-[10px] text-slate-400 mt-1 font-mono">Targets: 4+ daily</p>
             </div>
@@ -550,7 +550,7 @@ export const StaffReportForm: React.FC<{ onSuccess?: () => void }> = ({ onSucces
                 disabled={isReadOnly}
                 value={commissionRetrieved}
                 onChange={(e) => setCommissionRetrieved(e.target.value)}
-                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#0F5132]/20 focus:border-[#0F5132] text-xs disabled:bg-slate-50 disabled:text-slate-500 disabled:border-slate-100"
+                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#1E88E5]/20 focus:border-[#1E88E5] text-xs disabled:bg-slate-50 disabled:text-slate-500 disabled:border-slate-100"
               />
             </div>
 
@@ -569,7 +569,7 @@ export const StaffReportForm: React.FC<{ onSuccess?: () => void }> = ({ onSucces
                   const val = e.target.value;
                   setFlyersMade(val === "" ? "" : Math.max(0, parseInt(val) || 0));
                 }}
-                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#0F5132]/20 focus:border-[#0F5132] text-xs font-mono disabled:bg-slate-50 disabled:text-slate-500 disabled:border-slate-100"
+                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#1E88E5]/20 focus:border-[#1E88E5] text-xs font-mono disabled:bg-slate-50 disabled:text-slate-500 disabled:border-slate-100"
               />
             </div>
 
@@ -588,7 +588,7 @@ export const StaffReportForm: React.FC<{ onSuccess?: () => void }> = ({ onSucces
                   const val = e.target.value;
                   setVideosMade(val === "" ? "" : Math.max(0, parseInt(val) || 0));
                 }}
-                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#0F5132]/20 focus:border-[#0F5132] text-xs font-mono disabled:bg-slate-50 disabled:text-slate-500 disabled:border-slate-100"
+                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#1E88E5]/20 focus:border-[#1E88E5] text-xs font-mono disabled:bg-slate-50 disabled:text-slate-500 disabled:border-slate-100"
               />
             </div>
 
@@ -607,7 +607,7 @@ export const StaffReportForm: React.FC<{ onSuccess?: () => void }> = ({ onSucces
                   const val = e.target.value;
                   setJobsGotten(val === "" ? "" : Math.max(0, parseInt(val) || 0));
                 }}
-                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#0F5132]/20 focus:border-[#0F5132] text-xs font-mono disabled:bg-slate-50 disabled:text-slate-500 disabled:border-slate-100"
+                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#1E88E5]/20 focus:border-[#1E88E5] text-xs font-mono disabled:bg-slate-50 disabled:text-slate-500 disabled:border-slate-100"
               />
             </div>
 
@@ -622,7 +622,7 @@ export const StaffReportForm: React.FC<{ onSuccess?: () => void }> = ({ onSucces
                 disabled={isReadOnly}
                 value={newJobsGottenClientRelations}
                 onChange={(e) => setNewJobsGottenClientRelations(e.target.value)}
-                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#0F5132]/20 focus:border-[#0F5132] text-xs disabled:bg-slate-50 disabled:text-slate-500 disabled:border-slate-100"
+                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#1E88E5]/20 focus:border-[#1E88E5] text-xs disabled:bg-slate-50 disabled:text-slate-500 disabled:border-slate-100"
               />
             </div>
 
@@ -632,7 +632,7 @@ export const StaffReportForm: React.FC<{ onSuccess?: () => void }> = ({ onSucces
         {/* Qualitative Responses */}
         <div className="bg-white border border-slate-200/60 rounded-3xl p-6 sm:p-8 shadow-sm text-left space-y-6">
           <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
-            <Smile className="w-5 h-5 text-emerald-600" />
+            <Smile className="w-5 h-5 text-blue-600" />
             <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Qualitative Report</h3>
           </div>
 
@@ -646,7 +646,7 @@ export const StaffReportForm: React.FC<{ onSuccess?: () => void }> = ({ onSucces
               disabled={isReadOnly}
               value={challenges}
               onChange={(e) => setChallenges(e.target.value)}
-              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#0F5132]/20 focus:border-[#0F5132] text-xs leading-relaxed disabled:bg-slate-50 disabled:text-slate-500 disabled:border-slate-100"
+              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#1E88E5]/20 focus:border-[#1E88E5] text-xs leading-relaxed disabled:bg-slate-50 disabled:text-slate-500 disabled:border-slate-100"
             />
           </div>
 
@@ -660,7 +660,7 @@ export const StaffReportForm: React.FC<{ onSuccess?: () => void }> = ({ onSucces
               disabled={isReadOnly}
               value={plansTomorrow}
               onChange={(e) => setPlansTomorrow(e.target.value)}
-              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#0F5132]/20 focus:border-[#0F5132] text-xs leading-relaxed disabled:bg-slate-50 disabled:text-slate-500 disabled:border-slate-100"
+              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#1E88E5]/20 focus:border-[#1E88E5] text-xs leading-relaxed disabled:bg-slate-50 disabled:text-slate-500 disabled:border-slate-100"
             />
           </div>
         </div>
@@ -668,18 +668,18 @@ export const StaffReportForm: React.FC<{ onSuccess?: () => void }> = ({ onSucces
         {/* Screen Confirmation & Proof Verification */}
         <div className="bg-white border border-slate-200/60 rounded-3xl p-6 sm:p-8 shadow-sm text-left space-y-6">
           <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
-            <HeartHandshake className="w-5 h-5 text-emerald-600" />
+            <HeartHandshake className="w-5 h-5 text-blue-600" />
             <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Proof of Work</h3>
           </div>
 
           {/* chatsClearedConfirmed Checkbox */}
-          <label className={`flex items-start gap-3 p-4 bg-emerald-50/40 border border-emerald-100 rounded-2xl select-none ${isReadOnly ? "cursor-not-allowed opacity-80" : "cursor-pointer"}`}>
+          <label className={`flex items-start gap-3 p-4 bg-blue-50/40 border border-blue-100 rounded-2xl select-none ${isReadOnly ? "cursor-not-allowed opacity-80" : "cursor-pointer"}`}>
             <input
               type="checkbox"
               checked={chatsClearedConfirmed}
               disabled={isReadOnly}
               onChange={(e) => setChatsClearedConfirmed(e.target.checked)}
-              className="mt-1 w-4 h-4 text-[#0F5132] border-slate-300 rounded focus:ring-[#0F5132] disabled:opacity-50"
+              className="mt-1 w-4 h-4 text-[#1E88E5] border-slate-300 rounded focus:ring-[#1E88E5] disabled:opacity-50"
             />
             <div className="flex flex-col">
               <span className="text-xs font-bold text-slate-800">Confirm chats are fully cleared</span>
@@ -704,7 +704,7 @@ export const StaffReportForm: React.FC<{ onSuccess?: () => void }> = ({ onSucces
                     referrerPolicy="no-referrer"
                   />
                   <div className="flex gap-2">
-                    <span className="text-[10px] font-mono bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-full font-bold">✓ Proof Attached</span>
+                    <span className="text-[10px] font-mono bg-blue-100 text-blue-800 px-2.5 py-0.5 rounded-full font-bold">✓ Proof Attached</span>
                     {!isReadOnly && (
                       <button 
                         type="button" 
@@ -724,7 +724,7 @@ export const StaffReportForm: React.FC<{ onSuccess?: () => void }> = ({ onSucces
                   {uploadProgress > 0 ? (
                     <div className="w-48 space-y-1.5">
                       <div className="h-1.5 bg-slate-200 rounded-full overflow-hidden">
-                        <div className="h-full bg-emerald-600 transition-all duration-300" style={{ width: `${uploadProgress}%` }} />
+                        <div className="h-full bg-blue-600 transition-all duration-300" style={{ width: `${uploadProgress}%` }} />
                       </div>
                       <span className="text-[9px] font-mono text-slate-400 block text-center">Uploading simulated proof ({uploadProgress}%)</span>
                     </div>
@@ -751,8 +751,8 @@ export const StaffReportForm: React.FC<{ onSuccess?: () => void }> = ({ onSucces
         <div className="flex items-center justify-end gap-3 pt-2">
           {isReadOnly ? (
             existingReportForDate ? (
-              <div className="flex items-center gap-1.5 text-emerald-700 bg-emerald-50 px-5 py-2.5 rounded-2xl border border-emerald-200 font-bold text-xs">
-                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+              <div className="flex items-center gap-1.5 text-blue-700 bg-blue-50 px-5 py-2.5 rounded-2xl border border-blue-200 font-bold text-xs">
+                <CheckCircle2 className="w-4 h-4 text-blue-600" />
                 <span>Daily Report Submitted</span>
               </div>
             ) : (
@@ -765,7 +765,7 @@ export const StaffReportForm: React.FC<{ onSuccess?: () => void }> = ({ onSucces
             <button
               type="submit"
               disabled={submitting || !chatsClearedConfirmed}
-              className={`px-8 py-3 bg-[#0F5132] hover:bg-[#0c4027] text-white text-xs font-bold rounded-2xl shadow-md transition-all flex items-center gap-2 cursor-pointer ${
+              className={`px-8 py-3 bg-[#1E88E5] hover:bg-[#1565C0] text-white text-xs font-bold rounded-2xl shadow-md transition-all flex items-center gap-2 cursor-pointer ${
                 (!chatsClearedConfirmed || submitting) ? "opacity-60 cursor-not-allowed" : "hover:scale-[1.02]"
               }`}
             >

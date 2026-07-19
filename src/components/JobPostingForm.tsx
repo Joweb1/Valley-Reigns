@@ -3,8 +3,9 @@ import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "motion/react";
 import { addJob, getJobs } from "../lib/services";
 import { useAuth } from "../context/AuthContext";
-import { Lock, FilePlus2, Plus, Trash2, CheckCircle2, Banknote, ChevronDown, Briefcase, Sparkles, Check, ArrowLeft } from "lucide-react";
+import { Lock, FilePlus2, Plus, Trash2, CheckCircle2, Banknote, ChevronDown, Briefcase, Sparkles, Check, ArrowLeft, Image, Palette } from "lucide-react";
 import { Job } from "../types";
+import { subscribeToCategories, addCustomCategory, JobCategory, DEFAULT_CATEGORIES } from "../lib/categories";
 
 const SPREAD_PARTICLES = Array.from({ length: 24 }).map((_, i) => ({
   id: i,
@@ -35,7 +36,7 @@ export const JobPostingForm: React.FC<JobPostingFormProps> = ({ onJobAdded, hide
   // State for form
   const [title, setTitle] = useState("");
   const [company, setCompany] = useState("");
-  const [category, setCategory] = useState("Tech");
+  const [category, setCategory] = useState("Information Technology (IT) & Software Development");
   const [salary, setSalary] = useState("");
   const [location, setLocation] = useState("");
   const [type, setType] = useState("Full-time");
@@ -52,24 +53,21 @@ export const JobPostingForm: React.FC<JobPostingFormProps> = ({ onJobAdded, hide
   const [postedJob, setPostedJob] = useState<Job | null>(null);
 
   // Dynamic categories list
-  const [categoriesList, setCategoriesList] = useState<string[]>(["Tech", "Healthcare", "Finance", "AI & Analytics"]);
+  const [categoriesList, setCategoriesList] = useState<JobCategory[]>(DEFAULT_CATEGORIES);
   const [showCustomCategory, setShowCustomCategory] = useState(false);
   const [customCategoryInput, setCustomCategoryInput] = useState("");
+  const [customCategoryImage, setCustomCategoryImage] = useState("");
+  const [customCategoryColor, setCustomCategoryColor] = useState("#2563EB");
+  const [savingCategory, setSavingCategory] = useState(false);
+  const [categorySaveSuccess, setCategorySaveSuccess] = useState(false);
   const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
   const [isTypeDropdownOpen, setIsTypeDropdownOpen] = useState(false);
 
   useEffect(() => {
-    const loadCategories = async () => {
-      try {
-        const allJobs = await getJobs();
-        const unique = Array.from(new Set(allJobs.map(j => j.category).filter(Boolean)));
-        const combined = Array.from(new Set(["Tech", "Healthcare", "Finance", "AI & Analytics", ...unique]));
-        setCategoriesList(combined);
-      } catch (err) {
-        console.warn("Failed to load dynamic categories in form", err);
-      }
-    };
-    loadCategories();
+    const unsubscribe = subscribeToCategories((allCategories) => {
+      setCategoriesList(allCategories);
+    });
+    return () => unsubscribe();
   }, []);
 
   // Check Firestore User profile flag 'canPostJobs'
@@ -112,6 +110,14 @@ export const JobPostingForm: React.FC<JobPostingFormProps> = ({ onJobAdded, hide
         ? customCategoryInput.trim() 
         : category;
 
+      if (showCustomCategory && customCategoryInput.trim()) {
+        await addCustomCategory(
+          customCategoryInput.trim(),
+          customCategoryImage.trim() || "https://images.unsplash.com/photo-1497215728101-856f4ea42174?w=300&auto=format&fit=crop&q=60",
+          customCategoryColor || "#475569"
+        );
+      }
+
       const newJob = await addJob({
         title,
         company,
@@ -128,21 +134,18 @@ export const JobPostingForm: React.FC<JobPostingFormProps> = ({ onJobAdded, hide
       setPostedJob(newJob);
       setOverlayStatus("success");
 
-      // Add to local categories list to avoid extra fetch
-      if (showCustomCategory && customCategoryInput.trim() && !categoriesList.includes(customCategoryInput.trim())) {
-        setCategoriesList([...categoriesList, customCategoryInput.trim()]);
-      }
-
       // Reset Form
       setTitle("");
       setCompany("");
-      setCategory("Tech");
+      setCategory("Information Technology (IT) & Software Development");
       setSalary("");
       setLocation("");
       setType("Full-time");
       setDescription("");
       setRequirements([]);
       setCustomCategoryInput("");
+      setCustomCategoryImage("");
+      setCustomCategoryColor("#2563EB");
       setShowCustomCategory(false);
 
     } catch (error) {
@@ -197,44 +200,44 @@ export const JobPostingForm: React.FC<JobPostingFormProps> = ({ onJobAdded, hide
           <div className="flex items-center justify-between">
             <button 
               onClick={() => navigate(-1)}
-              className="px-4 py-2 border border-emerald-800 rounded-xl bg-white hover:bg-emerald-50/20 text-[#0B3C2D] hover:text-[#06241B] text-xs font-extrabold transition-all flex items-center gap-2 cursor-pointer shadow-[0_4px_12px_rgba(0,0,0,0.03)] hover:-translate-y-0.5"
+              className="px-4 py-2 border border-[#0084FF]/40 rounded-xl bg-white hover:bg-blue-50/20 text-[#0084FF] hover:text-[#0070DA] text-xs font-extrabold transition-all flex items-center gap-2 cursor-pointer shadow-[0_4px_12px_rgba(0,0,0,0.03)] hover:-translate-y-0.5"
               title="Go Back"
             >
               <ArrowLeft className="w-4 h-4" /> Go Back
             </button>
-            <div className="flex items-center gap-1.5 bg-[#0B3C2D] border border-emerald-900 text-emerald-200 px-3 py-1.5 rounded-xl text-[10px] font-mono font-bold uppercase tracking-wider">
+            <div className="flex items-center gap-1.5 bg-[#0084FF] border border-[#0084FF]/20 text-white px-3 py-1.5 rounded-xl text-[10px] font-mono font-bold uppercase tracking-wider">
               <FilePlus2 className="w-3.5 h-3.5" /> Job Creation Form
             </div>
           </div>
         </div>
       )}
 
-      <div className="bg-white border border-emerald-800 rounded-3xl p-6 sm:p-8 shadow-[0_10px_25px_-5px_rgba(0,0,0,0.04)] relative overflow-hidden">
+      <div className="bg-white border border-[#0084FF]/30 rounded-3xl p-6 sm:p-8 shadow-[0_10px_25px_-5px_rgba(0,0,0,0.04)] relative overflow-hidden">
       {/* Vector pattern background overlay */}
-      <div className="absolute inset-0 pointer-events-none opacity-[0.03] z-0">
+      <div className="absolute inset-0 pointer-events-none opacity-[0.04] z-0">
         <svg width="100%" height="100%" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <circle cx="95%" cy="5%" r="40" stroke="#0B3C2D" strokeWidth="1" />
-          <path d="M-20,100 C40,70 100,120 180,80" stroke="#0B3C2D" strokeWidth="1" />
+          <circle cx="95%" cy="5%" r="40" stroke="#0084FF" strokeWidth="1.2" />
+          <path d="M-20,100 C40,70 100,120 180,80" stroke="#0084FF" strokeWidth="1.2" />
         </svg>
       </div>
 
       <div className="flex items-center gap-3 mb-6 relative z-10">
-        <div className="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center text-[#0B3C2D] border border-emerald-800/20">
-          <FilePlus2 className="w-5 h-5" />
+        <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center text-[#0084FF] border border-[#0084FF]/25">
+          <FilePlus2 className="w-5 h-5 animate-pulse" />
         </div>
         <div>
-          <h3 className="text-lg font-sans font-extrabold text-slate-900 tracking-tight leading-none">
+          <h3 className="text-lg font-sans font-extrabold text-[#0B1B3D] tracking-tight leading-none">
             Post New Job Opening
           </h3>
-          <span className="text-[10px] font-mono text-[#0B3C2D] font-bold uppercase tracking-wider block mt-1">
-            Firestore-Linked Form
+          <span className="text-[10px] font-mono text-[#0084FF] font-bold uppercase tracking-wider block mt-1">
+            Platform Recruitment Form
           </span>
         </div>
       </div>
 
       {success && (
-        <div className="mb-6 p-4 bg-emerald-50 text-[#0B3C2D] rounded-2xl flex items-center gap-3 text-sm font-sans font-semibold border border-emerald-100 relative z-10">
-          <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+        <div className="mb-6 p-4 bg-blue-50 text-[#0084FF] rounded-2xl flex items-center gap-3 text-sm font-sans font-semibold border border-blue-100 relative z-10">
+          <CheckCircle2 className="w-5 h-5 text-[#0084FF] shrink-0" />
           Job listed successfully! It is now instantly visible on the public seeker board.
         </div>
       )}
@@ -252,7 +255,7 @@ export const JobPostingForm: React.FC<JobPostingFormProps> = ({ onJobAdded, hide
               placeholder="e.g. Senior Backend Engineer"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-sans font-medium focus:border-[#0B3C2D] focus:outline-none"
+              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-sans font-medium focus:border-[#0084FF] focus:ring-1 focus:ring-[#0084FF]/20 focus:outline-none"
             />
           </div>
 
@@ -267,7 +270,7 @@ export const JobPostingForm: React.FC<JobPostingFormProps> = ({ onJobAdded, hide
               placeholder="e.g. Valley Reigns Ltd"
               value={company}
               onChange={(e) => setCompany(e.target.value)}
-              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-sans font-medium focus:border-[#0B3C2D] focus:outline-none"
+              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-sans font-medium focus:border-[#0084FF] focus:ring-1 focus:ring-[#0084FF]/20 focus:outline-none"
             />
           </div>
         </div>
@@ -300,24 +303,36 @@ export const JobPostingForm: React.FC<JobPostingFormProps> = ({ onJobAdded, hide
                 />
                 <div className="absolute left-0 right-0 mt-1.5 bg-white border border-slate-200 rounded-2xl shadow-xl z-40 max-h-56 overflow-y-auto py-1.5 animate-fadeIn">
                   {categoriesList.map((cat) => {
-                    const isSelected = !showCustomCategory && category === cat;
+                    const isSelected = !showCustomCategory && category === cat.name;
                     return (
                       <button
-                        key={cat}
+                        key={cat.name}
                         type="button"
                         onClick={() => {
                           setShowCustomCategory(false);
-                          setCategory(cat);
+                          setCategory(cat.name);
                           setIsCategoryDropdownOpen(false);
                         }}
-                        className={`w-full text-left px-3.5 py-2 text-[11px] font-sans font-bold transition-all flex items-center justify-between border-b border-slate-50 last:border-b-0 cursor-pointer ${
+                        className={`w-full text-left px-3.5 py-2.5 text-[11px] font-sans font-bold transition-all flex items-center justify-between border-b border-slate-50 last:border-b-0 cursor-pointer ${
                           isSelected 
-                            ? "bg-emerald-50 text-[#0B3C2D]" 
+                            ? "bg-blue-50 text-[#0084FF]" 
                             : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
                         }`}
                       >
-                        <span className="truncate">{cat}</span>
-                        {isSelected && <Check className="w-3.5 h-3.5 text-[#0B3C2D]" />}
+                        <span className="flex items-center gap-2 truncate">
+                          <img 
+                            src={cat.imageUrl} 
+                            alt={cat.label} 
+                            className="w-5 h-5 rounded-md object-cover border border-slate-100 shrink-0" 
+                            referrerPolicy="no-referrer"
+                          />
+                          <span 
+                            className="w-2 h-2 rounded-full shrink-0" 
+                            style={{ backgroundColor: cat.color }}
+                          />
+                          <span className="truncate">{cat.label}</span>
+                        </span>
+                        {isSelected && <Check className="w-3.5 h-3.5 text-[#0084FF]" />}
                       </button>
                     );
                   })}
@@ -329,35 +344,161 @@ export const JobPostingForm: React.FC<JobPostingFormProps> = ({ onJobAdded, hide
                       setCategory("");
                       setIsCategoryDropdownOpen(false);
                     }}
-                    className={`w-full text-left px-3.5 py-2 text-[11px] font-sans font-bold transition-all flex items-center justify-between cursor-pointer border-t border-slate-100 text-emerald-700 hover:bg-emerald-50/50 ${
-                      showCustomCategory ? "bg-emerald-50 text-[#0B3C2D]" : ""
+                    className={`w-full text-left px-3.5 py-2 text-[11px] font-sans font-bold transition-all flex items-center justify-between cursor-pointer border-t border-slate-100 text-blue-700 hover:bg-blue-50/50 ${
+                      showCustomCategory ? "bg-blue-50 text-[#0084FF]" : ""
                     }`}
                   >
                     <span className="truncate flex items-center gap-1.5">
                       <Plus className="w-3.5 h-3.5" /> + Add Custom Category...
                     </span>
-                    {showCustomCategory && <Check className="w-3.5 h-3.5 text-[#0B3C2D]" />}
+                    {showCustomCategory && <Check className="w-3.5 h-3.5 text-[#0084FF]" />}
                   </button>
                 </div>
               </>
             )}
 
             {showCustomCategory && (
-              <div className="space-y-1 mt-2 animate-fadeIn relative z-10">
-                <label className="text-[9px] font-mono font-bold text-[#0B3C2D] uppercase tracking-wider block">
-                  New Category Name
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Sales, Construction"
-                  value={customCategoryInput}
-                  onChange={(e) => {
-                    setCustomCategoryInput(e.target.value);
-                    setCategory(e.target.value);
+              <div className="space-y-3 mt-3 p-4 bg-slate-50 rounded-2xl border border-slate-200 animate-fadeIn relative z-10">
+                <div className="flex items-center gap-1.5 text-slate-800 font-bold text-[11px]">
+                  <Sparkles className="w-3.5 h-3.5 text-[#0084FF]" />
+                  <span>Customize Category Assets & Colors</span>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[9px] font-mono font-bold text-[#0084FF] uppercase tracking-wider block">
+                    New Category Name
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Sales, Construction"
+                    value={customCategoryInput}
+                    onChange={(e) => {
+                      setCustomCategoryInput(e.target.value);
+                      setCategory(e.target.value);
+                    }}
+                    className="w-full px-3.5 py-2 rounded-xl border border-blue-300 text-xs font-sans font-medium focus:border-[#0084FF] focus:ring-1 focus:ring-[#0084FF]/20 focus:outline-none bg-white"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[9px] font-mono font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1 block">
+                    <Image className="w-3 h-3 text-slate-400" />
+                    <span>Choose an Image for the Category</span>
+                  </label>
+                  
+                  {/* Preset Images Grid */}
+                  <div className="grid grid-cols-3 gap-2 p-1.5 bg-white border border-slate-200 rounded-xl">
+                    {[
+                      { label: "💻 Tech", url: "https://images.unsplash.com/photo-1517694712202-14dd9538aa97?w=300&auto=format&fit=crop&q=60" },
+                      { label: "🏥 Medical", url: "https://images.unsplash.com/photo-1505751172876-fa1923c5c528?w=300&auto=format&fit=crop&q=60" },
+                      { label: "💼 Office", url: "https://images.unsplash.com/photo-1497215728101-856f4ea42174?w=300&auto=format&fit=crop&q=60" },
+                      { label: "🍳 Food & Drink", url: "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=300&auto=format&fit=crop&q=60" },
+                      { label: "🚜 Agribusiness", url: "https://images.unsplash.com/photo-1595974482597-4b8da8879bc5?w=300&auto=format&fit=crop&q=60" },
+                      { label: "🏗️ Trade/Craft", url: "https://images.unsplash.com/photo-1621905251189-08b45d6a269e?w=300&auto=format&fit=crop&q=60" }
+                    ].map((preset) => {
+                      const isSelected = customCategoryImage === preset.url;
+                      return (
+                        <button
+                          key={preset.label}
+                          type="button"
+                          onClick={() => setCustomCategoryImage(preset.url)}
+                          className={`group/preset text-[9px] font-sans font-bold p-1 border rounded-lg transition-all flex flex-col items-center gap-1 cursor-pointer overflow-hidden relative ${
+                            isSelected 
+                              ? "border-[#0084FF] bg-blue-50 text-[#0084FF]" 
+                              : "border-slate-100 hover:border-slate-300 bg-slate-50 text-slate-600"
+                          }`}
+                        >
+                          <img 
+                            src={preset.url} 
+                            alt={preset.label} 
+                            className="w-full h-8 object-cover rounded-md" 
+                            referrerPolicy="no-referrer"
+                          />
+                          <span className="truncate w-full text-center">{preset.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <input
+                    type="url"
+                    placeholder="Or enter custom image URL..."
+                    value={customCategoryImage}
+                    onChange={(e) => setCustomCategoryImage(e.target.value)}
+                    className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs font-sans font-medium focus:border-[#0084FF] focus:ring-1 focus:ring-[#0084FF]/20 focus:outline-none bg-white placeholder-slate-400"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[9px] font-mono font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1 block">
+                    <Palette className="w-3 h-3 text-slate-400" />
+                    <span>Choose Category Theme Color</span>
+                  </label>
+                  
+                  {/* Preset Colors Grid */}
+                  <div className="flex flex-wrap gap-2 p-2 bg-white border border-slate-200 rounded-xl justify-center">
+                    {[
+                      { name: "Blue", hex: "#2563EB" },
+                      { name: "Emerald", hex: "#059669" },
+                      { name: "Teal", hex: "#0D9488" },
+                      { name: "Orange", hex: "#EA580C" },
+                      { name: "Violet", hex: "#7C3AED" },
+                      { name: "Rose", hex: "#E11D48" },
+                      { name: "Pink", hex: "#DB2777" },
+                      { name: "Slate", hex: "#475569" }
+                    ].map((presetColor) => {
+                      const isSelected = customCategoryColor === presetColor.hex;
+                      return (
+                        <button
+                          key={presetColor.hex}
+                          type="button"
+                          onClick={() => setCustomCategoryColor(presetColor.hex)}
+                          className="w-6 h-6 rounded-full border-2 cursor-pointer transition-all flex items-center justify-center shadow-sm relative hover:scale-110"
+                          style={{ 
+                            backgroundColor: presetColor.hex,
+                            borderColor: isSelected ? "#ffffff" : "transparent",
+                            boxShadow: isSelected ? "0 0 0 2px #0084FF" : undefined
+                          }}
+                          title={presetColor.name}
+                        >
+                          {isSelected && <Check className="w-3.5 h-3.5 text-white" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (!customCategoryInput.trim()) return;
+                    setSavingCategory(true);
+                    try {
+                      await addCustomCategory(
+                        customCategoryInput.trim(),
+                        customCategoryImage.trim() || "https://images.unsplash.com/photo-1497215728101-856f4ea42174?w=300&auto=format&fit=crop&q=60",
+                        customCategoryColor
+                      );
+                      setCategorySaveSuccess(true);
+                      setTimeout(() => setCategorySaveSuccess(false), 2000);
+                    } catch (e) {
+                      console.error(e);
+                    } finally {
+                      setSavingCategory(false);
+                    }
                   }}
-                  className="w-full px-4 py-2 rounded-xl border border-emerald-300 text-xs font-sans font-medium focus:border-[#0B3C2D] focus:outline-none bg-emerald-50/10"
-                />
+                  disabled={!customCategoryInput.trim() || savingCategory}
+                  className="w-full text-center px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white font-sans font-bold text-[11px] rounded-xl cursor-pointer transition-all flex items-center justify-center gap-1.5 shadow-sm"
+                >
+                  {savingCategory ? (
+                    <span>Registering...</span>
+                  ) : categorySaveSuccess ? (
+                    <span className="flex items-center gap-1"><Check className="w-3.5 h-3.5" /> Registered Successfully!</span>
+                  ) : (
+                    <span>Pre-Register Category</span>
+                  )}
+                </button>
               </div>
             )}
           </div>
@@ -398,12 +539,12 @@ export const JobPostingForm: React.FC<JobPostingFormProps> = ({ onJobAdded, hide
                         }}
                         className={`w-full text-left px-3.5 py-2 text-[11px] font-sans font-bold transition-all flex items-center justify-between border-b border-slate-50 last:border-b-0 cursor-pointer ${
                           isSelected 
-                            ? "bg-emerald-50 text-[#0B3C2D]" 
+                            ? "bg-blue-50 text-[#0084FF]" 
                             : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
                         }`}
                       >
                         <span className="truncate">{opt}</span>
-                        {isSelected && <Check className="w-3.5 h-3.5 text-[#0B3C2D]" />}
+                        {isSelected && <Check className="w-3.5 h-3.5 text-[#0084FF]" />}
                       </button>
                     );
                   })}
@@ -423,7 +564,7 @@ export const JobPostingForm: React.FC<JobPostingFormProps> = ({ onJobAdded, hide
               placeholder="e.g. Lagos (Remote) / Abuja"
               value={location}
               onChange={(e) => setLocation(e.target.value)}
-              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-sans font-medium focus:border-[#0B3C2D] focus:outline-none"
+              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-sans font-medium focus:border-[#0084FF] focus:ring-1 focus:ring-[#0084FF]/20 focus:outline-none"
             />
           </div>
         </div>
@@ -439,7 +580,7 @@ export const JobPostingForm: React.FC<JobPostingFormProps> = ({ onJobAdded, hide
             placeholder="e.g. ₦450,000 - ₦600,000 / month"
             value={salary}
             onChange={(e) => setSalary(e.target.value)}
-            className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-sans font-medium focus:border-[#0B3C2D] focus:outline-none"
+            className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-sans font-medium focus:border-[#0084FF] focus:ring-1 focus:ring-[#0084FF]/20 focus:outline-none"
           />
         </div>
 
@@ -454,7 +595,7 @@ export const JobPostingForm: React.FC<JobPostingFormProps> = ({ onJobAdded, hide
             placeholder="Summarize the core day-to-day responsibilities..."
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-sans font-medium focus:border-[#0B3C2D] focus:outline-none resize-none"
+            className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-sans font-medium focus:border-[#0084FF] focus:ring-1 focus:ring-[#0084FF]/20 focus:outline-none resize-none"
           />
         </div>
 
@@ -470,7 +611,7 @@ export const JobPostingForm: React.FC<JobPostingFormProps> = ({ onJobAdded, hide
               value={reqInput}
               onChange={(e) => setReqInput(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), handleAddRequirement())}
-              className="w-full px-4 py-2 rounded-xl border border-slate-200 text-xs font-sans font-medium focus:border-[#0B3C2D] focus:outline-none"
+              className="w-full px-4 py-2 rounded-xl border border-slate-200 text-xs font-sans font-medium focus:border-[#0084FF] focus:ring-1 focus:ring-[#0084FF]/20 focus:outline-none"
             />
             <button
               type="button"
@@ -501,7 +642,7 @@ export const JobPostingForm: React.FC<JobPostingFormProps> = ({ onJobAdded, hide
         <button
           type="submit"
           disabled={isSubmitting}
-          className="w-full py-3.5 bg-[#0B3C2D] hover:bg-[#06241B] text-white rounded-xl text-sm font-sans font-extrabold shadow-md shadow-emerald-950/15 hover:shadow-lg transition-all cursor-pointer flex items-center justify-center"
+          className="w-full py-3.5 bg-[#0084FF] hover:bg-[#0070DA] text-white rounded-xl text-sm font-sans font-extrabold shadow-md shadow-blue-500/15 hover:shadow-lg transition-all cursor-pointer flex items-center justify-center"
         >
           {isSubmitting ? "Listing Job Openings..." : "Publish Job to Platform"}
         </button>
@@ -521,9 +662,9 @@ export const JobPostingForm: React.FC<JobPostingFormProps> = ({ onJobAdded, hide
               <div className="absolute inset-0 bg-white/80 backdrop-blur-md flex flex-col items-center justify-center">
                 <div className="relative flex items-center justify-center mb-6">
                   {/* Outer pulsing ring */}
-                  <div className="absolute w-20 h-20 rounded-full border-2 border-emerald-500/20 animate-ping" />
+                  <div className="absolute w-20 h-20 rounded-full border-2 border-blue-500/20 animate-ping" />
                   {/* Spinning active ring */}
-                  <div className="w-14 h-14 rounded-full border-4 border-emerald-100 border-t-[#0B3C2D] animate-spin" />
+                  <div className="w-14 h-14 rounded-full border-4 border-blue-100 border-t-[#111827] animate-spin" />
                 </div>
                 
                 <motion.h4
@@ -538,7 +679,7 @@ export const JobPostingForm: React.FC<JobPostingFormProps> = ({ onJobAdded, hide
                   initial={{ opacity: 0, y: 5 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.3 }}
-                  className="text-xs font-mono text-[#0B3C2D] uppercase tracking-wider mt-1.5"
+                  className="text-xs font-mono text-[#111827] uppercase tracking-wider mt-1.5"
                 >
                   Publishing job details to the platform feed
                 </motion.p>

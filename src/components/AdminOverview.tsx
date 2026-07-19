@@ -174,7 +174,7 @@ export const AdminOverview: React.FC<AdminOverviewProps> = ({
       {/* ========================================== */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Card: Job Impressions */}
-        <div className="bg-white border border-slate-200/60 hover:border-[#0F5132]/30 rounded-[28px] p-6 sm:p-8 shadow-[0_4px_20px_rgba(15,81,50,0.02)] hover:shadow-[0_12px_30px_rgba(15,81,50,0.06)] hover:-translate-y-0.5 transition-all duration-300 flex items-start justify-between">
+        <div className="bg-white border border-slate-200/60 hover:border-[#1E88E5]/30 rounded-[28px] p-6 sm:p-8 shadow-[0_4px_20px_rgba(30, 136, 229, 0.02)] hover:shadow-[0_12px_30px_rgba(30, 136, 229, 0.06)] hover:-translate-y-0.5 transition-all duration-300 flex items-start justify-between">
           <div className="space-y-2">
             <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-widest block leading-none">
               Aggregate Discovery
@@ -186,13 +186,13 @@ export const AdminOverview: React.FC<AdminOverviewProps> = ({
               Seeker Job Impressions
             </p>
           </div>
-          <div className="w-12 h-12 bg-emerald-50 rounded-2xl flex items-center justify-center text-[#0F5132] shadow-sm">
+          <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center text-[#1E88E5] shadow-sm">
             <Eye className="w-6 h-6" />
           </div>
         </div>
 
         {/* Card: Registered Recruiters */}
-        <div className="bg-white border border-slate-200/60 hover:border-blue-500/30 rounded-[28px] p-6 sm:p-8 shadow-[0_4px_20px_rgba(15,81,50,0.02)] hover:shadow-[0_12px_30px_rgba(37,99,235,0.06)] hover:-translate-y-0.5 transition-all duration-300 flex items-start justify-between">
+        <div className="bg-white border border-slate-200/60 hover:border-blue-500/30 rounded-[28px] p-6 sm:p-8 shadow-[0_4px_20px_rgba(30, 136, 229, 0.02)] hover:shadow-[0_12px_30px_rgba(37,99,235,0.06)] hover:-translate-y-0.5 transition-all duration-300 flex items-start justify-between">
           <div className="space-y-2">
             <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-widest block leading-none">
               Operational Pool
@@ -210,7 +210,7 @@ export const AdminOverview: React.FC<AdminOverviewProps> = ({
         </div>
 
         {/* Card: Abandoned Tickets (SLA) */}
-        <div className="bg-white border border-slate-200/60 hover:border-red-500/30 rounded-[28px] p-6 sm:p-8 shadow-[0_4px_20px_rgba(15,81,50,0.02)] hover:shadow-[0_12px_30px_rgba(239,68,68,0.06)] hover:-translate-y-0.5 transition-all duration-300 flex items-start justify-between">
+        <div className="bg-white border border-slate-200/60 hover:border-red-500/30 rounded-[28px] p-6 sm:p-8 shadow-[0_4px_20px_rgba(30, 136, 229, 0.02)] hover:shadow-[0_12px_30px_rgba(239,68,68,0.06)] hover:-translate-y-0.5 transition-all duration-300 flex items-start justify-between">
           <div className="space-y-2">
             <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-widest block leading-none">
               SLA Compliance
@@ -236,14 +236,14 @@ export const AdminOverview: React.FC<AdminOverviewProps> = ({
         <motion.button
           whileHover={{ y: -4, scale: 1.01 }}
           onClick={() => onNavigateToView("staff")}
-          className="bg-gradient-to-br from-white to-slate-50 border border-slate-200/80 rounded-[28px] p-6 sm:p-8 flex items-center justify-between text-left shadow-[0_8px_24px_rgba(15,81,50,0.03)] hover:shadow-[0_12px_32px_rgba(15,81,50,0.06)] cursor-pointer focus:outline-none transition-all group"
+          className="bg-gradient-to-br from-white to-slate-50 border border-slate-200/80 rounded-[28px] p-6 sm:p-8 flex items-center justify-between text-left shadow-[0_8px_24px_rgba(30, 136, 229, 0.03)] hover:shadow-[0_12px_32px_rgba(30, 136, 229, 0.06)] cursor-pointer focus:outline-none transition-all group"
         >
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 bg-purple-50 group-hover:bg-purple-100 rounded-2xl flex items-center justify-center text-purple-600 transition-colors shadow-sm">
               <Users className="w-5 h-5" />
             </div>
             <div>
-              <h5 className="text-sm font-sans font-extrabold text-slate-800 group-hover:text-[#0F5132] transition-colors">
+              <h5 className="text-sm font-sans font-extrabold text-slate-800 group-hover:text-[#1E88E5] transition-colors">
                 Staff Management Console
               </h5>
               <p className="text-xs font-sans text-slate-400 font-medium leading-relaxed mt-1">
@@ -251,7 +251,7 @@ export const AdminOverview: React.FC<AdminOverviewProps> = ({
               </p>
             </div>
           </div>
-          <div className="w-9 h-9 bg-slate-100 group-hover:bg-[#0F5132] group-hover:text-white rounded-full flex items-center justify-center text-slate-500 transition-all shrink-0">
+          <div className="w-9 h-9 bg-slate-100 group-hover:bg-[#1E88E5] group-hover:text-white rounded-full flex items-center justify-center text-slate-500 transition-all shrink-0">
             <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
           </div>
         </motion.button>
@@ -260,14 +260,14 @@ export const AdminOverview: React.FC<AdminOverviewProps> = ({
         <motion.button
           whileHover={{ y: -4, scale: 1.01 }}
           onClick={() => onNavigateToView("routing")}
-          className="bg-gradient-to-br from-white to-slate-50 border border-slate-200/80 rounded-[28px] p-6 sm:p-8 flex items-center justify-between text-left shadow-[0_8px_24px_rgba(15,81,50,0.03)] hover:shadow-[0_12px_32px_rgba(15,81,50,0.06)] cursor-pointer focus:outline-none transition-all group"
+          className="bg-gradient-to-br from-white to-slate-50 border border-slate-200/80 rounded-[28px] p-6 sm:p-8 flex items-center justify-between text-left shadow-[0_8px_24px_rgba(30, 136, 229, 0.03)] hover:shadow-[0_12px_32px_rgba(30, 136, 229, 0.06)] cursor-pointer focus:outline-none transition-all group"
         >
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-emerald-50 group-hover:bg-emerald-100 rounded-2xl flex items-center justify-center text-[#0F5132] transition-colors shadow-sm">
+            <div className="w-12 h-12 bg-blue-50 group-hover:bg-blue-100 rounded-2xl flex items-center justify-center text-[#1E88E5] transition-colors shadow-sm">
               <Shuffle className="w-5 h-5" />
             </div>
             <div>
-              <h5 className="text-sm font-sans font-extrabold text-slate-800 group-hover:text-[#0F5132] transition-colors">
+              <h5 className="text-sm font-sans font-extrabold text-slate-800 group-hover:text-[#1E88E5] transition-colors">
                 Global Ticket Routing Board
               </h5>
               <p className="text-xs font-sans text-slate-400 font-medium leading-relaxed mt-1">
@@ -275,7 +275,7 @@ export const AdminOverview: React.FC<AdminOverviewProps> = ({
               </p>
             </div>
           </div>
-          <div className="w-9 h-9 bg-slate-100 group-hover:bg-[#0F5132] group-hover:text-white rounded-full flex items-center justify-center text-slate-500 transition-all shrink-0">
+          <div className="w-9 h-9 bg-slate-100 group-hover:bg-[#1E88E5] group-hover:text-white rounded-full flex items-center justify-center text-slate-500 transition-all shrink-0">
             <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
           </div>
         </motion.button>
@@ -284,10 +284,10 @@ export const AdminOverview: React.FC<AdminOverviewProps> = ({
       {/* ========================================== */}
       {/* 3. DYNAMIC REAL-TIME LINE CHART            */}
       {/* ========================================== */}
-      <div className="bg-white border border-slate-200/60 rounded-[32px] p-6 sm:p-8 shadow-[0_8px_30px_rgba(15,81,50,0.03)] space-y-6">
+      <div className="bg-white border border-slate-200/60 rounded-[32px] p-6 sm:p-8 shadow-[0_8px_30px_rgba(30, 136, 229, 0.03)] space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center text-[#0F5132]">
+            <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center text-[#1E88E5]">
               <Activity className="w-5 h-5" />
             </div>
             <div>
@@ -369,7 +369,7 @@ export const AdminOverview: React.FC<AdminOverviewProps> = ({
                 type="monotone"
                 dataKey="impressions"
                 name="Job Impressions"
-                stroke="#0F5132"
+                stroke="#1E88E5"
                 strokeWidth={3}
                 dot={{ r: 4, strokeWidth: 1, fill: "#fff" }}
                 activeDot={{ r: 6 }}

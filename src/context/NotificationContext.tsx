@@ -148,10 +148,6 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     navigator.serviceWorker.ready.then((registration) => {
       const alreadyToasted = sessionStorage.getItem("sw_registered_toast_shown");
       if (!alreadyToasted) {
-        addToast(
-          "Notification Access Available",
-          ""
-        );
         sessionStorage.setItem("sw_registered_toast_shown", "true");
       }
     }).catch((err) => {
@@ -543,17 +539,17 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
               className="pointer-events-auto bg-white/95 backdrop-blur-md border border-slate-150 rounded-[20px] shadow-2xl p-4 flex items-start gap-3.5 relative overflow-hidden"
             >
               {/* Highlight status line */}
-              <div className="absolute top-0 left-0 bottom-0 w-1.5 bg-[#0F5132]" />
+              <div className="absolute top-0 left-0 bottom-0 w-1.5 bg-[#1E88E5]" />
               
               {/* Icon Container */}
-              <div className="w-9 h-9 rounded-xl bg-[#0F5132]/10 flex items-center justify-center text-[#0F5132] shrink-0">
+              <div className="w-9 h-9 rounded-xl bg-[#1E88E5]/10 flex items-center justify-center text-[#1E88E5] shrink-0">
                 <Bell className="w-5 h-5 animate-pulse" />
               </div>
               
               {/* Text content */}
               <div className="flex-1 space-y-0.5 text-left pr-4">
                 <div className="flex items-center gap-1.5">
-                  <span className="text-[10px] font-mono font-bold tracking-wider uppercase text-[#0F5132] bg-[#0F5132]/10 px-1.5 py-0.5 rounded">
+                  <span className="text-[10px] font-mono font-bold tracking-wider uppercase text-[#1E88E5] bg-[#1E88E5]/10 px-1.5 py-0.5 rounded">
                     Push Notification
                   </span>
                   {localStorage.getItem("push_notifications_simulated") === "true" && (
@@ -562,7 +558,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
                     </span>
                   )}
                 </div>
-                <h4 className="text-xs font-bold text-[#0B3C49] leading-snug">
+                <h4 className="text-xs font-bold text-[#1e3a8a] leading-snug">
                   {toast.title}
                 </h4>
                 <p className="text-[11px] text-slate-500 leading-relaxed">

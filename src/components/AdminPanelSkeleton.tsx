@@ -4,7 +4,7 @@ export const KPIGridSkeleton: React.FC = () => {
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6">
       {/* Card 1: Job Views skeleton */}
-      <div className="bg-white border border-emerald-800 rounded-3xl p-4 sm:p-6 flex items-start justify-between">
+      <div className="bg-white border border-blue-800 rounded-3xl p-4 sm:p-6 flex items-start justify-between">
         <div className="space-y-3 flex-1">
           <div className="h-2.5 animate-shimmer rounded w-1/2"></div>
           <div className="h-8 animate-shimmer rounded w-2/3"></div>
@@ -13,7 +13,7 @@ export const KPIGridSkeleton: React.FC = () => {
       </div>
 
       {/* Card 2: Staff count skeleton */}
-      <div className="bg-[#0B3C2D]/10 border border-emerald-800 rounded-3xl p-4 sm:p-6 flex items-start justify-between">
+      <div className="bg-black/10 border border-neutral-800/20 rounded-3xl p-4 sm:p-6 flex items-start justify-between">
         <div className="space-y-3 flex-1">
           <div className="h-2.5 animate-shimmer rounded w-1/2"></div>
           <div className="h-8 animate-shimmer rounded w-2/3"></div>
@@ -22,7 +22,7 @@ export const KPIGridSkeleton: React.FC = () => {
       </div>
 
       {/* Card 3: Chats overview skeleton (col-span-2) */}
-      <div className="bg-[#0B3C2D]/10 border border-emerald-800 rounded-3xl p-4 sm:p-6 flex items-start justify-between col-span-2 md:col-span-2">
+      <div className="bg-black/10 border border-neutral-800/20 rounded-3xl p-4 sm:p-6 flex items-start justify-between col-span-2 md:col-span-2">
         <div className="space-y-3.5 flex-1 mr-2">
           <div className="h-2.5 animate-shimmer rounded w-1/4"></div>
           <div className="h-8 animate-shimmer rounded w-1/6"></div>
@@ -58,17 +58,17 @@ export const NavigationCardsSkeleton: React.FC = () => {
 
 export const ChartSkeleton: React.FC = () => {
   return (
-    <div className="bg-white border border-emerald-800 rounded-3xl pt-3.5 pb-6 px-6 sm:pt-4 sm:pb-8 sm:px-8 shadow-none space-y-6">
+    <div className="bg-white border border-blue-800 rounded-3xl pt-3.5 pb-6 px-6 sm:pt-4 sm:pb-8 sm:px-8 shadow-none space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-50 pb-5">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-[#0B3C2D]/15 border border-emerald-900 rounded-xl flex items-center justify-center shrink-0">
+          <div className="w-10 h-10 bg-black/10 border border-neutral-800/20 rounded-xl flex items-center justify-center shrink-0">
             <div className="w-5 h-5 animate-shimmer rounded-md" />
           </div>
           <div className="space-y-2">
             <div className="h-4 animate-shimmer rounded w-28 animate-shimmer"></div>
           </div>
         </div>
-        <div className="flex gap-1 bg-[#0B3C2D]/10 border border-emerald-950 p-1.5 rounded-2xl w-full sm:w-auto">
+        <div className="flex gap-1 bg-black/5 border border-neutral-800/10 p-1.5 rounded-2xl w-full sm:w-auto">
           {[1, 2, 3, 4].map((i) => (
             <div key={i} className="h-6 animate-shimmer rounded-xl w-14 sm:w-16"></div>
           ))}

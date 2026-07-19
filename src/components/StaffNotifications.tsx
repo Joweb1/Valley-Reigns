@@ -126,7 +126,7 @@ export const StaffNotifications: React.FC = () => {
         );
       case "new_job_posted":
         return (
-          <div className="w-10 h-10 bg-emerald-50 border border-emerald-100 rounded-xl flex items-center justify-center text-emerald-600 shrink-0">
+          <div className="w-10 h-10 bg-blue-50 border border-blue-100 rounded-xl flex items-center justify-center text-blue-600 shrink-0">
             <Briefcase className="w-5 h-5" />
           </div>
         );
@@ -165,24 +165,24 @@ export const StaffNotifications: React.FC = () => {
       <div className="flex items-center justify-between">
         <Link 
           to="/staff" 
-          className="px-4 py-2 border border-emerald-800 rounded-xl bg-white hover:bg-emerald-50/20 text-[#0B3C2D] hover:text-[#06241B] text-xs font-extrabold transition-all flex items-center gap-2 cursor-pointer shadow-[0_4px_12px_rgba(0,0,0,0.03)] hover:-translate-y-0.5"
+          className="px-4 py-2 border border-blue-800 rounded-xl bg-white hover:bg-blue-50/20 text-[#111827] hover:text-[#1f2937] text-xs font-extrabold transition-all flex items-center gap-2 cursor-pointer shadow-[0_4px_12px_rgba(0,0,0,0.03)] hover:-translate-y-0.5"
           title="Go Back"
         >
           <ArrowLeft className="w-4 h-4" /> Recruiter Dashboard
         </Link>
-        <div className="flex items-center gap-1.5 bg-[#0B3C2D] border border-emerald-900 text-emerald-200 px-3 py-1.5 rounded-xl text-[10px] font-mono font-bold uppercase tracking-wider">
+        <div className="flex items-center gap-1.5 bg-black border border-neutral-800 text-blue-200 px-3 py-1.5 rounded-xl text-[10px] font-mono font-bold uppercase tracking-wider">
           <Bell className="w-3.5 h-3.5 animate-bounce" /> Staff Console
         </div>
       </div>
 
       {/* Premium Top Heading Card */}
-      <div className="bg-[#0B3C2D] border border-emerald-900 rounded-[32px] text-white p-6 sm:p-8 shadow-sm relative overflow-hidden flex flex-col md:flex-row md:items-center justify-between gap-6">
+      <div className="bg-[#0084FF] border border-[#0084FF]/40 rounded-[32px] text-white p-6 sm:p-8 shadow-sm relative overflow-hidden flex flex-col md:flex-row md:items-center justify-between gap-6">
         {/* Vector pattern background overlay */}
-        <div className="absolute inset-0 pointer-events-none opacity-15">
+        <div className="absolute inset-0 pointer-events-none opacity-[0.55]">
           <svg width="100%" height="100%" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="85%" cy="15%" r="50" stroke="currentColor" strokeWidth="1.2" className="text-emerald-400" />
-            <circle cx="90%" cy="20%" r="80" stroke="currentColor" strokeWidth="1" className="text-emerald-500" strokeDasharray="3 3" />
-            <path d="M-10,80 C30,40 80,100 150,60" stroke="currentColor" strokeWidth="1.2" className="text-emerald-300" />
+            <circle cx="85%" cy="15%" r="50" stroke="currentColor" strokeWidth="1.2" className="text-white/40" />
+            <circle cx="90%" cy="20%" r="80" stroke="currentColor" strokeWidth="1" className="text-white/30" strokeDasharray="3 3" />
+            <path d="M-10,80 C30,40 80,100 150,60" stroke="currentColor" strokeWidth="1.2" className="text-white/35" />
           </svg>
         </div>
 
@@ -190,7 +190,7 @@ export const StaffNotifications: React.FC = () => {
           <span className="bg-white/15 px-3 py-1 rounded-full text-[10px] font-bold font-mono uppercase tracking-wider">
             Personal Alerts Feed
           </span>
-          <h2 className="text-2xl sm:text-3xl font-serif italic font-extrabold tracking-tight">
+          <h2 className="text-2xl sm:text-3xl font-display font-black uppercase tracking-wider">
             Staff Notifications
           </h2>
         </div>
@@ -202,12 +202,12 @@ export const StaffNotifications: React.FC = () => {
             className="p-3 bg-white/10 hover:bg-white/20 border border-white/10 text-white rounded-xl shadow-sm cursor-pointer transition-all active:scale-95 flex items-center justify-center shrink-0"
             title="Refresh logs"
           >
-            <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin text-emerald-300" : ""}`} />
+            <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin text-blue-300" : ""}`} />
           </button>
           <button
             onClick={handleMarkAllRead}
             disabled={getUnreadCount() === 0}
-            className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-[#051812] border border-emerald-400 rounded-xl text-xs font-sans font-extrabold flex items-center gap-2 cursor-pointer transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed shadow-[0_4px_12px_rgba(16,185,129,0.2)]"
+            className="px-4 py-2.5 bg-blue-500 hover:bg-blue-400 text-white border border-blue-400 rounded-xl text-xs font-sans font-extrabold flex items-center gap-2 cursor-pointer transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed shadow-[0_4px_12px_rgba(16,185,129,0.2)]"
           >
             <CheckSquare className="w-4 h-4" />
             Mark All Read
@@ -228,7 +228,7 @@ export const StaffNotifications: React.FC = () => {
             onClick={() => setFilter(tab.key as any)}
             className={`px-4 py-2 rounded-xl text-xs font-sans font-bold transition-all whitespace-nowrap cursor-pointer ${
               filter === tab.key
-                ? "bg-[#0B3C2D] text-white shadow-none"
+                ? "bg-black text-white shadow-none"
                 : "bg-slate-50 border border-slate-200/60 text-slate-600 hover:bg-slate-100/80 hover:text-slate-900"
             }`}
           >
@@ -240,7 +240,7 @@ export const StaffNotifications: React.FC = () => {
       {/* Notification Logs Feed */}
       {loading ? (
         <div className="bg-white border border-slate-200 w-full p-12 text-center rounded-none shadow-none">
-          <RefreshCw className="w-8 h-8 text-emerald-700 animate-spin mx-auto mb-3" />
+          <RefreshCw className="w-8 h-8 text-blue-700 animate-spin mx-auto mb-3" />
           <p className="text-sm font-sans font-medium text-slate-500">Loading alerts...</p>
         </div>
       ) : filteredNotifications.length === 0 ? (
@@ -263,12 +263,12 @@ export const StaffNotifications: React.FC = () => {
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 className={`w-full p-4.5 sm:p-5 flex items-start gap-4 transition-colors relative bg-white border-0 rounded-none shadow-none ${
-                  notif.read ? "bg-white" : "bg-emerald-50/10"
+                  notif.read ? "bg-white" : "bg-blue-50/10"
                 }`}
               >
                 {/* Unread vertical bar indicator */}
                 {!notif.read && (
-                  <span className="absolute left-0 top-0 bottom-0 w-1.5 bg-emerald-600" />
+                  <span className="absolute left-0 top-0 bottom-0 w-1.5 bg-blue-600" />
                 )}
 
                 {/* Left side: Icon */}
@@ -297,18 +297,18 @@ export const StaffNotifications: React.FC = () => {
                       {notif.metadata.chatId && (
                         <Link 
                           to="/staff" 
-                          className="px-2.5 py-1 bg-slate-50 border border-slate-200/60 hover:bg-emerald-50 hover:border-emerald-200 hover:text-emerald-800 text-[9px] font-mono font-bold rounded-lg transition-colors inline-flex items-center gap-1"
+                          className="px-2.5 py-1 bg-slate-50 border border-slate-200/60 hover:bg-blue-50 hover:border-blue-200 hover:text-blue-800 text-[9px] font-mono font-bold rounded-lg transition-colors inline-flex items-center gap-1"
                         >
-                          <MessageSquare className="w-3 h-3 text-emerald-600" />
+                          <MessageSquare className="w-3 h-3 text-blue-600" />
                           View Chat
                         </Link>
                       )}
                       {notif.metadata.jobId && (
                         <Link 
                           to="/staff/manage-jobs" 
-                          className="px-2.5 py-1 bg-slate-50 border border-slate-200/60 hover:bg-emerald-50 hover:border-emerald-200 hover:text-emerald-800 text-[9px] font-mono font-bold rounded-lg transition-colors inline-flex items-center gap-1"
+                          className="px-2.5 py-1 bg-slate-50 border border-slate-200/60 hover:bg-blue-50 hover:border-blue-200 hover:text-blue-800 text-[9px] font-mono font-bold rounded-lg transition-colors inline-flex items-center gap-1"
                         >
-                          <Briefcase className="w-3 h-3 text-emerald-600" />
+                          <Briefcase className="w-3 h-3 text-blue-600" />
                           Manage Jobs
                         </Link>
                       )}
@@ -320,7 +320,7 @@ export const StaffNotifications: React.FC = () => {
                 {!notif.read && (
                   <button
                     onClick={() => handleMarkAsRead(notif.id)}
-                    className="w-8 h-8 bg-slate-50 border border-slate-150 rounded-lg flex items-center justify-center text-slate-400 hover:text-emerald-700 hover:bg-emerald-50 hover:border-emerald-100 transition-all cursor-pointer shrink-0"
+                    className="w-8 h-8 bg-slate-50 border border-slate-150 rounded-lg flex items-center justify-center text-slate-400 hover:text-blue-700 hover:bg-blue-50 hover:border-blue-100 transition-all cursor-pointer shrink-0"
                     title="Mark as read"
                   >
                     <Check className="w-4 h-4" />

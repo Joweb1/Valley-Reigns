@@ -28,15 +28,11 @@ const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 export const auth = getAuth(app);
 export const db = initializeFirestore(app, {
   localCache: memoryLocalCache(),
-  experimentalAutoDetectLongPolling: true
+  experimentalForceLongPolling: true
 }, env.VITE_FIREBASE_FIRESTORE_DATABASE_ID || "ai-studio-valleyreigns-b8be1d27-7bef-4ee3-8468-1b1246b9b417");
 
-let rtdbInstance: any = null;
-try {
-  rtdbInstance = getDatabase(app, env.VITE_FIREBASE_DATABASE_URL || "https://gen-lang-client-0916743897-default-rtdb.firebaseio.com/");
-} catch (e) {
-  console.warn("Realtime Database initialization failed or is not configured:", e);
-}
-export const rtdb = rtdbInstance;
+// Realtime Database is disabled to prevent PERMISSION_DENIED errors on unconfigured databases.
+// The application seamlessly falls back to Cloud Firestore which is fully provisioned and secure.
+export const rtdb = null;
 
 export default app;

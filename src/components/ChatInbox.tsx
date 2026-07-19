@@ -266,7 +266,7 @@ export const ChatInbox: React.FC<ChatInboxProps> = ({ jobsList, searchQuery: ext
               onClick={() => { setActiveTab("available"); setActiveChatId(null); }}
               className={`py-3.5 text-sm font-sans font-bold transition-colors cursor-pointer border-b-2 text-center relative ${
                 activeTab === "available"
-                  ? "border-[#0F5132] text-[#0F5132]"
+                  ? "border-[#1E88E5] text-[#1E88E5]"
                   : "border-transparent text-slate-400 hover:text-slate-600"
               }`}
             >
@@ -281,13 +281,13 @@ export const ChatInbox: React.FC<ChatInboxProps> = ({ jobsList, searchQuery: ext
               onClick={() => { setActiveTab("my-chats"); setActiveChatId(null); }}
               className={`py-3.5 text-sm font-sans font-bold transition-colors cursor-pointer border-b-2 text-center relative ${
                 activeTab === "my-chats"
-                  ? "border-[#0F5132] text-[#0F5132]"
+                  ? "border-[#1E88E5] text-[#1E88E5]"
                   : "border-transparent text-slate-400 hover:text-slate-600"
               }`}
             >
               My Live Inbox
               {myLiveConversations.length > 0 && (
-                <span className="ml-1.5 px-2 py-0.5 bg-[#0F5132] text-white rounded-full text-[9px] font-extrabold font-mono">
+                <span className="ml-1.5 px-2 py-0.5 bg-[#1E88E5] text-white rounded-full text-[9px] font-extrabold font-mono">
                   {myLiveConversations.length}
                 </span>
               )}
@@ -360,10 +360,10 @@ export const ChatInbox: React.FC<ChatInboxProps> = ({ jobsList, searchQuery: ext
                       activeTab === "my-chats" ? "cursor-pointer" : ""
                     } ${
                       isSelected
-                        ? "bg-[#FAFDFB] border-2 border-[#0F5132] shadow-md scale-[1.01]"
+                        ? "bg-[#FAFDFB] border-2 border-[#1E88E5] shadow-md scale-[1.01]"
                         : activeTab === "available"
-                        ? "bg-gradient-to-r from-amber-50/70 via-amber-100/40 to-amber-50/70 border border-[#0F5132] shadow-sm hover:shadow-md hover:scale-[1.01]"
-                        : "bg-white border border-[#0F5132]/30 hover:border-[#0F5132] hover:shadow-sm"
+                        ? "bg-gradient-to-r from-amber-50/70 via-amber-100/40 to-amber-50/70 border border-[#1E88E5] shadow-sm hover:shadow-md hover:scale-[1.01]"
+                        : "bg-white border border-[#1E88E5]/30 hover:border-[#1E88E5] hover:shadow-sm"
                     }`}
                   >
                     <div className="flex items-center justify-between gap-2 mb-1.5">
@@ -374,11 +374,11 @@ export const ChatInbox: React.FC<ChatInboxProps> = ({ jobsList, searchQuery: ext
                       {activeTab === "available" ? (
                         <span className="h-2 w-2 rounded-full bg-amber-500 animate-ping"></span>
                       ) : exp.isInApp ? (
-                        <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-[#0F5132] shrink-0">
+                        <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-blue-50 text-[#1E88E5] shrink-0">
                           In-App
                         </span>
                       ) : (
-                        <span className={`text-[9px] font-mono font-bold px-1.5 py-0.5 rounded flex items-center gap-0.5 shrink-0 ${exp.isUrgent ? "bg-red-50 text-red-600 animate-pulse" : "bg-emerald-50 text-[#0F5132]"}`}>
+                        <span className={`text-[9px] font-mono font-bold px-1.5 py-0.5 rounded flex items-center gap-0.5 shrink-0 ${exp.isUrgent ? "bg-red-50 text-red-600 animate-pulse" : "bg-blue-50 text-[#1E88E5]"}`}>
                           <Clock className="w-2.5 h-2.5" />
                           {exp.hoursLeft}h left
                         </span>
@@ -399,7 +399,7 @@ export const ChatInbox: React.FC<ChatInboxProps> = ({ jobsList, searchQuery: ext
                           <button
                             onClick={(e) => { e.stopPropagation(); handleClaimChat(conv.chatId); }}
                             disabled={claimingIds[conv.chatId]}
-                            className={`w-full py-1.5 bg-[#0F5132] hover:bg-[#0c4027] text-white rounded-xl text-[10px] font-sans font-extrabold transition-all cursor-pointer shadow-sm flex items-center justify-center gap-1.5 ${
+                            className={`w-full py-1.5 bg-[#1E88E5] hover:bg-[#1565C0] text-white rounded-xl text-[10px] font-sans font-extrabold transition-all cursor-pointer shadow-sm flex items-center justify-center gap-1.5 ${
                               claimingIds[conv.chatId] ? "" : "animate-soft-bounce"
                             }`}
                           >
@@ -442,7 +442,7 @@ export const ChatInbox: React.FC<ChatInboxProps> = ({ jobsList, searchQuery: ext
                     <ArrowLeft className="w-5 h-5" />
                   </button>
 
-                  <div className="w-10 h-10 bg-emerald-50 rounded-full flex items-center justify-center text-[#0F5132] font-mono text-xs font-black shrink-0 border border-emerald-100 shadow-sm">
+                  <div className="w-10 h-10 bg-blue-50 rounded-full flex items-center justify-center text-[#1E88E5] font-mono text-xs font-black shrink-0 border border-blue-100 shadow-sm">
                     WA
                   </div>
                   <div className="min-w-0 leading-tight">
@@ -458,7 +458,7 @@ export const ChatInbox: React.FC<ChatInboxProps> = ({ jobsList, searchQuery: ext
                     const exp = getExpirationState(activeConversation);
                     if (exp.isInApp) {
                       return (
-                        <div className="px-3 py-1.5 rounded-xl text-xs font-mono font-extrabold bg-emerald-50 border border-emerald-100 text-[#0F5132]">
+                        <div className="px-3 py-1.5 rounded-xl text-xs font-mono font-extrabold bg-blue-50 border border-blue-100 text-[#1E88E5]">
                           In-App Chat
                         </div>
                       );
@@ -469,7 +469,7 @@ export const ChatInbox: React.FC<ChatInboxProps> = ({ jobsList, searchQuery: ext
                           ? "bg-slate-100 border-slate-200 text-slate-400" 
                           : exp.isUrgent 
                           ? "bg-red-50 border-red-100 text-red-600 animate-[pulse_1.5s_infinite]" 
-                          : "bg-emerald-50 border-emerald-100 text-[#0F5132]"
+                          : "bg-blue-50 border-blue-100 text-[#1E88E5]"
                       }`}>
                         <Clock className="w-3.5 h-3.5" />
                         {exp.text}
@@ -587,7 +587,7 @@ export const ChatInbox: React.FC<ChatInboxProps> = ({ jobsList, searchQuery: ext
                       return (
                         <div key={msg.id || index} className="flex justify-center">
                           <div className="bg-slate-100 text-slate-500 rounded-full px-4 py-1.5 text-[10px] font-sans font-semibold tracking-wide flex items-center gap-1.5 shadow-sm border border-slate-200/50">
-                            <Sparkles className="w-3 h-3 text-[#0F5132]" />
+                            <Sparkles className="w-3 h-3 text-[#1E88E5]" />
                             {msg.text}
                           </div>
                         </div>
@@ -616,7 +616,7 @@ export const ChatInbox: React.FC<ChatInboxProps> = ({ jobsList, searchQuery: ext
                       >
                         <div className={`max-w-[80%] rounded-2xl p-4 shadow-sm border ${
                           isStaff
-                            ? "bg-[#0F5132] text-white border-emerald-700 rounded-tr-none"
+                            ? "bg-[#1E88E5] text-white border-blue-700 rounded-tr-none"
                             : "bg-white text-slate-800 border-slate-100 rounded-tl-none"
                         }`}>
                           <p className="text-xs font-sans leading-relaxed whitespace-pre-line">
@@ -627,13 +627,13 @@ export const ChatInbox: React.FC<ChatInboxProps> = ({ jobsList, searchQuery: ext
                           {matchedJob && (
                             <div className={`mt-3 border rounded-xl p-3 text-left transition-all ${
                               isStaff 
-                                ? "bg-emerald-950/40 border-emerald-800 text-white" 
+                                ? "bg-slate-900/40 border-blue-800 text-white" 
                                 : "bg-slate-50 border-slate-100 text-slate-800"
                             }`}>
                               <div className="flex items-start justify-between gap-2">
                                 <div className="min-w-0">
                                   <span className={`text-[8px] font-mono uppercase tracking-wider block mb-0.5 ${
-                                    isStaff ? "text-emerald-300" : "text-emerald-700"
+                                    isStaff ? "text-blue-300" : "text-blue-700"
                                   }`}>
                                     Referenced Job Opportunity
                                   </span>
@@ -643,18 +643,18 @@ export const ChatInbox: React.FC<ChatInboxProps> = ({ jobsList, searchQuery: ext
                                     {matchedJob.title}
                                   </h5>
                                   <p className={`text-[10px] font-medium ${
-                                    isStaff ? "text-emerald-200/80" : "text-slate-500"
+                                    isStaff ? "text-blue-200/80" : "text-slate-500"
                                   }`}>
                                     {matchedJob.company} • {matchedJob.location}
                                   </p>
                                   <div className="flex items-center gap-1.5 mt-1.5">
                                     <span className={`text-[9px] font-mono font-bold px-1.5 py-0.5 rounded ${
-                                      isStaff ? "bg-emerald-800/60 text-emerald-200" : "bg-[#0F5132]/10 text-[#0F5132]"
+                                      isStaff ? "bg-blue-800/60 text-blue-200" : "bg-[#1E88E5]/10 text-[#1E88E5]"
                                     }`}>
                                       {matchedJob.salary}
                                     </span>
                                     <span className={`text-[9px] font-sans font-semibold px-1.5 py-0.5 rounded ${
-                                      isStaff ? "bg-emerald-800/40 text-emerald-300" : "bg-slate-200/60 text-slate-600"
+                                      isStaff ? "bg-blue-800/40 text-blue-300" : "bg-slate-200/60 text-slate-600"
                                     }`}>
                                       {matchedJob.type}
                                     </span>
@@ -671,7 +671,7 @@ export const ChatInbox: React.FC<ChatInboxProps> = ({ jobsList, searchQuery: ext
                                   }}
                                   className={`p-1.5 rounded-lg transition-all shrink-0 cursor-pointer ${
                                     isStaff 
-                                      ? "hover:bg-emerald-800/40 text-emerald-300 hover:text-white" 
+                                      ? "hover:bg-blue-800/40 text-blue-300 hover:text-white" 
                                       : "hover:bg-slate-200/60 text-slate-500 hover:text-slate-800"
                                   }`}
                                   title={jobExpanded[activeConversation.chatId] ? "Hide details" : "Show details"}
@@ -688,17 +688,17 @@ export const ChatInbox: React.FC<ChatInboxProps> = ({ jobsList, searchQuery: ext
                                 <div
                                   className={`mt-2.5 pt-2.5 border-t text-[10px] font-sans leading-relaxed space-y-2 ${
                                     isStaff 
-                                      ? "border-emerald-800/60 text-emerald-100" 
+                                      ? "border-blue-800/60 text-blue-100" 
                                       : "border-slate-200/60 text-slate-600"
                                   }`}
                                 >
                                   <div>
-                                    <p className={`font-bold ${isStaff ? "text-emerald-200" : "text-slate-700"}`}>Description:</p>
+                                    <p className={`font-bold ${isStaff ? "text-blue-200" : "text-slate-700"}`}>Description:</p>
                                     <p className="mt-0.5 whitespace-pre-line">{matchedJob.description}</p>
                                   </div>
                                   {matchedJob.requirements && matchedJob.requirements.length > 0 && (
                                     <div className="pt-1.5">
-                                      <p className={`font-bold ${isStaff ? "text-emerald-200" : "text-slate-700"}`}>Requirements:</p>
+                                      <p className={`font-bold ${isStaff ? "text-blue-200" : "text-slate-700"}`}>Requirements:</p>
                                       <ul className="list-disc pl-3.5 space-y-1 mt-1">
                                         {matchedJob.requirements.map((req, i) => (
                                           <li key={i}>{req}</li>
@@ -712,7 +712,7 @@ export const ChatInbox: React.FC<ChatInboxProps> = ({ jobsList, searchQuery: ext
                           )}
 
                           <div className={`text-[9px] font-mono mt-1.5 text-right flex items-center justify-end gap-1.5 ${
-                            isStaff ? "text-emerald-200/80" : "text-slate-400"
+                            isStaff ? "text-blue-200/80" : "text-slate-400"
                           }`}>
                             {!isStaff && (
                               <button
@@ -737,7 +737,7 @@ export const ChatInbox: React.FC<ChatInboxProps> = ({ jobsList, searchQuery: ext
                               </button>
                             )}
                             {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                            {isStaff && <CheckCheck className="w-3.5 h-3.5 text-emerald-300" />}
+                            {isStaff && <CheckCheck className="w-3.5 h-3.5 text-blue-300" />}
                           </div>
                         </div>
                       </div>
@@ -773,7 +773,7 @@ export const ChatInbox: React.FC<ChatInboxProps> = ({ jobsList, searchQuery: ext
                             <button
                               key={idx}
                               onClick={() => handleSendTemplate(tmpl)}
-                              className="w-full text-left p-3 hover:bg-emerald-50 hover:border-emerald-200 border border-slate-100 rounded-xl text-xs font-sans font-semibold text-slate-700 hover:text-[#0F5132] transition-all cursor-pointer flex items-center justify-between gap-2"
+                              className="w-full text-left p-3 hover:bg-blue-50 hover:border-blue-200 border border-slate-100 rounded-xl text-xs font-sans font-semibold text-slate-700 hover:text-[#1E88E5] transition-all cursor-pointer flex items-center justify-between gap-2"
                             >
                               <span>{tmpl}</span>
                               <ChevronRight className="w-4 h-4 shrink-0 text-slate-300" />
@@ -793,7 +793,7 @@ export const ChatInbox: React.FC<ChatInboxProps> = ({ jobsList, searchQuery: ext
                         value={messageInput}
                         onChange={(e) => setMessageInput(e.target.value)}
                         placeholder={exp.isInApp ? "Type in-app message securely..." : "Type WhatsApp dispatch message..."}
-                        className={`w-full px-4 py-3 rounded-xl border text-xs font-sans font-medium focus:outline-none focus:border-[#0F5132] ${
+                        className={`w-full px-4 py-3 rounded-xl border text-xs font-sans font-medium focus:outline-none focus:border-[#1E88E5] ${
                           exp.isUrgent 
                             ? "border-red-300 bg-red-50/10 focus:border-red-500 animate-[pulse_2s_infinite]" 
                             : "border-slate-200"
@@ -802,7 +802,7 @@ export const ChatInbox: React.FC<ChatInboxProps> = ({ jobsList, searchQuery: ext
                       <button
                         type="submit"
                         disabled={isSending}
-                        className="px-5 py-3 bg-[#0F5132] hover:bg-[#0c4027] text-white rounded-xl text-xs font-sans font-extrabold flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm shrink-0 disabled:opacity-75 disabled:cursor-not-allowed"
+                        className="px-5 py-3 bg-[#1E88E5] hover:bg-[#1565C0] text-white rounded-xl text-xs font-sans font-extrabold flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm shrink-0 disabled:opacity-75 disabled:cursor-not-allowed"
                       >
                         {isSending ? (
                           <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -853,9 +853,9 @@ export const ChatInbox: React.FC<ChatInboxProps> = ({ jobsList, searchQuery: ext
               className="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden border border-slate-100 flex flex-col max-h-[85vh] z-10"
             >
               {/* Header */}
-              <div className="bg-[#0F5132] px-6 py-4 flex items-center justify-between text-white shrink-0">
+              <div className="bg-[#1E88E5] px-6 py-4 flex items-center justify-between text-white shrink-0">
                 <div>
-                  <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-emerald-200">
+                  <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-blue-200">
                     Referenced Job Specification
                   </span>
                   <h4 className="text-base font-sans font-extrabold tracking-tight mt-0.5">
@@ -864,7 +864,7 @@ export const ChatInbox: React.FC<ChatInboxProps> = ({ jobsList, searchQuery: ext
                 </div>
                 <button
                   onClick={() => setPopupJob(null)}
-                  className="p-1.5 hover:bg-emerald-800/60 rounded-lg transition-colors cursor-pointer text-emerald-100 hover:text-white"
+                  className="p-1.5 hover:bg-blue-800/60 rounded-lg transition-colors cursor-pointer text-blue-100 hover:text-white"
                   title="Close details"
                 >
                   <X className="w-5 h-5" />
@@ -894,7 +894,7 @@ export const ChatInbox: React.FC<ChatInboxProps> = ({ jobsList, searchQuery: ext
                     <span className="text-[9px] font-mono text-slate-400 uppercase font-bold tracking-wider">
                       Compensation
                     </span>
-                    <p className="text-xs font-sans font-bold text-emerald-700 mt-0.5">
+                    <p className="text-xs font-sans font-bold text-blue-700 mt-0.5">
                       💰 {popupJob.salary}
                     </p>
                   </div>
@@ -924,8 +924,8 @@ export const ChatInbox: React.FC<ChatInboxProps> = ({ jobsList, searchQuery: ext
                     </span>
                     <ul className="grid grid-cols-1 gap-2">
                       {popupJob.requirements.map((req, idx) => (
-                        <li key={idx} className="flex items-start gap-2 text-xs font-sans text-slate-600 bg-emerald-50/30 px-3 py-2 rounded-lg border border-emerald-50/50 leading-relaxed">
-                          <Check className="w-3.5 h-3.5 text-[#0F5132] shrink-0 mt-0.5" />
+                        <li key={idx} className="flex items-start gap-2 text-xs font-sans text-slate-600 bg-blue-50/30 px-3 py-2 rounded-lg border border-blue-50/50 leading-relaxed">
+                          <Check className="w-3.5 h-3.5 text-[#1E88E5] shrink-0 mt-0.5" />
                           <span>{req}</span>
                         </li>
                       ))}

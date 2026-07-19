@@ -90,10 +90,10 @@ const RecruiterDropdown: React.FC<{
                       setIsOpen(false);
                       if (onOpenChange) onOpenChange(false);
                     }}
-                    className="w-full text-left px-3.5 py-2 text-[10px] font-sans font-bold text-slate-700 hover:bg-emerald-50/60 hover:text-emerald-950 transition-all flex items-center justify-between border-b border-slate-50 last:border-b-0 cursor-pointer"
+                    className="w-full text-left px-3.5 py-2 text-[10px] font-sans font-bold text-slate-700 hover:bg-blue-50/60 hover:text-slate-900 transition-all flex items-center justify-between border-b border-slate-50 last:border-b-0 cursor-pointer"
                   >
                     <span className="truncate">{staff.displayName}</span>
-                    <span className="text-[8px] font-mono bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded font-extrabold shrink-0 uppercase tracking-wider">
+                    <span className="text-[8px] font-mono bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded font-extrabold shrink-0 uppercase tracking-wider">
                       {activeCount} active
                     </span>
                   </button>
@@ -161,7 +161,7 @@ export const TicketRoutingBoard: React.FC<TicketRoutingBoardProps> = ({
   const tabsInfo = [
     { id: "pending" as const, label: "Pending Queue", color: "bg-amber-100 text-amber-800 ring-amber-200/50" },
     { id: "ongoing" as const, label: "Ongoing Live", color: "bg-blue-100 text-blue-800 ring-blue-200/50" },
-    { id: "finished" as const, label: "Finished", color: "bg-emerald-100 text-emerald-800 ring-emerald-200/50" },
+    { id: "finished" as const, label: "Finished", color: "bg-blue-100 text-blue-800 ring-emerald-200/50" },
     { id: "abandoned" as const, label: "Abandoned", color: "bg-rose-100 text-rose-800 ring-rose-200/50" }
   ];
 
@@ -187,7 +187,7 @@ export const TicketRoutingBoard: React.FC<TicketRoutingBoardProps> = ({
       </div>
 
       {/* Main Board Card Container */}
-      <div className="bg-white border border-slate-200/60 rounded-[32px] p-6 sm:p-8 shadow-[0_8px_30px_rgba(15,81,50,0.03)] space-y-6">
+      <div className="bg-white border border-slate-200/60 rounded-[32px] p-6 sm:p-8 shadow-[0_8px_30px_rgba(30, 136, 229, 0.03)] space-y-6">
         {/* TOP TAB CONTROLS (ALIGNED SIDE-BY-SIDE) */}
         <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 pb-4 select-none">
           {tabsInfo.map((tab) => {
@@ -199,7 +199,7 @@ export const TicketRoutingBoard: React.FC<TicketRoutingBoardProps> = ({
                 onClick={() => setActiveTab(tab.id)}
                 className={`relative px-4 py-2.5 rounded-2xl text-xs font-bold tracking-tight transition-all cursor-pointer flex items-center gap-2 border ${
                   isActive
-                    ? "bg-[#0F5132] text-white border-[#0F5132] shadow-md shadow-emerald-950/10"
+                    ? "bg-[#1E88E5] text-white border-[#1E88E5] shadow-md shadow-blue-950/10"
                     : "bg-slate-50 text-slate-600 hover:bg-slate-100 border-slate-200/50"
                 }`}
               >
@@ -211,7 +211,7 @@ export const TicketRoutingBoard: React.FC<TicketRoutingBoardProps> = ({
                       : tab.id === "ongoing"
                       ? "bg-blue-900 text-white"
                       : tab.id === "finished"
-                      ? "bg-emerald-950 text-white"
+                      ? "bg-slate-900 text-white"
                       : "bg-rose-900 text-white"
                     : "bg-slate-200 text-slate-700"
                 }`}>
@@ -220,7 +220,7 @@ export const TicketRoutingBoard: React.FC<TicketRoutingBoardProps> = ({
                 {isActive && (
                   <motion.div
                     layoutId="routing-active-tab-indicator"
-                    className="absolute bottom-[-17px] left-1/2 -translate-x-1/2 w-8 h-1 bg-[#0F5132] rounded-full hidden sm:block"
+                    className="absolute bottom-[-17px] left-1/2 -translate-x-1/2 w-8 h-1 bg-[#1E88E5] rounded-full hidden sm:block"
                     transition={{ type: "spring", stiffness: 350, damping: 30 }}
                   />
                 )}
@@ -278,10 +278,10 @@ export const TicketRoutingBoard: React.FC<TicketRoutingBoardProps> = ({
                         key={c.chatId}
                         className={`bg-white border rounded-3xl p-6 space-y-4 transition-all duration-300 flex flex-col justify-between relative ${
                           isDropdownActive
-                            ? "border-2 border-[#0F5132] shadow-lg z-50 bg-[#FAFDFB]"
+                            ? "border-2 border-[#1E88E5] shadow-lg z-50 bg-[#FAFDFB]"
                             : isExpanded 
-                            ? "border-2 border-[#0F5132] shadow-md z-20 bg-[#FAFDFB]" 
-                            : "border border-[#0F5132]/30 hover:border-[#0F5132]/80 hover:shadow-md z-10"
+                            ? "border-2 border-[#1E88E5] shadow-md z-20 bg-[#FAFDFB]" 
+                            : "border border-[#1E88E5]/30 hover:border-[#1E88E5]/80 hover:shadow-md z-10"
                         }`}
                       >
                         {/* Header Details */}
@@ -312,7 +312,7 @@ export const TicketRoutingBoard: React.FC<TicketRoutingBoardProps> = ({
                               className="flex items-center justify-between text-[10px] text-slate-600 font-sans font-bold cursor-pointer hover:opacity-80 select-none"
                             >
                               <span>Routed staff members ({c.sharedWith?.length || 0})</span>
-                              <span className="text-[#0F5132] font-semibold">{isExpanded ? "▲ Hide" : "▼ Expand"}</span>
+                              <span className="text-[#1E88E5] font-semibold">{isExpanded ? "▲ Hide" : "▼ Expand"}</span>
                             </div>
 
                             {isExpanded && (
@@ -380,7 +380,7 @@ export const TicketRoutingBoard: React.FC<TicketRoutingBoardProps> = ({
                         )}
 
                         {activeTab === "finished" && (
-                          <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[10px] font-mono text-emerald-700 font-bold">
+                          <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[10px] font-mono text-blue-700 font-bold">
                             <span className="flex items-center gap-1">
                               <CheckCircle2 className="w-3.5 h-3.5" />
                               ARCHIVED
@@ -399,7 +399,7 @@ export const TicketRoutingBoard: React.FC<TicketRoutingBoardProps> = ({
                             </div>
                             <button
                               onClick={() => onForceReassign(c.chatId)}
-                              className="w-full py-1.5 bg-slate-100 hover:bg-[#0F5132] text-slate-700 hover:text-white text-[10px] font-mono font-bold rounded-xl flex items-center justify-center gap-1 transition-all cursor-pointer border-0"
+                              className="w-full py-1.5 bg-slate-100 hover:bg-[#1E88E5] text-slate-700 hover:text-white text-[10px] font-mono font-bold rounded-xl flex items-center justify-center gap-1 transition-all cursor-pointer border-0"
                             >
                               Reset Chat back to Pending
                             </button>

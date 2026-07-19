@@ -107,13 +107,18 @@ export const Header: React.FC = () => {
   if (isDashboardPage) {
     return (
       <header id="app-header" className="sticky top-4 z-40 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
-        <div className="bg-white/95 backdrop-blur-md border border-slate-200/60 rounded-[28px] shadow-[0_24px_55px_-10px_rgba(15,81,50,0.12),0_12px_24px_-12px_rgba(15,81,50,0.08)] px-4 sm:px-6 h-16 flex items-center justify-between relative">
+        <div className="bg-white/95 backdrop-blur-md border border-slate-200/60 rounded-[28px] shadow-[0_24px_55px_-10px_rgba(30, 136, 229, 0.12),0_12px_24px_-12px_rgba(30, 136, 229, 0.08)] px-4 sm:px-6 h-16 flex items-center justify-between relative">
           
           {/* Left: Companies logo and Administration tag */}
           <div className="flex items-center gap-3">
             <Link to={currentUser?.role === "seeker" ? "/seeker" : "/staff"} className="flex items-center group">
-              <div className="w-10 h-10 bg-[#0F5132] rounded-xl flex items-center justify-center shadow-md shadow-emerald-900/10 group-hover:scale-105 transition-all duration-300">
-                <Briefcase className="w-5 h-5 text-white" />
+              <div className="w-12 h-12 flex items-center justify-center group-hover:scale-105 transition-all duration-300">
+                <img 
+                  src="/icon.svg" 
+                  alt="Valley Reigns Logo" 
+                  className="w-full h-full object-cover"
+                  referrerPolicy="no-referrer"
+                />
               </div>
             </Link>
             {currentUser?.role === "admin" && (
@@ -139,12 +144,12 @@ export const Header: React.FC = () => {
             {currentUser?.role === "seeker" && (
               <Link
                 to="/seeker/notifications"
-                className="w-10 h-10 flex items-center justify-center text-[#0B3C49] hover:bg-slate-100 rounded-xl transition-all relative cursor-pointer hover:scale-105 active:scale-95"
+                className="w-10 h-10 flex items-center justify-center text-[#1e3a8a] hover:bg-slate-100 rounded-xl transition-all relative cursor-pointer hover:scale-105 active:scale-95"
                 title="Notifications"
                 id="seeker-header-notif-btn"
               >
                 <Bell className="w-5 h-5" />
-                <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-[#0F5132] rounded-full animate-pulse" />
+                <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-[#1E88E5] rounded-full animate-pulse" />
               </Link>
             )}
 
@@ -152,7 +157,7 @@ export const Header: React.FC = () => {
             {currentUser?.role === "staff" && (
               <Link
                 to="/staff/notifications"
-                className="w-10 h-10 flex items-center justify-center text-[#0B3C49] hover:bg-slate-100 rounded-xl transition-all relative cursor-pointer hover:scale-105 active:scale-95"
+                className="w-10 h-10 flex items-center justify-center text-[#1e3a8a] hover:bg-slate-100 rounded-xl transition-all relative cursor-pointer hover:scale-105 active:scale-95"
                 title="Staff Notifications"
               >
                 <Bell className="w-5 h-5" />
@@ -164,7 +169,7 @@ export const Header: React.FC = () => {
             {currentUser?.role === "admin" && (
               <Link
                 to="/admin/notifications"
-                className="w-10 h-10 flex items-center justify-center text-[#0B3C49] hover:bg-slate-100 rounded-xl transition-all relative cursor-pointer hover:scale-105 active:scale-95"
+                className="w-10 h-10 flex items-center justify-center text-[#1e3a8a] hover:bg-slate-100 rounded-xl transition-all relative cursor-pointer hover:scale-105 active:scale-95"
                 title="System Notifications"
               >
                 <Bell className="w-5 h-5" />
@@ -178,10 +183,10 @@ export const Header: React.FC = () => {
                 whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.93 }}
                 onClick={() => setProfilePopupOpen(!profilePopupOpen)}
-                className="p-2 text-[#0F5132] bg-transparent border-0 shadow-none transition-all cursor-pointer flex items-center justify-center focus:outline-none"
+                className="p-2 text-[#1E88E5] bg-transparent border-0 shadow-none transition-all cursor-pointer flex items-center justify-center focus:outline-none"
                 title="User Menu"
               >
-                <User className="w-6 h-6 text-[#0F5132]" />
+                <User className="w-6 h-6 text-[#1E88E5]" />
               </motion.button>
 
               {/* Seeker / Staff Tooltip Popup Menu */}
@@ -200,7 +205,7 @@ export const Header: React.FC = () => {
                       animate={{ opacity: 1, scale: 1, y: 0 }}
                       exit={{ opacity: 0, scale: 0.92, y: 10 }}
                       transition={{ type: "spring", duration: 0.3 }}
-                      className="absolute right-[-8px] mt-3 w-64 bg-white/95 backdrop-blur-md border border-slate-200/60 rounded-xl shadow-[0_24px_50px_rgba(15,81,50,0.18),0_1px_3px_rgba(0,0,0,0.05)] p-2 z-50 overflow-hidden"
+                      className="absolute right-[-8px] mt-3 w-64 bg-white/95 backdrop-blur-md border border-slate-200/60 rounded-xl shadow-[0_24px_50px_rgba(30, 136, 229, 0.18),0_1px_3px_rgba(0,0,0,0.05)] p-2 z-50 overflow-hidden"
                     >
                     {/* User profile header inside popup */}
                     <div className="px-3.5 py-3 border-b border-slate-100 mb-2 flex items-center gap-3">
@@ -212,7 +217,7 @@ export const Header: React.FC = () => {
                           referrerPolicy="no-referrer"
                         />
                       ) : (
-                        <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-[#0F5132] to-[#20c997] text-white flex items-center justify-center font-bold text-sm shadow-sm select-none font-sans">
+                        <div className="w-9 h-9 rounded-full bg-[#0B1B3D] text-white flex items-center justify-center font-bold text-sm shadow-sm select-none font-sans">
                           {currentUser?.displayName ? currentUser.displayName[0].toUpperCase() : "U"}
                         </div>
                       )}
@@ -220,7 +225,7 @@ export const Header: React.FC = () => {
                         <p className="text-xs font-bold text-slate-800 truncate leading-snug">{currentUser?.displayName}</p>
                         <p className="text-[10px] text-slate-400 font-medium truncate mt-0.5 leading-none font-mono">{currentUser?.email}</p>
                         <div className="mt-1.5 flex items-center gap-1.5">
-                          <span className="inline-flex items-center text-[8px] font-bold px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-100 uppercase tracking-wider font-mono">
+                          <span className="inline-flex items-center text-[8px] font-bold px-1.5 py-0.5 rounded-md bg-blue-50 text-blue-800 border border-blue-100 uppercase tracking-wider font-mono">
                             {currentUser?.role || "Seeker"}
                           </span>
                           {currentUser?.canPostJobs && (
@@ -268,7 +273,7 @@ export const Header: React.FC = () => {
                               }
                             }}
                             className={`w-10 h-5 rounded-full p-0.5 transition-colors focus:outline-none flex items-center cursor-pointer ${
-                              isStaffOnlineState ? "bg-emerald-500" : "bg-slate-300"
+                              isStaffOnlineState ? "bg-blue-500" : "bg-slate-300"
                             }`}
                           >
                             <div
@@ -299,7 +304,7 @@ export const Header: React.FC = () => {
                               }
                             }}
                             className={`w-10 h-5 rounded-full p-0.5 transition-colors focus:outline-none flex items-center cursor-pointer ${
-                              currentUser.messagingPreference === "in-app" ? "bg-[#0F5132]" : "bg-slate-300"
+                              currentUser.messagingPreference === "in-app" ? "bg-[#1E88E5]" : "bg-slate-300"
                             }`}
                           >
                             <div
@@ -328,7 +333,7 @@ export const Header: React.FC = () => {
                             onClick={handleTogglePushNotifications}
                             className={`w-10 h-5 rounded-full p-0.5 transition-colors focus:outline-none flex items-center cursor-pointer ${
                               pushNotificationsEnabled
-                                ? "bg-[#0F5132]"
+                                ? "bg-[#1E88E5]"
                                 : "bg-slate-300"
                             }`}
                           >
@@ -386,7 +391,7 @@ export const Header: React.FC = () => {
                 className="relative bg-white border border-slate-100 rounded-[24px] shadow-2xl p-6 w-full max-w-sm z-10 space-y-4 text-left"
               >
                 <div className="flex justify-between items-center pb-2 border-b border-slate-100">
-                  <h3 className="text-sm font-bold text-[#0B3C49] uppercase tracking-wider">Account Details</h3>
+                  <h3 className="text-sm font-bold text-[#1e3a8a] uppercase tracking-wider">Account Details</h3>
                   <button onClick={() => setShowAccountModal(false)} className="text-slate-400 hover:text-slate-600 font-bold text-sm cursor-pointer">✕</button>
                 </div>
                 <div className="space-y-3 font-sans text-xs">
@@ -404,12 +409,12 @@ export const Header: React.FC = () => {
                   </div>
                   <div>
                     <span className="text-slate-400 font-mono text-[9px] block uppercase">Access Role</span>
-                    <span className="inline-block bg-[#0F5132]/10 text-[#0F5132] font-mono px-2 py-0.5 rounded font-bold">{currentUser?.role.toUpperCase()}</span>
+                    <span className="inline-block bg-[#1E88E5]/10 text-[#1E88E5] font-mono px-2 py-0.5 rounded font-bold">{currentUser?.role.toUpperCase()}</span>
                   </div>
                 </div>
                 <button
                   onClick={() => setShowAccountModal(false)}
-                  className="w-full py-2.5 bg-[#0F5132] hover:bg-[#0c4027] text-white text-xs font-bold rounded-xl cursor-pointer"
+                  className="w-full py-2.5 bg-[#1E88E5] hover:bg-[#1565C0] text-white text-xs font-bold rounded-xl cursor-pointer"
                 >
                   Close Settings
                 </button>
@@ -436,13 +441,13 @@ export const Header: React.FC = () => {
                 className="relative bg-white border border-slate-100 rounded-[24px] shadow-2xl p-6 w-full max-w-sm z-10 space-y-4 text-left"
               >
                 <div className="flex justify-between items-center pb-2 border-b border-slate-100">
-                  <h3 className="text-sm font-bold text-[#0B3C49] uppercase tracking-wider">System Alerts</h3>
+                  <h3 className="text-sm font-bold text-[#1e3a8a] uppercase tracking-wider">System Alerts</h3>
                   <button onClick={() => setShowNotificationsModal(false)} className="text-slate-400 hover:text-slate-600 font-bold text-sm cursor-pointer">✕</button>
                 </div>
                 <div className="space-y-3 font-sans text-xs">
-                  <div className="p-3 bg-[#0F5132]/5 border border-emerald-100 rounded-xl space-y-1">
+                  <div className="p-3 bg-[#1E88E5]/5 border border-blue-100 rounded-xl space-y-1">
                     <div className="flex justify-between items-center">
-                      <span className="font-bold text-[#0F5132]">Welcome to Valley Reigns</span>
+                      <span className="font-bold text-[#1E88E5]">Welcome to Valley Reigns</span>
                       <span className="text-[8px] font-mono text-slate-400">Just Now</span>
                     </div>
                     <p className="text-slate-600 leading-relaxed text-[11px]">Your seeker dashboard has been initialized. You have access to real-time search, filters, and chat threads.</p>
@@ -457,7 +462,7 @@ export const Header: React.FC = () => {
                 </div>
                 <button
                   onClick={() => setShowNotificationsModal(false)}
-                  className="w-full py-2.5 bg-[#0F5132] hover:bg-[#0c4027] text-white text-xs font-bold rounded-xl cursor-pointer"
+                  className="w-full py-2.5 bg-[#1E88E5] hover:bg-[#1565C0] text-white text-xs font-bold rounded-xl cursor-pointer"
                 >
                   Dismiss Notifications
                 </button>
@@ -484,18 +489,18 @@ export const Header: React.FC = () => {
                 className="relative bg-white border border-slate-100 rounded-[24px] shadow-2xl p-6 w-full max-w-sm z-10 space-y-3 text-slate-700 text-left"
               >
                 <div className="flex justify-between items-center pb-2 border-b border-slate-100">
-                  <h3 className="text-sm font-bold text-[#0B3C49] uppercase tracking-wider">About Our Workspace</h3>
+                  <h3 className="text-sm font-bold text-[#1e3a8a] uppercase tracking-wider">About Our Workspace</h3>
                   <button onClick={() => setShowAboutModal(false)} className="text-slate-400 hover:text-slate-600 font-bold text-sm cursor-pointer">✕</button>
                 </div>
                 <p className="text-[11px] leading-relaxed font-sans">
                   Valley Reigns is a full-cycle recruitment management workspace designed to unite ambitious talent with forward-thinking organizations.
                 </p>
-                <p className="text-[11px] leading-relaxed font-sans font-semibold text-[#0F5132]">
+                <p className="text-[11px] leading-relaxed font-sans font-semibold text-[#1E88E5]">
                   Recruitment for everyone — streamlined, collaborative, and secure.
                 </p>
                 <button
                   onClick={() => setShowAboutModal(false)}
-                  className="w-full py-2.5 bg-[#0F5132] hover:bg-[#0c4027] text-white text-xs font-bold rounded-xl cursor-pointer mt-2"
+                  className="w-full py-2.5 bg-[#1E88E5] hover:bg-[#1565C0] text-white text-xs font-bold rounded-xl cursor-pointer mt-2"
                 >
                   Confirm
                 </button>
@@ -509,15 +514,20 @@ export const Header: React.FC = () => {
 
   return (
     <header id="app-header" className="sticky top-4 z-40 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
-      <div className="bg-white/95 backdrop-blur-md border border-slate-200/60 rounded-[28px] shadow-[0_24px_55px_-10px_rgba(15,81,50,0.12),0_12px_24px_-12px_rgba(15,81,50,0.08)] px-4 sm:px-6 h-16 flex items-center justify-between">
+      <div className="bg-white/95 backdrop-blur-md border border-slate-200/60 rounded-[28px] shadow-[0_24px_55px_-10px_rgba(30, 136, 229, 0.12),0_12px_24px_-12px_rgba(30, 136, 229, 0.08)] px-4 sm:px-6 h-16 flex items-center justify-between">
         
         {/* Brand Logo - Designed for high-end aesthetics */}
         <Link to="/" className="flex items-center gap-2.5 group">
-          <div className="w-9 h-9 bg-[#0F5132] rounded-xl flex items-center justify-center shadow-md shadow-emerald-900/10 group-hover:scale-105 transition-transform duration-300">
-            <Briefcase className="w-4.5 h-4.5 text-white" />
+          <div className="w-12 h-12 flex items-center justify-center group-hover:scale-105 transition-transform duration-300">
+            <img 
+              src="/icon.svg" 
+              alt="Valley Reigns Logo" 
+              className="w-full h-full object-cover"
+              referrerPolicy="no-referrer"
+            />
           </div>
           <div>
-            <span className="text-base sm:text-lg font-display font-black tracking-tight text-[#0B3C49] group-hover:text-[#0F5132] transition-colors">
+            <span className="text-base sm:text-lg font-display font-black tracking-tight text-black group-hover:text-[#1E88E5] transition-colors">
               Valley Reigns
             </span>
           </div>
@@ -529,7 +539,7 @@ export const Header: React.FC = () => {
             to="/"
             className={`px-4 py-2 rounded-xl text-xs font-bold tracking-tight transition-all ${
               location.pathname === "/"
-                ? "bg-slate-50 text-[#0F5132] border border-slate-150"
+                ? "bg-slate-50 text-[#1E88E5] border border-slate-150"
                 : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
             }`}
           >
@@ -541,7 +551,7 @@ export const Header: React.FC = () => {
               to="/seeker"
               className={`px-4 py-2 rounded-xl text-xs font-bold tracking-tight transition-all flex items-center gap-1.5 ${
                 location.pathname === "/seeker"
-                  ? "bg-emerald-50 text-[#0F5132] border border-emerald-100"
+                  ? "bg-blue-50 text-[#1E88E5] border border-blue-100"
                   : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
               }`}
             >
@@ -554,7 +564,7 @@ export const Header: React.FC = () => {
               to="/staff"
               className={`px-4 py-2 rounded-xl text-xs font-bold tracking-tight transition-all flex items-center gap-1.5 ${
                 location.pathname === "/staff"
-                  ? "bg-emerald-50 text-[#0F5132] border border-emerald-100"
+                  ? "bg-blue-50 text-[#1E88E5] border border-blue-100"
                   : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
               }`}
             >
@@ -569,7 +579,7 @@ export const Header: React.FC = () => {
                 to="/staff"
                 className={`px-4 py-2 rounded-xl text-xs font-bold tracking-tight transition-all flex items-center gap-1.5 ${
                   location.pathname === "/staff"
-                    ? "bg-emerald-50 text-[#0F5132]"
+                    ? "bg-blue-50 text-[#1E88E5]"
                     : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
                 }`}
               >
@@ -642,13 +652,13 @@ export const Header: React.FC = () => {
         {/* Mobile Hamburger Button */}
         <div className="flex items-center md:hidden gap-2">
           {currentUser && (
-            <span className="text-xs font-bold text-[#0B3C49] max-w-[100px] truncate">
+            <span className="text-xs font-bold text-[#1e3a8a] max-w-[100px] truncate">
               {currentUser.displayName.split(" ")[0]}
             </span>
           )}
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="p-2 text-[#0B3C49] hover:bg-slate-100 rounded-xl transition-all cursor-pointer hover:scale-105 active:scale-95"
+            className="p-2 text-[#1e3a8a] hover:bg-slate-100 rounded-xl transition-all cursor-pointer hover:scale-105 active:scale-95"
             aria-label="Toggle Menu"
           >
             {mobileMenuOpen ? <X className="w-7 h-7" /> : <Menu className="w-7 h-7" />}
@@ -723,7 +733,7 @@ export const Header: React.FC = () => {
                 <Link
                   to="/seeker"
                   onClick={() => setMobileMenuOpen(false)}
-                  className="block px-4 py-2.5 rounded-xl text-sm font-bold text-[#0F5132] bg-emerald-50 hover:bg-emerald-100"
+                  className="block px-4 py-2.5 rounded-xl text-sm font-bold text-[#1E88E5] bg-blue-50 hover:bg-blue-100"
                 >
                   My Dashboard
                 </Link>
@@ -786,7 +796,7 @@ export const Header: React.FC = () => {
                         window.dispatchEvent(new CustomEvent("open-auth-modal", { detail: { tab: "signup" } }));
                         setMobileMenuOpen(false);
                       }}
-                      className="w-full px-4 py-2.5 bg-[#0F5132] hover:bg-[#0c4027] text-white rounded-xl text-sm font-bold shadow-sm flex items-center justify-center gap-2 cursor-pointer transition-all"
+                      className="w-full px-4 py-2.5 bg-[#1E88E5] hover:bg-[#1565C0] text-white rounded-xl text-sm font-bold shadow-sm flex items-center justify-center gap-2 cursor-pointer transition-all"
                     >
                       <UserPlus className="w-4 h-4 shrink-0" />
                       <span>Sign Up</span>

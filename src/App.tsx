@@ -10,7 +10,7 @@ import { AuthModal } from "./components/AuthModal";
 import { ChatInbox } from "./components/ChatInbox";
 import { AdminPanel } from "./components/AdminPanel";
 import { JobPostingForm } from "./components/JobPostingForm";
-import { SeekerDashboardView } from "./components/SeekerDashboardView";
+import { SeekerDashboardView, getCategoryStyles } from "./components/SeekerDashboardView";
 import { SeekerMessagesView } from "./components/SeekerMessagesView";
 import { SeekerNotifications } from "./components/SeekerNotifications";
 import { WhatsAppSimulator } from "./components/WhatsAppSimulator";
@@ -26,6 +26,7 @@ import { WhatsAppConfigPage } from "./components/WhatsAppConfigPage";
 import { NetworkStatusMonitor } from "./components/NetworkStatusMonitor";
 import { StaffReportForm } from "./components/StaffReportForm";
 import { getJobs, subscribeToJobs, checkAndEnforceSLAs } from "./lib/services";
+import { getCategoryImage } from "./lib/categories";
 import { Job } from "./types";
 import { 
   Search, 
@@ -103,7 +104,7 @@ const getCategoryIcon = (categoryName: string) => {
 
 const HomepageFooter: React.FC = () => {
   return (
-    <footer className="relative bg-[#052216] text-white/90 overflow-hidden border-t border-[#0F5132]/20 font-sans mt-24 select-none">
+    <footer className="relative bg-[#111827] text-white/90 overflow-hidden border-t border-[#1E88E5]/20 font-sans mt-24 select-none">
       {/* Geometric / Vector Wave Pattern Overlay */}
       <div className="absolute inset-0 opacity-[0.03] pointer-events-none">
         <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
@@ -120,7 +121,7 @@ const HomepageFooter: React.FC = () => {
       <div className="absolute top-0 left-0 right-0 h-4 bg-gradient-to-b from-[#FAFCFD] to-transparent opacity-10" />
 
       {/* Vector lines glowing effect */}
-      <div className="absolute -left-20 -bottom-20 w-80 h-80 bg-[#0F5132]/30 rounded-full blur-[80px] pointer-events-none" />
+      <div className="absolute -left-20 -bottom-20 w-80 h-80 bg-[#1E88E5]/30 rounded-full blur-[80px] pointer-events-none" />
       <div className="absolute -right-20 -top-20 w-80 h-80 bg-[#005F73]/20 rounded-full blur-[80px] pointer-events-none" />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 relative z-10">
@@ -128,10 +129,15 @@ const HomepageFooter: React.FC = () => {
           {/* Logo & Headline */}
           <div className="col-span-1 md:col-span-5 space-y-4">
             <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 bg-white text-[#052216] rounded-xl flex items-center justify-center font-bold shadow-md">
-                <Briefcase className="w-5 h-5 text-[#052216]" />
+              <div className="w-9 h-9 rounded-xl overflow-hidden flex items-center justify-center shadow-md">
+                <img 
+                  src="/icon.svg" 
+                  alt="Valley Reigns Logo" 
+                  className="w-full h-full object-cover"
+                  referrerPolicy="no-referrer"
+                />
               </div>
-              <span className="font-serif italic font-bold text-xl text-white tracking-tight">
+              <span className="font-display font-extrabold tracking-wider text-xl text-white uppercase">
                 Valley Reigns
               </span>
             </div>
@@ -140,8 +146,8 @@ const HomepageFooter: React.FC = () => {
             </p>
             {/* Dynamic visual vector graphic accent */}
             <div className="flex items-center gap-1.5 pt-1">
-              <span className="w-2.5 h-2.5 bg-emerald-400 rounded-full animate-pulse" />
-              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-emerald-400">
+              <span className="w-2.5 h-2.5 bg-blue-400 rounded-full animate-pulse" />
+              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-blue-400">
                 100% Kind human recruitment support
               </span>
             </div>
@@ -149,7 +155,7 @@ const HomepageFooter: React.FC = () => {
 
           {/* Quick Links */}
           <div className="col-span-1 md:col-span-3 space-y-3">
-            <h4 className="text-xs font-mono font-bold uppercase tracking-widest text-emerald-400">
+            <h4 className="text-xs font-mono font-bold uppercase tracking-widest text-blue-400">
               Browse Sectors
             </h4>
             <ul className="space-y-2 text-xs">
@@ -160,7 +166,7 @@ const HomepageFooter: React.FC = () => {
                       const el = document.getElementById("jobs-explore");
                       if (el) el.scrollIntoView({ behavior: "smooth" });
                     }}
-                    className="hover:text-emerald-300 text-white/75 transition-colors cursor-pointer text-left font-medium"
+                    className="hover:text-blue-300 text-white/75 transition-colors cursor-pointer text-left font-medium"
                   >
                     {sec}
                   </button>
@@ -171,7 +177,7 @@ const HomepageFooter: React.FC = () => {
 
           {/* Support Info */}
           <div className="col-span-1 md:col-span-4 space-y-3">
-            <h4 className="text-xs font-mono font-bold uppercase tracking-widest text-emerald-400">
+            <h4 className="text-xs font-mono font-bold uppercase tracking-widest text-blue-400">
               Immediate Help
             </h4>
             <p className="text-xs text-white/75 leading-relaxed">
@@ -180,7 +186,7 @@ const HomepageFooter: React.FC = () => {
             <div className="pt-1">
               <button 
                 onClick={() => window.dispatchEvent(new CustomEvent("open-auth-modal"))}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-800 hover:bg-emerald-700 active:scale-95 text-white text-xs font-bold rounded-xl transition-all border border-emerald-600/30"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-800 hover:bg-blue-700 active:scale-95 text-white text-xs font-bold rounded-xl transition-all border border-blue-600/30"
               >
                 <span>Get Started Now</span>
                 <ArrowRight className="w-3.5 h-3.5" />
@@ -195,11 +201,11 @@ const HomepageFooter: React.FC = () => {
             &copy; {new Date().getFullYear()} Valley Reigns Recruitment. Designed with meticulous human care.
           </div>
           <div className="flex items-center gap-4">
-            <span className="hover:text-emerald-400 cursor-pointer transition-colors">Privacy Charter</span>
+            <span className="hover:text-blue-400 cursor-pointer transition-colors">Privacy Charter</span>
             <span>&bull;</span>
-            <span className="hover:text-emerald-400 cursor-pointer transition-colors">Terms of Work</span>
+            <span className="hover:text-blue-400 cursor-pointer transition-colors">Terms of Work</span>
             <span>&bull;</span>
-            <span className="hover:text-emerald-400 cursor-pointer transition-colors">Workspace API</span>
+            <span className="hover:text-blue-400 cursor-pointer transition-colors">Workspace API</span>
           </div>
         </div>
       </div>
@@ -213,6 +219,12 @@ const JobSeekerDashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
+  const [visibleCount, setVisibleCount] = useState(10);
+  const sentinelRef = React.useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setVisibleCount(10);
+  }, [selectedCategory, searchQuery]);
 
   useEffect(() => {
     setLoading(true);
@@ -298,6 +310,21 @@ const JobSeekerDashboard: React.FC = () => {
     return list;
   })();
 
+  useEffect(() => {
+    if (!sentinelRef.current) return;
+    const observer = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting) {
+        setVisibleCount((prev) => prev + 10);
+      }
+    }, {
+      rootMargin: "250px"
+    });
+    observer.observe(sentinelRef.current);
+    return () => observer.disconnect();
+  }, [sentinelRef, filteredJobs.length]);
+
+  const displayedJobs = filteredJobs.slice(0, visibleCount);
+
   return (
     <div className="flex flex-col justify-between bg-[#FAFCFD]">
       <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 pt-16 sm:pt-24 pb-8 sm:pb-16 space-y-16 flex-grow">
@@ -311,10 +338,7 @@ const JobSeekerDashboard: React.FC = () => {
               transition={{ duration: 0.6, ease: "easeOut" }}
               className="inline-flex items-center gap-2 bg-white border border-black rounded-full px-4 py-1.5 shadow-none text-[10px] sm:text-xs font-bold text-black tracking-wider uppercase"
             >
-              <span className="text-black font-light font-mono">&lt;</span>
               <span className="text-black">We find you awesome jobs</span>
-              <span className="text-black font-light font-mono">/</span>
-              <span className="text-black font-light font-mono">&gt;</span>
             </motion.div>
     
             {/* Unique Display Typography: Valley Reigns Recruitment for Everyone */}
@@ -331,7 +355,7 @@ const JobSeekerDashboard: React.FC = () => {
                     delay: 0.1 
                   }}
                   whileHover={{ scale: 1.02 }}
-                  className="bg-gradient-to-r from-slate-950 via-slate-900 to-[#021317] bg-clip-text text-transparent inline-block sm:inline cursor-default font-extrabold tracking-tighter py-3 pr-2"
+                  className="bg-gradient-to-r from-slate-950 via-slate-900 to-[#0f172a] bg-clip-text text-transparent inline-block sm:inline cursor-default font-extrabold tracking-tighter py-3 pr-2"
                 >
                   Valley Reigns
                 </motion.span>
@@ -375,7 +399,7 @@ const JobSeekerDashboard: React.FC = () => {
                     hover: { x: 3, y: 3 },
                     tap: { x: 0, y: 0 }
                   }}
-                  className="absolute -left-2 -top-2 w-full h-full border-2 border-[#0F5132] rounded-xl bg-transparent pointer-events-none transition-transform" 
+                  className="absolute -left-2 -top-2 w-full h-full border-2 border-[#0B1B3D] rounded-xl bg-transparent pointer-events-none transition-transform" 
                 />
                 {/* Main Solid Button */}
                 <Link
@@ -387,7 +411,7 @@ const JobSeekerDashboard: React.FC = () => {
                       hover: { x: -3, y: -3 },
                       tap: { x: 0, y: 0 }
                     }}
-                    className="relative z-10 px-6 py-3.5 sm:px-10 sm:py-4 bg-[#0F5132] text-white hover:bg-[#0c4027] font-bold text-sm sm:text-lg rounded-xl flex items-center gap-2 cursor-pointer shadow-md inline-flex"
+                    className="relative z-10 px-6 py-3.5 sm:px-10 sm:py-4 bg-[#0B1B3D] text-white hover:bg-[#07132C] font-bold text-sm sm:text-lg rounded-xl flex items-center gap-2 cursor-pointer shadow-md inline-flex"
                   >
                     <Briefcase className="w-4 h-4 sm:w-5.5 sm:h-5.5 text-white" />
                     <span>My Dashboard</span>
@@ -407,7 +431,7 @@ const JobSeekerDashboard: React.FC = () => {
                     hover: { x: 3, y: 3 },
                     tap: { x: 0, y: 0 }
                   }}
-                  className="absolute -left-2 -top-2 w-full h-full border-2 border-[#0F5132] rounded-xl bg-transparent pointer-events-none transition-transform" 
+                  className="absolute -left-2 -top-2 w-full h-full border-2 border-[#0B1B3D] rounded-xl bg-transparent pointer-events-none transition-transform" 
                 />
                 {/* Main Solid Button */}
                 <motion.button 
@@ -416,7 +440,7 @@ const JobSeekerDashboard: React.FC = () => {
                     tap: { x: 0, y: 0 }
                   }}
                   onClick={() => window.dispatchEvent(new CustomEvent("open-auth-modal"))}
-                  className="relative z-10 px-6 py-3.5 sm:px-10 sm:py-4 bg-[#0F5132] text-white hover:bg-[#0c4027] font-bold text-sm sm:text-lg rounded-xl flex items-center gap-2 cursor-pointer shadow-md"
+                  className="relative z-10 px-6 py-3.5 sm:px-10 sm:py-4 bg-[#0B1B3D] text-white hover:bg-[#07132C] font-bold text-sm sm:text-lg rounded-xl flex items-center gap-2 cursor-pointer shadow-md"
                 >
                   <LogIn className="w-4 h-4 sm:w-5.5 sm:h-5.5 text-white" />
                   <span>Sign In</span>
@@ -434,22 +458,22 @@ const JobSeekerDashboard: React.FC = () => {
                   element.scrollIntoView({ behavior: "smooth" });
                 }
               }}
-              className="px-6 py-3.5 sm:px-10 sm:py-4 bg-transparent border-2 border-[#0B3C49] text-[#0B3C49] font-bold text-sm sm:text-lg rounded-xl flex items-center gap-2 cursor-pointer transition-all shadow-sm"
+              className="px-6 py-3.5 sm:px-10 sm:py-4 bg-transparent border-2 border-[#1e3a8a] text-[#1e3a8a] font-bold text-sm sm:text-lg rounded-xl flex items-center gap-2 cursor-pointer transition-all shadow-sm"
             >
-              <Search className="w-4 h-4 sm:w-5.5 sm:h-5.5 text-[#0B3C49]" />
+              <Search className="w-4 h-4 sm:w-5.5 sm:h-5.5 text-[#1e3a8a]" />
               <span>Find Jobs</span>
             </motion.button>
           </div>
   
           {/* Beautiful Bento-Grid Metrics arranged in the requested unique layout, smaller and elegant */}
           <div className="grid grid-cols-6 gap-3 max-w-4xl mx-auto pt-4">
-            {/* Box 1: Plum - Row 1, Left (col-span-3) */}
+            {/* Box 1: Deep Navy - Row 1, Left (col-span-3) */}
             <motion.div 
               initial={{ opacity: 0, y: 25, scale: 0.93 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               transition={{ type: "spring", stiffness: 80, damping: 12, delay: 0.45 }}
               whileHover={{ y: -4, scale: 1.02 }}
-              className="col-span-3 bg-[#4A154B] text-white p-4 sm:p-5 rounded-2xl flex flex-col justify-between min-h-[100px] sm:min-h-[110px] shadow-sm hover:shadow-md transition-shadow duration-300"
+              className="col-span-3 bg-[#1e3a8a] text-white p-4 sm:p-5 rounded-2xl flex flex-col justify-between min-h-[100px] sm:min-h-[110px] shadow-sm hover:shadow-md transition-shadow duration-300"
             >
               <span className="text-xl sm:text-2xl font-display font-extrabold tracking-tight leading-none">
                 1,200+
@@ -459,13 +483,13 @@ const JobSeekerDashboard: React.FC = () => {
               </span>
             </motion.div>
   
-            {/* Box 2: Rose/Pink - Row 1, Right (col-span-3) */}
+            {/* Box 2: Primary Brand Blue - Row 1, Right (col-span-3) */}
             <motion.div 
               initial={{ opacity: 0, y: 25, scale: 0.93 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               transition={{ type: "spring", stiffness: 80, damping: 12, delay: 0.52 }}
               whileHover={{ y: -4, scale: 1.02 }}
-              className="col-span-3 bg-[#E91E63] text-white p-4 sm:p-5 rounded-2xl flex flex-col justify-between min-h-[100px] sm:min-h-[110px] shadow-sm hover:shadow-md transition-shadow duration-300"
+              className="col-span-3 bg-[#1E88E5] text-white p-4 sm:p-5 rounded-2xl flex flex-col justify-between min-h-[100px] sm:min-h-[110px] shadow-sm hover:shadow-md transition-shadow duration-300"
             >
               <span className="text-xl sm:text-2xl font-display font-extrabold tracking-tight leading-none">
                 10,000+
@@ -475,13 +499,13 @@ const JobSeekerDashboard: React.FC = () => {
               </span>
             </motion.div>
   
-            {/* Box 3: Teal - Row 2, Card 1 (col-span-2) */}
+            {/* Box 3: Vibrant Orange - Row 2, Card 1 (col-span-2) */}
             <motion.div 
               initial={{ opacity: 0, y: 25, scale: 0.93 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               transition={{ type: "spring", stiffness: 80, damping: 12, delay: 0.59 }}
               whileHover={{ y: -4, scale: 1.02 }}
-              className="col-span-2 bg-[#005F73] text-white p-4 sm:p-5 rounded-2xl flex flex-col justify-between min-h-[100px] sm:min-h-[110px] shadow-sm hover:shadow-md transition-shadow duration-300"
+              className="col-span-2 bg-[#EA580C] text-white p-4 sm:p-5 rounded-2xl flex flex-col justify-between min-h-[100px] sm:min-h-[110px] shadow-sm hover:shadow-md transition-shadow duration-300"
             >
               <span className="text-xl sm:text-2xl font-display font-extrabold tracking-tight leading-none">
                 150+
@@ -491,13 +515,13 @@ const JobSeekerDashboard: React.FC = () => {
               </span>
             </motion.div>
   
-            {/* Box 4: Black - Row 2, Card 2 (col-span-2) */}
+            {/* Box 4: Midnight Dark Slate - Row 2, Card 2 (col-span-2) */}
             <motion.div 
               initial={{ opacity: 0, y: 25, scale: 0.93 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               transition={{ type: "spring", stiffness: 80, damping: 12, delay: 0.66 }}
               whileHover={{ y: -4, scale: 1.02 }}
-              className="col-span-2 bg-[#000000] text-white p-4 sm:p-5 rounded-2xl flex flex-col justify-between min-h-[100px] sm:min-h-[110px] shadow-sm hover:shadow-md transition-shadow duration-300"
+              className="col-span-2 bg-[#0F172A] text-white p-4 sm:p-5 rounded-2xl flex flex-col justify-between min-h-[100px] sm:min-h-[110px] shadow-sm hover:shadow-md transition-shadow duration-300"
             >
               <span className="text-xl sm:text-2xl font-display font-extrabold tracking-tight leading-none">
                 24/7 Live
@@ -507,37 +531,37 @@ const JobSeekerDashboard: React.FC = () => {
               </span>
             </motion.div>
   
-            {/* Box 5: Charcoal/Gray - Row 2, Card 3 (col-span-2, row-span-2) */}
+            {/* Box 5: Emerald Green - Row 2, Card 3 (col-span-2, row-span-2) */}
             {/* Extends downwards through row 2 and row 3 on the right */}
             <motion.div 
               initial={{ opacity: 0, y: 25, scale: 0.93 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               transition={{ type: "spring", stiffness: 80, damping: 12, delay: 0.73 }}
               whileHover={{ y: -4, scale: 1.02 }}
-              className="col-span-2 row-span-2 bg-[#4F5D75] text-white p-4 sm:p-5 rounded-2xl flex flex-col justify-between min-h-[210px] sm:min-h-[230px] shadow-sm hover:shadow-md transition-shadow duration-300"
+              className="col-span-2 row-span-2 bg-[#15803d] text-white p-4 sm:p-5 rounded-2xl flex flex-col justify-between min-h-[210px] sm:min-h-[230px] shadow-sm hover:shadow-md transition-shadow duration-300"
             >
               <span className="text-xl sm:text-2xl font-display font-extrabold tracking-tight leading-none">
-                100% Free
+                Verified Jobs
               </span>
               <span className="text-[10px] sm:text-xs font-medium opacity-90 leading-tight">
-                We never charge seekers any money to find work
+                All opportunities are manually vetted for safety and quality
               </span>
             </motion.div>
   
-            {/* Box 6: Magenta - Row 3, Card 1 (col-span-4) */}
+            {/* Box 6: Royal Purple - Row 3, Card 1 (col-span-4) */}
             {/* Extends to meet Box 5's vertical extension */}
             <motion.div 
               initial={{ opacity: 0, y: 25, scale: 0.93 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               transition={{ type: "spring", stiffness: 80, damping: 12, delay: 0.8 }}
               whileHover={{ y: -4, scale: 1.01 }}
-              className="col-span-4 bg-[#EC4899] text-white p-4 sm:p-5 rounded-2xl flex flex-col justify-between min-h-[100px] sm:min-h-[110px] shadow-sm hover:shadow-md transition-shadow duration-300"
+              className="col-span-4 bg-[#7E22CE] text-white p-4 sm:p-5 rounded-2xl flex flex-col justify-between min-h-[100px] sm:min-h-[110px] shadow-sm hover:shadow-md transition-shadow duration-300"
             >
               <span className="text-xl sm:text-2xl font-display font-extrabold tracking-tight leading-none">
-                Instant Connection
+                Direct Response
               </span>
               <span className="text-[10px] sm:text-xs font-medium opacity-90 leading-tight">
-                Talk with real, kind experts—never boring automated robots!
+                Connect with hiring managers directly via WhatsApp for quick answers!
               </span>
             </motion.div>
           </div>
@@ -546,8 +570,8 @@ const JobSeekerDashboard: React.FC = () => {
         {/* Main Discover Workspace Section */}
         <div id="jobs-explore" className="space-y-6 pt-4 text-left">
           {/* Search Input bar - Hover & Focus scale / shadow enhancements */}
-          <div className="relative max-w-lg bg-white border border-slate-900 p-1.5 rounded-[24px] shadow-[0_16px_36px_-6px_rgba(15,81,50,0.05),0_10px_20px_-10px_rgba(15,81,50,0.03)] hover:border-[#0F5132] hover:shadow-[0_16px_40px_rgba(15,81,50,0.08)] focus-within:ring-4 focus-within:ring-[#0F5132]/10 focus-within:border-[#0F5132] focus-within:scale-[1.015] transition-all duration-300 flex items-center gap-2 md:mx-auto">
-            <Search className="w-4.5 h-4.5 text-[#0F5132] ml-3 shrink-0" />
+          <div className="relative max-w-lg bg-white border border-slate-900 p-1.5 rounded-[24px] shadow-[0_16px_36px_-6px_rgba(30, 136, 229, 0.05),0_10px_20px_-10px_rgba(30, 136, 229, 0.03)] hover:border-[#1E88E5] hover:shadow-[0_16px_40px_rgba(30, 136, 229, 0.08)] focus-within:ring-4 focus-within:ring-[#1E88E5]/10 focus-within:border-[#1E88E5] focus-within:scale-[1.015] transition-all duration-300 flex items-center gap-2 md:mx-auto">
+            <Search className="w-4.5 h-4.5 text-[#1E88E5] ml-3 shrink-0" />
             <input
               type="text"
               placeholder="Type any job title, skill, or company name..."
@@ -555,7 +579,7 @@ const JobSeekerDashboard: React.FC = () => {
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full py-1 bg-transparent text-xs font-medium focus:outline-none text-slate-800 placeholder-slate-400"
             />
-            <span className="text-[10px] font-mono font-bold bg-slate-50 text-[#0F5132] px-3 py-1.5 rounded-xl uppercase tracking-wider shrink-0 hidden sm:inline border border-slate-200/50">
+            <span className="text-[10px] font-mono font-bold bg-slate-50 text-[#1E88E5] px-3 py-1.5 rounded-xl uppercase tracking-wider shrink-0 hidden sm:inline border border-slate-200/50">
               {filteredJobs.length} Vacancies
             </span>
           </div>
@@ -566,35 +590,57 @@ const JobSeekerDashboard: React.FC = () => {
               Tap a Category Card to Filter
             </span>
             
-            {/* Horizontal Scrolling Carousel with Cool springy motion category buttons */}
+            {/* Horizontal Scrolling Carousel with Cool background-image category buttons */}
             <div className="overflow-x-auto flex gap-2 pb-4 px-1 scrollbar-none snap-x snap-mandatory">
               {CATEGORIES.map((cat) => {
                 const IconComp = cat.icon;
                 const isSelected = selectedCategory === cat.name;
+                const styles = getCategoryStyles(cat.name);
+                const bgImg = getCategoryImage(cat.name);
                 return (
                   <motion.button
                     whileHover={{ 
                       scale: 1.05, 
                       y: -2,
-                      boxShadow: isSelected ? "none" : "0 8px 20px -8px rgba(11, 60, 45, 0.2)"
+                      boxShadow: isSelected ? `0 8px 20px -8px ${styles.primary}33` : "0 8px 20px -8px rgba(0, 0, 0, 0.15)"
                     }}
                     whileTap={{ scale: 0.95 }}
                     key={cat.name}
                     onClick={() => setSelectedCategory(isSelected ? "All" : cat.name)}
-                    className={`w-[20%] min-w-[80px] sm:w-auto sm:flex-1 flex-shrink-0 flex flex-col items-center justify-center p-2 sm:p-2.5 rounded-lg cursor-pointer transition-all snap-start select-none border text-center space-y-1.5 ${
-                      isSelected
-                        ? "bg-[#0B3C2D] text-white border-[#0B3C2D] shadow-none"
-                        : "bg-white text-[#0B3C2D] border-[#0B3C2D]/40 hover:bg-slate-50"
-                    }`}
+                    className={`w-[18%] min-w-[80px] sm:w-[9%] sm:min-w-[85px] h-16 sm:h-18 flex-shrink-0 flex flex-col items-center justify-center rounded-xl cursor-pointer transition-all snap-start select-none bg-cover bg-center border text-center relative overflow-hidden group`}
+                    style={{
+                      backgroundImage: `url(${bgImg})`,
+                      borderColor: isSelected ? styles.primary : "rgba(226, 232, 240, 0.2)",
+                      borderWidth: isSelected ? "3px" : "1px"
+                    }}
                   >
-                    <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${
-                      isSelected ? "bg-white text-[#0B3C2D]" : "bg-[#0B3C2D] text-white"
-                    }`}>
-                      <IconComp className="w-3 h-3" />
+                    {/* Category accent color transparent overlay */}
+                    <div 
+                      className={`absolute inset-0 transition-all duration-200 z-0 ${
+                        isSelected 
+                          ? "opacity-85" 
+                          : "opacity-65 group-hover:opacity-45"
+                      }`}
+                      style={{
+                        backgroundColor: styles.primary
+                      }}
+                    />
+                    
+                    {/* Overlay content */}
+                    <div className="relative z-10 flex flex-col items-center justify-center space-y-1.5 w-full h-full p-1 text-white">
+                      <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 transition-colors ${
+                        isSelected ? "bg-white text-slate-950 shadow-sm" : "bg-white/20 text-white backdrop-blur-sm"
+                      }`}>
+                        {IconComp ? (
+                          <IconComp className="w-3.5 h-3.5" />
+                        ) : (
+                          <Briefcase className="w-3.5 h-3.5" />
+                        )}
+                      </div>
+                      <span className="text-[9px] sm:text-[11px] font-sans font-black tracking-tight block text-white drop-shadow-sm px-1 line-clamp-2 leading-tight">
+                        {cat.label}
+                      </span>
                     </div>
-                    <span className="text-[9px] sm:text-[11px] font-sans font-extrabold tracking-tight block">
-                      {cat.label}
-                    </span>
                   </motion.button>
                 );
               })}
@@ -624,11 +670,18 @@ const JobSeekerDashboard: React.FC = () => {
                 </p>
               </div>
             ) : (
-              filteredJobs.map((job) => (
-                <motion.div key={job.id} variants={itemVariants}>
-                  <JobCard job={job} />
-                </motion.div>
-              ))
+              <>
+                {displayedJobs.map((job) => (
+                  <motion.div key={job.id} variants={itemVariants}>
+                    <JobCard job={job} />
+                  </motion.div>
+                ))}
+                {filteredJobs.length > visibleCount && (
+                  <div ref={sentinelRef} className="h-14 flex items-center justify-center pt-4">
+                    <div className="w-6 h-6 border-2 border-[#1E88E5] border-t-transparent rounded-full animate-spin" />
+                  </div>
+                )}
+              </>
             )}
           </motion.div>
         </div>
@@ -683,7 +736,7 @@ const StaffDashboardView: React.FC = () => {
       {!hasActiveChat && staffTab !== "report" && staffTab !== "post-job" && (
         <div className="flex flex-col items-center gap-4 pt-6 pb-6">
           <div className="relative w-full max-w-md bg-white border border-slate-200/80 p-1.5 rounded-2xl flex items-center gap-2 shadow-sm mt-2 select-text">
-            <Search className="w-4 h-4 text-[#0F5132] ml-2 shrink-0" />
+            <Search className="w-4 h-4 text-[#1E88E5] ml-2 shrink-0" />
             <input
               type="text"
               placeholder={isInbox ? "Search live chats or available requests..." : "Search jobs..."}
@@ -691,7 +744,7 @@ const StaffDashboardView: React.FC = () => {
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full py-1 bg-transparent text-xs font-medium focus:outline-none text-slate-800 placeholder-slate-400"
             />
-            <span className="text-[10px] font-mono font-bold bg-slate-50 text-[#0F5132] px-2.5 py-1 rounded-xl uppercase tracking-wider shrink-0 hidden sm:inline border border-slate-100">
+            <span className="text-[10px] font-mono font-bold bg-slate-50 text-[#1E88E5] px-2.5 py-1 rounded-xl uppercase tracking-wider shrink-0 hidden sm:inline border border-slate-100">
               {isInbox ? "Staff" : "Jobs"}
             </span>
           </div>
@@ -776,7 +829,7 @@ const StaffPortalInvite: React.FC = () => {
     return (
       <div className="min-h-[500px] flex items-center justify-center p-4">
         <div className="bg-white border border-slate-100 shadow-xl rounded-3xl p-8 max-w-md w-full text-center space-y-5">
-          <div className="w-12 h-12 bg-emerald-50 rounded-2xl flex items-center justify-center text-[#0F5132] mx-auto">
+          <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center text-[#1E88E5] mx-auto">
             <UserCheck className="w-6 h-6" />
           </div>
           <div>
@@ -789,7 +842,7 @@ const StaffPortalInvite: React.FC = () => {
           </div>
           <Link
             to="/staff"
-            className="w-full py-3 bg-[#0F5132] hover:bg-[#0c4027] text-white rounded-xl text-xs font-sans font-extrabold flex items-center justify-center gap-1.5 transition-colors shadow-md"
+            className="w-full py-3 bg-[#1E88E5] hover:bg-[#1565C0] text-white rounded-xl text-xs font-sans font-extrabold flex items-center justify-center gap-1.5 transition-colors shadow-md"
           >
             Enter Staff Dashboard Console <ChevronRight className="w-4 h-4" />
           </Link>
@@ -802,13 +855,13 @@ const StaffPortalInvite: React.FC = () => {
     <div className="min-h-[600px] flex items-center justify-center p-4">
       <div className="bg-white border border-slate-100 shadow-xl rounded-3xl p-8 max-w-md w-full space-y-6">
         <div className="text-center">
-          <div className="w-12 h-12 bg-emerald-50 rounded-2xl flex items-center justify-center text-[#0F5132] mx-auto mb-3">
+          <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center text-[#1E88E5] mx-auto mb-3">
             <UserPlus className="w-5 h-5" />
           </div>
           <h2 className="text-xl font-sans font-extrabold text-slate-900 tracking-tight">
             Recruiter Enrollment Portal
           </h2>
-          <span className="text-[10px] font-mono text-[#0F5132] font-bold uppercase tracking-wider block mt-1">
+          <span className="text-[10px] font-mono text-[#1E88E5] font-bold uppercase tracking-wider block mt-1">
             Secure Staff Invite Route
           </span>
         </div>
@@ -824,7 +877,7 @@ const StaffPortalInvite: React.FC = () => {
               placeholder="e.g. Marcus Vance"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-sans font-medium focus:border-[#0F5132] focus:outline-none"
+              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-sans font-medium focus:border-[#1E88E5] focus:outline-none"
             />
           </div>
 
@@ -838,7 +891,7 @@ const StaffPortalInvite: React.FC = () => {
               placeholder="e.g. vance@valleyreigns.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-sans font-medium focus:border-[#0F5132] focus:outline-none"
+              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-sans font-medium focus:border-[#1E88E5] focus:outline-none"
             />
           </div>
 
@@ -851,14 +904,14 @@ const StaffPortalInvite: React.FC = () => {
               required
               placeholder="••••••••"
               defaultValue="VALLEY_STAFF_2026"
-              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-sans font-medium focus:border-[#0F5132] focus:outline-none"
+              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-sans font-medium focus:border-[#1E88E5] focus:outline-none"
             />
           </div>
 
           <button
             type="submit"
             disabled={submitting}
-            className="w-full py-3 bg-[#0F5132] hover:bg-[#0c4027] text-white rounded-xl text-xs font-sans font-extrabold shadow-md shadow-emerald-950/10 flex items-center justify-center cursor-pointer"
+            className="w-full py-3 bg-[#1E88E5] hover:bg-[#1565C0] text-white rounded-xl text-xs font-sans font-extrabold shadow-md shadow-blue-950/10 flex items-center justify-center cursor-pointer"
           >
             {submitting ? "Registering Credentials..." : "Enroll Recruiter & Log In"}
           </button>
@@ -1135,22 +1188,27 @@ function AppContent() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.35 }}
-            className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-gradient-to-tr from-[#021317] via-[#0F5132] to-[#0B3C49] text-white"
+            className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-gradient-to-br from-[#F0F7FF] via-[#FAFCFD] to-[#FFFFFF]"
           >
-            <div className="relative flex flex-col items-center justify-center space-y-6 max-w-sm px-6 text-center">
-              {/* Spinning and pulsing loader structure */}
+            <div className="relative flex flex-col items-center justify-center max-w-sm px-6 text-center">
+              {/* Cool loading blue curve rotating with a pulser around the brand logo */}
               <div className="relative flex items-center justify-center">
-                <div className="absolute w-24 h-24 rounded-full bg-emerald-500/10 border border-emerald-400/20 animate-ping duration-1000" />
-                <div className="absolute w-16 h-16 rounded-full bg-emerald-400/10 animate-pulse duration-700" />
-                <div className="relative w-12 h-12 rounded-full border-2 border-white/20 border-t-emerald-300 animate-spin" />
-              </div>
-              <div className="space-y-2">
-                <h2 className="text-2xl font-display font-black tracking-tight text-white uppercase tracking-wider">
-                  Valley Reigns
-                </h2>
-                <p className="text-xs font-mono text-emerald-300 font-bold uppercase tracking-widest animate-pulse">
-                  Verifying Workspace Session...
-                </p>
+                {/* Pulsers */}
+                <div className="absolute w-32 h-32 rounded-full bg-[#1E88E5]/10 border border-[#1E88E5]/10 animate-ping duration-[1800ms]" />
+                <div className="absolute w-24 h-24 rounded-full bg-[#1E88E5]/8 animate-pulse duration-[1200ms]" />
+                
+                {/* Rotating blue loading curve (perfectly circular) */}
+                <div className="absolute w-22 h-22 rounded-full border-[3px] border-slate-100/50 border-t-[#1E88E5] animate-spin duration-[1000ms]" />
+                
+                {/* Main Static Logo Container */}
+                <div className="relative w-16 h-16 bg-white rounded-2xl shadow-lg border border-blue-50/50 overflow-hidden flex items-center justify-center p-1.5">
+                  <img 
+                    src="/icon.svg" 
+                    alt="Valley Reigns Logo" 
+                    className="w-full h-full object-contain"
+                    referrerPolicy="no-referrer"
+                  />
+                </div>
               </div>
             </div>
           </motion.div>
@@ -1307,7 +1365,7 @@ function AppContent() {
         {/* Admin Sticky Fixed Bottom Navigation Pill */}
         {currentUser && currentUser.role === "admin" && !shouldHideHeader && (
           <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-40 w-full max-w-[200px] px-2 animate-none">
-            <div className="bg-[#0B3C2D]/70 backdrop-blur-lg border border-[#0F5132] shadow-[0_2px_8px_rgba(0,0,0,0.1)] rounded-full px-4 py-1.5 flex items-center justify-around transition-all duration-300">
+            <div className="bg-[#0b1b3d]/85 backdrop-blur-lg border border-[#0084FF] shadow-[0_10px_30px_rgba(0,132,255,0.15)] rounded-full px-4 py-1.5 flex items-center justify-around transition-all duration-300">
               {/* Search Icon Component (Left) */}
               <button
                 onClick={() => {
@@ -1316,8 +1374,8 @@ function AppContent() {
                 }}
                 className={`p-2 border cursor-pointer transition-all duration-200 hover:scale-110 active:scale-95 flex items-center justify-center ${
                   location.pathname === "/seeker"
-                    ? "bg-[#0F5132]/35 border-emerald-400/20 text-white rounded-full"
-                    : "bg-transparent border-transparent text-emerald-400 hover:text-white rounded-full"
+                    ? "bg-[#0084FF]/30 border-[#0084FF]/25 text-white rounded-full"
+                    : "bg-transparent border-transparent text-blue-300 hover:text-white rounded-full"
                 }`}
                 title="Search Jobs"
               >
@@ -1333,8 +1391,8 @@ function AppContent() {
                 }}
                 className={`p-2 border cursor-pointer transition-all duration-200 hover:scale-110 active:scale-95 flex items-center justify-center ${
                   location.pathname.startsWith("/admin")
-                    ? "bg-[#0F5132]/35 border-emerald-400/20 text-white rounded-full"
-                    : "bg-transparent border-transparent text-emerald-400 hover:text-white rounded-full"
+                    ? "bg-[#0084FF]/30 border-[#0084FF]/25 text-white rounded-full"
+                    : "bg-transparent border-transparent text-blue-300 hover:text-white rounded-full"
                 }`}
                 title="Admin Dashboard"
               >
@@ -1348,8 +1406,8 @@ function AppContent() {
                 }}
                 className={`p-2 border cursor-pointer transition-all duration-200 hover:scale-110 active:scale-95 flex items-center justify-center ${
                   isAdminSettingsOpen
-                    ? "bg-[#0F5132]/35 border-emerald-400/20 text-white rounded-full"
-                    : "bg-transparent border-transparent text-emerald-400 hover:text-white rounded-full"
+                    ? "bg-[#0084FF]/30 border-[#0084FF]/25 text-white rounded-full"
+                    : "bg-transparent border-transparent text-blue-300 hover:text-white rounded-full"
                 }`}
                 title="Admin Settings"
               >
@@ -1362,7 +1420,7 @@ function AppContent() {
         {/* Staff Sticky Fixed Bottom Navigation Pill */}
         {currentUser && currentUser.role === "staff" && !shouldHideHeader && (
           <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-40 w-full max-w-[300px] px-2 animate-none">
-            <div className="bg-[#0B3C2D]/70 backdrop-blur-lg border border-[#0F5132] shadow-[0_2px_8px_rgba(0,0,0,0.1)] rounded-full px-3 py-1.5 flex items-center justify-around transition-all duration-300">
+            <div className="bg-[#0b1b3d]/85 backdrop-blur-lg border border-[#0084FF] shadow-[0_10px_30px_rgba(0,132,255,0.15)] rounded-full px-3 py-1.5 flex items-center justify-around transition-all duration-300">
               {/* Search Jobs (Seeker View) */}
               <button
                 onClick={() => {
@@ -1371,8 +1429,8 @@ function AppContent() {
                 }}
                 className={`p-2 border cursor-pointer transition-all duration-200 hover:scale-110 active:scale-95 flex items-center justify-center ${
                   location.pathname === "/seeker"
-                    ? "bg-[#0F5132]/35 border-emerald-400/20 text-white rounded-full"
-                    : "bg-transparent border-transparent text-emerald-400 hover:text-white rounded-full"
+                    ? "bg-[#0084FF]/30 border-[#0084FF]/25 text-white rounded-full"
+                    : "bg-transparent border-transparent text-blue-300 hover:text-white rounded-full"
                 }`}
                 title="Find Jobs"
               >
@@ -1387,8 +1445,8 @@ function AppContent() {
                 }}
                 className={`p-2 border cursor-pointer transition-all duration-200 hover:scale-110 active:scale-95 flex items-center justify-center ${
                   location.pathname === "/staff" && (new URLSearchParams(location.search).get("tab") === "inbox" || !new URLSearchParams(location.search).get("tab"))
-                    ? "bg-[#0F5132]/35 border-emerald-400/20 text-white rounded-full"
-                    : "bg-transparent border-transparent text-emerald-400 hover:text-white rounded-full"
+                    ? "bg-[#0084FF]/30 border-[#0084FF]/25 text-white rounded-full"
+                    : "bg-transparent border-transparent text-blue-300 hover:text-white rounded-full"
                 }`}
                 title="Chat Inbox"
               >
@@ -1403,8 +1461,8 @@ function AppContent() {
                 }}
                 className={`p-2 border cursor-pointer transition-all duration-200 hover:scale-110 active:scale-95 flex items-center justify-center ${
                   location.pathname === "/staff/manage-jobs"
-                    ? "bg-[#0F5132]/35 border-emerald-400/20 text-white rounded-full"
-                    : "bg-transparent border-transparent text-emerald-400 hover:text-white rounded-full"
+                    ? "bg-[#0084FF]/30 border-[#0084FF]/25 text-white rounded-full"
+                    : "bg-transparent border-transparent text-blue-300 hover:text-white rounded-full"
                 }`}
                 title="Manage Jobs"
               >
@@ -1419,8 +1477,8 @@ function AppContent() {
                 }}
                 className={`p-2 border cursor-pointer transition-all duration-200 hover:scale-110 active:scale-95 flex items-center justify-center ${
                   location.pathname === "/staff" && new URLSearchParams(location.search).get("tab") === "report"
-                    ? "bg-[#0F5132]/35 border-emerald-400/20 text-white rounded-full"
-                    : "bg-transparent border-transparent text-emerald-400 hover:text-white rounded-full"
+                    ? "bg-[#0084FF]/30 border-[#0084FF]/25 text-white rounded-full"
+                    : "bg-transparent border-transparent text-blue-300 hover:text-white rounded-full"
                 }`}
                 title="Daily Staff Report"
               >
@@ -1434,8 +1492,8 @@ function AppContent() {
                 }}
                 className={`p-2 border cursor-pointer transition-all duration-200 hover:scale-110 active:scale-95 flex items-center justify-center ${
                   isStaffSettingsOpen
-                    ? "bg-[#0F5132]/35 border-emerald-400/20 text-white rounded-full"
-                    : "bg-transparent border-transparent text-emerald-400 hover:text-white rounded-full"
+                    ? "bg-[#0084FF]/30 border-[#0084FF]/25 text-white rounded-full"
+                    : "bg-transparent border-transparent text-blue-300 hover:text-white rounded-full"
                 }`}
                 title="Recruiter Settings"
               >
@@ -1448,7 +1506,7 @@ function AppContent() {
         {/* Seeker/User Sticky Fixed Bottom Navigation Pill */}
         {(currentUser && currentUser.role === "seeker") && !shouldHideHeader && (
           <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-40 w-full max-w-[200px] px-2 animate-none">
-            <div className="bg-[#0B3C2D]/70 backdrop-blur-lg border border-[#0F5132] shadow-[0_2px_8px_rgba(0,0,0,0.1)] rounded-full px-4 py-1.5 flex items-center justify-around transition-all duration-300">
+            <div className="bg-[#0b1b3d]/85 backdrop-blur-lg border border-[#0084FF] shadow-[0_10px_30px_rgba(0,132,255,0.15)] rounded-full px-4 py-1.5 flex items-center justify-around transition-all duration-300">
               {/* Find Jobs / Search */}
               <button
                 onClick={() => {
@@ -1457,8 +1515,8 @@ function AppContent() {
                 }}
                 className={`p-2 border cursor-pointer transition-all duration-200 hover:scale-110 active:scale-95 flex items-center justify-center ${
                   location.pathname === "/" || location.pathname === "/seeker"
-                    ? "bg-[#0F5132]/35 border-emerald-400/20 text-white rounded-full"
-                    : "bg-transparent border-transparent text-emerald-400 hover:text-white rounded-full"
+                    ? "bg-[#0084FF]/30 border-[#0084FF]/25 text-white rounded-full"
+                    : "bg-transparent border-transparent text-blue-300 hover:text-white rounded-full"
                 }`}
                 title="Find Jobs"
               >
@@ -1473,8 +1531,8 @@ function AppContent() {
                 }}
                 className={`p-2 border cursor-pointer transition-all duration-200 hover:scale-110 active:scale-95 flex items-center justify-center relative ${
                   location.pathname === "/seeker/messages"
-                    ? "bg-[#0F5132]/35 border-emerald-400/20 text-white rounded-full"
-                    : "bg-transparent border-transparent text-emerald-400 hover:text-white rounded-full"
+                    ? "bg-[#0084FF]/30 border-[#0084FF]/25 text-white rounded-full"
+                    : "bg-transparent border-transparent text-blue-300 hover:text-white rounded-full"
                 }`}
                 title="My Chats"
               >
@@ -1488,8 +1546,8 @@ function AppContent() {
                 }}
                 className={`p-2 border cursor-pointer transition-all duration-200 hover:scale-110 active:scale-95 flex items-center justify-center ${
                   isSeekerSettingsOpen
-                    ? "bg-[#0F5132]/35 border-emerald-400/20 text-white rounded-full"
-                    : "bg-transparent border-transparent text-emerald-400 hover:text-white rounded-full"
+                    ? "bg-[#0084FF]/30 border-[#0084FF]/25 text-white rounded-full"
+                    : "bg-transparent border-transparent text-blue-300 hover:text-white rounded-full"
                 }`}
                 title="Account Settings"
               >
@@ -1518,10 +1576,10 @@ function AppContent() {
                 animate={{ y: 0 }}
                 exit={{ y: "100%" }}
                 transition={{ type: "spring", damping: 25, stiffness: 220 }}
-                className="fixed bottom-0 left-0 right-0 z-50 w-full max-w-lg mx-auto bg-[#051812] text-white rounded-t-[32px] border-t border-emerald-800/40 shadow-2xl overflow-hidden pb-8 flex flex-col animate-none"
+                className="fixed bottom-0 left-0 right-0 z-50 w-full max-w-lg mx-auto bg-white text-[#0B1B3D] rounded-t-[32px] border-t border-blue-200/50 shadow-2xl overflow-hidden pb-8 flex flex-col animate-none"
               >
                 {/* Vector graphic design background pattern matching admin dashboard chats card */}
-                <div className="absolute inset-0 pointer-events-none opacity-[0.06] text-emerald-400">
+                <div className="absolute inset-0 pointer-events-none opacity-[0.03] text-blue-600">
                   <svg width="100%" height="100%" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <circle cx="85%" cy="15%" r="50" stroke="currentColor" strokeWidth="1.2" />
                     <circle cx="90%" cy="20%" r="80" stroke="currentColor" strokeWidth="1" strokeDasharray="3 3" />
@@ -1530,19 +1588,19 @@ function AppContent() {
                 </div>
 
                 {/* Handle bar */}
-                <div className="w-12 h-1.5 bg-emerald-950/80 rounded-full mx-auto my-3 opacity-60" />
+                <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto my-3" />
 
                 {/* Profile Summary Section */}
-                <div className="px-6 pb-5 flex items-center gap-4 relative z-10 border-b border-emerald-900/10">
+                <div className="px-6 pb-5 flex items-center gap-4 relative z-10 border-b border-slate-100">
                   {firebaseUser?.photoURL || currentUser?.photoURL ? (
                     <img 
                       src={firebaseUser?.photoURL || currentUser?.photoURL} 
                       alt={currentUser?.displayName || "User"} 
-                      className="w-14 h-14 rounded-full object-cover border-2 border-emerald-500/30 shadow-sm select-none"
+                      className="w-14 h-14 rounded-full object-cover border-2 border-blue-500/20 shadow-sm select-none"
                       referrerPolicy="no-referrer"
                     />
                   ) : (
-                    <div className="w-14 h-14 rounded-full bg-emerald-500/10 border-2 border-emerald-500/30 flex items-center justify-center text-emerald-300 font-bold text-lg font-mono shadow-sm">
+                    <div className="w-14 h-14 rounded-full bg-blue-50 border-2 border-blue-100 flex items-center justify-center text-blue-600 font-bold text-lg font-mono shadow-sm">
                       {currentUser?.displayName ? (
                         currentUser.displayName.split(" ").map(n => n[0]).join("").substring(0, 2).toUpperCase()
                       ) : (
@@ -1551,13 +1609,13 @@ function AppContent() {
                     </div>
                   )}
                   <div className="space-y-0.5 text-left">
-                    <h4 className="text-base font-sans font-extrabold text-white tracking-tight">
+                    <h4 className="text-base font-sans font-extrabold text-[#0B1B3D] tracking-tight">
                       {currentUser?.displayName || "System Administrator"}
                     </h4>
-                    <p className="text-xs font-mono text-emerald-400/80 font-medium">
+                    <p className="text-xs font-mono text-slate-500 font-medium">
                       {currentUser?.email}
                     </p>
-                    <span className="inline-block text-[9px] font-mono font-bold bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 px-2 py-0.5 rounded-md uppercase tracking-wider mt-1">
+                    <span className="inline-block text-[9px] font-mono font-bold bg-blue-50 text-blue-600 border border-blue-100 px-2 py-0.5 rounded-md uppercase tracking-wider mt-1">
                       {currentUser?.role || "ADMIN"}
                     </span>
                   </div>
@@ -1570,13 +1628,13 @@ function AppContent() {
                     onClick={() => {
                       setShowAdminAccountModal(true);
                     }}
-                    className="w-full flex items-center justify-between py-3.5 px-2 hover:bg-emerald-950/40 rounded-xl transition-all duration-200 group border-0 bg-transparent cursor-pointer"
+                    className="w-full flex items-center justify-between py-3.5 px-2.5 hover:bg-blue-50/55 rounded-xl transition-all duration-200 group border-0 bg-transparent cursor-pointer"
                   >
-                    <span className="text-sm font-bold text-emerald-100 group-hover:text-white transition-colors">My Account</span>
-                    <User className="w-4 h-4 text-emerald-400 group-hover:scale-110 transition-transform" />
+                    <span className="text-sm font-bold text-slate-700 group-hover:text-blue-600 transition-colors">My Account</span>
+                    <User className="w-4 h-4 text-blue-500 group-hover:scale-110 transition-transform" />
                   </button>
                   
-                  <div className="border-t border-emerald-900/15 my-1" />
+                  <div className="border-t border-slate-100 my-1" />
 
                   {/* WhatsApp Config Row */}
                   <button
@@ -1584,13 +1642,13 @@ function AppContent() {
                       setIsAdminSettingsOpen(false);
                       navigate("/admin/whatsapp-config");
                     }}
-                    className="w-full flex items-center justify-between py-3.5 px-2 hover:bg-emerald-950/40 rounded-xl transition-all duration-200 group border-0 bg-transparent cursor-pointer"
+                    className="w-full flex items-center justify-between py-3.5 px-2.5 hover:bg-blue-50/55 rounded-xl transition-all duration-200 group border-0 bg-transparent cursor-pointer"
                   >
-                    <span className="text-sm font-bold text-emerald-100 group-hover:text-white transition-colors">WhatsApp Config</span>
-                    <MessageCircle className="w-4 h-4 text-emerald-400 group-hover:scale-110 transition-transform" />
+                    <span className="text-sm font-bold text-slate-700 group-hover:text-blue-600 transition-colors">WhatsApp Config</span>
+                    <MessageCircle className="w-4 h-4 text-blue-500 group-hover:scale-110 transition-transform" />
                   </button>
 
-                  <div className="border-t border-emerald-900/15 my-1" />
+                  <div className="border-t border-slate-100 my-1" />
 
                   {/* Dev & Diagnostics Center Row */}
                   <button
@@ -1598,26 +1656,26 @@ function AppContent() {
                       setIsAdminSettingsOpen(false);
                       navigate("/admin/diagnostics");
                     }}
-                    className="w-full flex items-center justify-between py-3.5 px-2 hover:bg-emerald-950/40 rounded-xl transition-all duration-200 group border-0 bg-transparent cursor-pointer"
+                    className="w-full flex items-center justify-between py-3.5 px-2.5 hover:bg-blue-50/55 rounded-xl transition-all duration-200 group border-0 bg-transparent cursor-pointer"
                   >
-                    <span className="text-sm font-bold text-emerald-100 group-hover:text-white transition-colors">Dev & Diagnostics Center</span>
-                    <Cpu className="w-4 h-4 text-emerald-400 group-hover:scale-110 transition-transform" />
+                    <span className="text-sm font-bold text-slate-700 group-hover:text-blue-600 transition-colors">Dev & Diagnostics Center</span>
+                    <Cpu className="w-4 h-4 text-blue-500 group-hover:scale-110 transition-transform" />
                   </button>
 
-                  <div className="border-t border-emerald-900/15 my-1" />
+                  <div className="border-t border-slate-100 my-1" />
 
                   {/* About Valley Reigns Row */}
                   <button
                     onClick={() => {
                       setShowAdminAboutModal(true);
                     }}
-                    className="w-full flex items-center justify-between py-3.5 px-2 hover:bg-emerald-950/40 rounded-xl transition-all duration-200 group border-0 bg-transparent cursor-pointer"
+                    className="w-full flex items-center justify-between py-3.5 px-2.5 hover:bg-blue-50/55 rounded-xl transition-all duration-200 group border-0 bg-transparent cursor-pointer"
                   >
-                    <span className="text-sm font-bold text-emerald-100 group-hover:text-white transition-colors">About Valley Reigns</span>
-                    <Info className="w-4 h-4 text-emerald-400 group-hover:scale-110 transition-transform" />
+                    <span className="text-sm font-bold text-slate-700 group-hover:text-blue-600 transition-colors">About Valley Reigns</span>
+                    <Info className="w-4 h-4 text-blue-500 group-hover:scale-110 transition-transform" />
                   </button>
 
-                  <div className="border-t border-emerald-900/15 my-1" />
+                  <div className="border-t border-slate-100 my-1" />
 
                   {/* Install App Row */}
                   {!isAppInstalled && (
@@ -1627,12 +1685,12 @@ function AppContent() {
                           setIsAdminSettingsOpen(false);
                           window.dispatchEvent(new CustomEvent("trigger-pwa-install"));
                         }}
-                        className="w-full flex items-center justify-between py-3.5 px-2 hover:bg-emerald-950/40 rounded-xl transition-all duration-200 group border-0 bg-transparent cursor-pointer"
+                        className="w-full flex items-center justify-between py-3.5 px-2.5 hover:bg-blue-50/55 rounded-xl transition-all duration-200 group border-0 bg-transparent cursor-pointer"
                       >
-                        <span className="text-sm font-bold text-emerald-100 group-hover:text-white transition-colors">Install App</span>
-                        <Download className="w-4 h-4 text-emerald-400 group-hover:scale-110 transition-transform" />
+                        <span className="text-sm font-bold text-slate-700 group-hover:text-blue-600 transition-colors">Install App</span>
+                        <Download className="w-4 h-4 text-blue-500 group-hover:scale-110 transition-transform" />
                       </button>
-                      <div className="border-t border-emerald-900/15 my-1" />
+                      <div className="border-t border-slate-100 my-1" />
                     </>
                   )}
 
@@ -1643,10 +1701,10 @@ function AppContent() {
                       await logout();
                       navigate("/");
                     }}
-                    className="w-full flex items-center justify-between py-3.5 px-2 hover:bg-rose-950/30 rounded-xl transition-all duration-200 group border-0 bg-transparent cursor-pointer"
+                    className="w-full flex items-center justify-between py-3.5 px-2.5 hover:bg-rose-50 rounded-xl transition-all duration-200 group border-0 bg-transparent cursor-pointer"
                   >
-                    <span className="text-sm font-bold text-rose-300 group-hover:text-rose-200 transition-colors">Sign Out</span>
-                    <LogOut className="w-4 h-4 text-rose-400 group-hover:scale-110 transition-transform" />
+                    <span className="text-sm font-bold text-rose-600 group-hover:text-rose-700 transition-colors">Sign Out</span>
+                    <LogOut className="w-4 h-4 text-rose-500 group-hover:scale-110 transition-transform" />
                   </button>
                 </div>
               </motion.div>
@@ -1673,10 +1731,10 @@ function AppContent() {
                 animate={{ y: 0 }}
                 exit={{ y: "100%" }}
                 transition={{ type: "spring", damping: 25, stiffness: 220 }}
-                className="fixed bottom-0 left-0 right-0 z-50 w-full max-w-lg mx-auto bg-[#051812] text-white rounded-t-[32px] border-t border-emerald-800/40 shadow-2xl overflow-hidden pb-8 flex flex-col animate-none"
+                className="fixed bottom-0 left-0 right-0 z-50 w-full max-w-lg mx-auto bg-white text-[#0B1B3D] rounded-t-[32px] border-t border-blue-200/50 shadow-2xl overflow-hidden pb-8 flex flex-col animate-none"
               >
                 {/* Vector graphic design background pattern matching admin dashboard chats card */}
-                <div className="absolute inset-0 pointer-events-none opacity-[0.06] text-emerald-400">
+                <div className="absolute inset-0 pointer-events-none opacity-[0.03] text-blue-600">
                   <svg width="100%" height="100%" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <circle cx="85%" cy="15%" r="50" stroke="currentColor" strokeWidth="1.2" />
                     <circle cx="90%" cy="20%" r="80" stroke="currentColor" strokeWidth="1" strokeDasharray="3 3" />
@@ -1685,19 +1743,19 @@ function AppContent() {
                 </div>
 
                 {/* Handle bar */}
-                <div className="w-12 h-1.5 bg-emerald-950/80 rounded-full mx-auto my-3 opacity-60" />
+                <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto my-3" />
 
                 {/* Profile Summary Section */}
-                <div className="px-6 pb-5 flex items-center gap-4 relative z-10 border-b border-emerald-900/10">
+                <div className="px-6 pb-5 flex items-center gap-4 relative z-10 border-b border-slate-100">
                   {firebaseUser?.photoURL || currentUser?.photoURL ? (
                     <img 
                       src={firebaseUser?.photoURL || currentUser?.photoURL} 
                       alt={currentUser?.displayName || "User"} 
-                      className="w-14 h-14 rounded-full object-cover border-2 border-emerald-500/30 shadow-sm select-none"
+                      className="w-14 h-14 rounded-full object-cover border-2 border-blue-500/20 shadow-sm select-none"
                       referrerPolicy="no-referrer"
                     />
                   ) : (
-                    <div className="w-14 h-14 rounded-full bg-emerald-500/10 border-2 border-emerald-500/30 flex items-center justify-center text-emerald-300 font-bold text-lg font-mono shadow-sm">
+                    <div className="w-14 h-14 rounded-full bg-blue-50 border-2 border-blue-100 flex items-center justify-center text-blue-600 font-bold text-lg font-mono shadow-sm">
                       {currentUser?.displayName ? (
                         currentUser.displayName.split(" ").map(n => n[0]).join("").substring(0, 2).toUpperCase()
                       ) : (
@@ -1706,13 +1764,13 @@ function AppContent() {
                     </div>
                   )}
                   <div className="space-y-0.5 text-left">
-                    <h4 className="text-base font-sans font-extrabold text-white tracking-tight">
+                    <h4 className="text-base font-sans font-extrabold text-[#0B1B3D] tracking-tight">
                       {currentUser?.displayName || "Valley Recruiter"}
                     </h4>
-                    <p className="text-xs font-mono text-emerald-400/80 font-medium">
+                    <p className="text-xs font-mono text-slate-500 font-medium">
                       {currentUser?.email}
                     </p>
-                    <span className="inline-block text-[9px] font-mono font-bold bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 px-2 py-0.5 rounded-md uppercase tracking-wider mt-1">
+                    <span className="inline-block text-[9px] font-mono font-bold bg-blue-50 text-blue-600 border border-blue-100 px-2 py-0.5 rounded-md uppercase tracking-wider mt-1">
                       {currentUser?.role || "STAFF"}
                     </span>
                   </div>
@@ -1726,13 +1784,13 @@ function AppContent() {
                       setIsStaffSettingsOpen(false);
                       setShowAdminAccountModal(true);
                     }}
-                    className="w-full flex items-center justify-between py-3.5 px-2 hover:bg-emerald-950/40 rounded-xl transition-all duration-200 group border-0 bg-transparent cursor-pointer"
+                    className="w-full flex items-center justify-between py-3.5 px-2.5 hover:bg-blue-50/55 rounded-xl transition-all duration-200 group border-0 bg-transparent cursor-pointer"
                   >
-                    <span className="text-sm font-bold text-emerald-100 group-hover:text-white transition-colors">My Account</span>
-                    <User className="w-4 h-4 text-emerald-400 group-hover:scale-110 transition-transform" />
+                    <span className="text-sm font-bold text-slate-700 group-hover:text-blue-600 transition-colors">My Account</span>
+                    <User className="w-4 h-4 text-blue-500 group-hover:scale-110 transition-transform" />
                   </button>
                   
-                  <div className="border-t border-emerald-900/15 my-1" />
+                  <div className="border-t border-slate-100 my-1" />
 
                   {/* About Valley Reigns Row */}
                   <button
@@ -1740,13 +1798,13 @@ function AppContent() {
                       setIsStaffSettingsOpen(false);
                       setShowAdminAboutModal(true);
                     }}
-                    className="w-full flex items-center justify-between py-3.5 px-2 hover:bg-emerald-950/40 rounded-xl transition-all duration-200 group border-0 bg-transparent cursor-pointer"
+                    className="w-full flex items-center justify-between py-3.5 px-2.5 hover:bg-blue-50/55 rounded-xl transition-all duration-200 group border-0 bg-transparent cursor-pointer"
                   >
-                    <span className="text-sm font-bold text-emerald-100 group-hover:text-white transition-colors">About Valley Reigns</span>
-                    <Info className="w-4 h-4 text-emerald-400 group-hover:scale-110 transition-transform" />
+                    <span className="text-sm font-bold text-slate-700 group-hover:text-blue-600 transition-colors">About Valley Reigns</span>
+                    <Info className="w-4 h-4 text-blue-500 group-hover:scale-110 transition-transform" />
                   </button>
 
-                  <div className="border-t border-emerald-900/15 my-1" />
+                  <div className="border-t border-slate-100 my-1" />
 
                   {/* Install App Row */}
                   {!isAppInstalled && (
@@ -1756,12 +1814,12 @@ function AppContent() {
                           setIsStaffSettingsOpen(false);
                           window.dispatchEvent(new CustomEvent("trigger-pwa-install"));
                         }}
-                        className="w-full flex items-center justify-between py-3.5 px-2 hover:bg-emerald-950/40 rounded-xl transition-all duration-200 group border-0 bg-transparent cursor-pointer"
+                        className="w-full flex items-center justify-between py-3.5 px-2.5 hover:bg-blue-50/55 rounded-xl transition-all duration-200 group border-0 bg-transparent cursor-pointer"
                       >
-                        <span className="text-sm font-bold text-emerald-100 group-hover:text-white transition-colors">Install App</span>
-                        <Download className="w-4 h-4 text-emerald-400 group-hover:scale-110 transition-transform" />
+                        <span className="text-sm font-bold text-slate-700 group-hover:text-blue-600 transition-colors">Install App</span>
+                        <Download className="w-4 h-4 text-blue-500 group-hover:scale-110 transition-transform" />
                       </button>
-                      <div className="border-t border-emerald-900/15 my-1" />
+                      <div className="border-t border-slate-100 my-1" />
                     </>
                   )}
 
@@ -1772,10 +1830,10 @@ function AppContent() {
                       await logout();
                       navigate("/");
                     }}
-                    className="w-full flex items-center justify-between py-3.5 px-2 hover:bg-rose-950/30 rounded-xl transition-all duration-200 group border-0 bg-transparent cursor-pointer"
+                    className="w-full flex items-center justify-between py-3.5 px-2.5 hover:bg-rose-50 rounded-xl transition-all duration-200 group border-0 bg-transparent cursor-pointer"
                   >
-                    <span className="text-sm font-bold text-rose-300 group-hover:text-rose-200 transition-colors">Sign Out</span>
-                    <LogOut className="w-4 h-4 text-rose-400 group-hover:scale-110 transition-transform" />
+                    <span className="text-sm font-bold text-rose-600 group-hover:text-rose-700 transition-colors">Sign Out</span>
+                    <LogOut className="w-4 h-4 text-rose-500 group-hover:scale-110 transition-transform" />
                   </button>
                 </div>
               </motion.div>
@@ -1802,10 +1860,10 @@ function AppContent() {
                 animate={{ y: 0 }}
                 exit={{ y: "100%" }}
                 transition={{ type: "spring", damping: 25, stiffness: 220 }}
-                className="fixed bottom-0 left-0 right-0 z-50 w-full max-w-lg mx-auto bg-[#051812] text-white rounded-t-[32px] border-t border-emerald-800/40 shadow-2xl overflow-hidden pb-8 flex flex-col animate-none"
+                className="fixed bottom-0 left-0 right-0 z-50 w-full max-w-lg mx-auto bg-white text-[#0B1B3D] rounded-t-[32px] border-t border-blue-200/50 shadow-2xl overflow-hidden pb-8 flex flex-col animate-none"
               >
                 {/* Vector graphic design background pattern matching other sheets */}
-                <div className="absolute inset-0 pointer-events-none opacity-[0.06] text-emerald-400">
+                <div className="absolute inset-0 pointer-events-none opacity-[0.03] text-blue-600">
                   <svg width="100%" height="100%" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <circle cx="85%" cy="15%" r="50" stroke="currentColor" strokeWidth="1.2" />
                     <circle cx="90%" cy="20%" r="80" stroke="currentColor" strokeWidth="1" strokeDasharray="3 3" />
@@ -1814,19 +1872,19 @@ function AppContent() {
                 </div>
 
                 {/* Handle bar */}
-                <div className="w-12 h-1.5 bg-emerald-950/80 rounded-full mx-auto my-3 opacity-60" />
+                <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto my-3" />
 
                 {/* Profile Summary Section */}
-                <div className="px-6 pb-5 flex items-center gap-4 relative z-10 border-b border-emerald-900/10">
+                <div className="px-6 pb-5 flex items-center gap-4 relative z-10 border-b border-slate-100">
                   {firebaseUser?.photoURL || currentUser?.photoURL ? (
                     <img 
                       src={firebaseUser?.photoURL || currentUser?.photoURL} 
                       alt={currentUser?.displayName || "User"} 
-                      className="w-14 h-14 rounded-full object-cover border-2 border-emerald-500/30 shadow-sm select-none"
+                      className="w-14 h-14 rounded-full object-cover border-2 border-blue-500/20 shadow-sm select-none"
                       referrerPolicy="no-referrer"
                     />
                   ) : (
-                    <div className="w-14 h-14 rounded-full bg-emerald-500/10 border-2 border-emerald-500/30 flex items-center justify-center text-emerald-300 font-bold text-lg font-mono shadow-sm">
+                    <div className="w-14 h-14 rounded-full bg-blue-50 border-2 border-blue-100 flex items-center justify-center text-blue-600 font-bold text-lg font-mono shadow-sm">
                       {currentUser?.displayName ? (
                         currentUser.displayName.split(" ").map(n => n[0]).join("").substring(0, 2).toUpperCase()
                       ) : (
@@ -1835,13 +1893,13 @@ function AppContent() {
                     </div>
                   )}
                   <div className="space-y-0.5 text-left">
-                    <h4 className="text-base font-sans font-extrabold text-white tracking-tight">
+                    <h4 className="text-base font-sans font-extrabold text-[#0B1B3D] tracking-tight">
                       {currentUser?.displayName || "Guest User"}
                     </h4>
-                    <p className="text-xs font-mono text-emerald-400/80 font-medium">
+                    <p className="text-xs font-mono text-slate-500 font-medium">
                       {currentUser?.email || "Browse job postings in real-time"}
                     </p>
-                    <span className="inline-block text-[9px] font-mono font-bold bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 px-2 py-0.5 rounded-md uppercase tracking-wider mt-1">
+                    <span className="inline-block text-[9px] font-mono font-bold bg-blue-50 text-blue-600 border border-blue-100 px-2 py-0.5 rounded-md uppercase tracking-wider mt-1">
                       {currentUser?.role ? currentUser.role.toUpperCase() : "GUEST"}
                     </span>
                   </div>
@@ -1857,12 +1915,12 @@ function AppContent() {
                           setIsSeekerSettingsOpen(false);
                           setShowAdminAccountModal(true);
                         }}
-                        className="w-full flex items-center justify-between py-3.5 px-2 hover:bg-emerald-950/40 rounded-xl transition-all duration-200 group border-0 bg-transparent cursor-pointer"
+                        className="w-full flex items-center justify-between py-3.5 px-2.5 hover:bg-blue-50/55 rounded-xl transition-all duration-200 group border-0 bg-transparent cursor-pointer"
                       >
-                        <span className="text-sm font-bold text-emerald-100 group-hover:text-white transition-colors">My Account</span>
-                        <User className="w-4 h-4 text-emerald-400 group-hover:scale-110 transition-transform" />
+                        <span className="text-sm font-bold text-slate-700 group-hover:text-blue-600 transition-colors">My Account</span>
+                        <User className="w-4 h-4 text-blue-500 group-hover:scale-110 transition-transform" />
                       </button>
-                      <div className="border-t border-emerald-900/15 my-1" />
+                      <div className="border-t border-slate-100 my-1" />
                     </>
                   )}
 
@@ -1872,13 +1930,13 @@ function AppContent() {
                       setIsSeekerSettingsOpen(false);
                       setShowAdminAboutModal(true);
                     }}
-                    className="w-full flex items-center justify-between py-3.5 px-2 hover:bg-emerald-950/40 rounded-xl transition-all duration-200 group border-0 bg-transparent cursor-pointer"
+                    className="w-full flex items-center justify-between py-3.5 px-2.5 hover:bg-blue-50/55 rounded-xl transition-all duration-200 group border-0 bg-transparent cursor-pointer"
                   >
-                    <span className="text-sm font-bold text-emerald-100 group-hover:text-white transition-colors">About Valley Reigns</span>
-                    <Info className="w-4 h-4 text-emerald-400 group-hover:scale-110 transition-transform" />
+                    <span className="text-sm font-bold text-slate-700 group-hover:text-blue-600 transition-colors">About Valley Reigns</span>
+                    <Info className="w-4 h-4 text-blue-500 group-hover:scale-110 transition-transform" />
                   </button>
 
-                  <div className="border-t border-emerald-900/15 my-1" />
+                  <div className="border-t border-slate-100 my-1" />
 
                   {/* Install App Row */}
                   {!isAppInstalled && (
@@ -1888,12 +1946,12 @@ function AppContent() {
                           setIsSeekerSettingsOpen(false);
                           window.dispatchEvent(new CustomEvent("trigger-pwa-install"));
                         }}
-                        className="w-full flex items-center justify-between py-3.5 px-2 hover:bg-emerald-950/40 rounded-xl transition-all duration-200 group border-0 bg-transparent cursor-pointer"
+                        className="w-full flex items-center justify-between py-3.5 px-2.5 hover:bg-blue-50/55 rounded-xl transition-all duration-200 group border-0 bg-transparent cursor-pointer"
                       >
-                        <span className="text-sm font-bold text-emerald-100 group-hover:text-white transition-colors">Install App</span>
-                        <Download className="w-4 h-4 text-emerald-400 group-hover:scale-110 transition-transform" />
+                        <span className="text-sm font-bold text-slate-700 group-hover:text-blue-600 transition-colors">Install App</span>
+                        <Download className="w-4 h-4 text-blue-500 group-hover:scale-110 transition-transform" />
                       </button>
-                      <div className="border-t border-emerald-900/15 my-1" />
+                      <div className="border-t border-slate-100 my-1" />
                     </>
                   )}
 
@@ -1905,10 +1963,10 @@ function AppContent() {
                         await logout();
                         navigate("/");
                       }}
-                      className="w-full flex items-center justify-between py-3.5 px-2 hover:bg-rose-950/30 rounded-xl transition-all duration-200 group border-0 bg-transparent cursor-pointer"
+                      className="w-full flex items-center justify-between py-3.5 px-2.5 hover:bg-rose-50 rounded-xl transition-all duration-200 group border-0 bg-transparent cursor-pointer"
                     >
-                      <span className="text-sm font-bold text-rose-300 group-hover:text-rose-200 transition-colors">Sign Out</span>
-                      <LogOut className="w-4 h-4 text-rose-400 group-hover:scale-110 transition-transform" />
+                      <span className="text-sm font-bold text-rose-600 group-hover:text-rose-700 transition-colors">Sign Out</span>
+                      <LogOut className="w-4 h-4 text-rose-500 group-hover:scale-110 transition-transform" />
                     </button>
                   ) : (
                     <button
@@ -1917,10 +1975,10 @@ function AppContent() {
                         // Trigger auth modal (auth modal checks if user is logged out and opens modal)
                         window.dispatchEvent(new CustomEvent("open-auth-modal"));
                       }}
-                      className="w-full flex items-center justify-between py-3.5 px-2 hover:bg-emerald-950/45 rounded-xl transition-all duration-200 group border-0 bg-transparent cursor-pointer"
+                      className="w-full flex items-center justify-between py-3.5 px-2.5 hover:bg-blue-50/55 rounded-xl transition-all duration-200 group border-0 bg-transparent cursor-pointer"
                     >
-                      <span className="text-sm font-bold text-emerald-300 group-hover:text-emerald-200 transition-colors">Sign In / Join</span>
-                      <UserPlus className="w-4 h-4 text-emerald-400 group-hover:scale-110 transition-transform" />
+                      <span className="text-sm font-bold text-slate-700 group-hover:text-blue-600 transition-colors">Sign In / Join</span>
+                      <UserPlus className="w-4 h-4 text-blue-500 group-hover:scale-110 transition-transform" />
                     </button>
                   )}
                 </div>
@@ -1944,10 +2002,10 @@ function AppContent() {
                 initial={{ opacity: 0, scale: 0.95, y: 15 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95, y: 15 }}
-                className="relative bg-[#051812] text-white border border-emerald-800/40 rounded-[24px] shadow-2xl p-6 w-full max-w-sm z-[70] space-y-4 text-left overflow-hidden"
+                className="relative bg-[#111827] text-white border border-blue-800/40 rounded-[24px] shadow-2xl p-6 w-full max-w-sm z-[70] space-y-4 text-left overflow-hidden"
               >
                 {/* Cool vector background */}
-                <div className="absolute inset-0 pointer-events-none opacity-[0.05] text-emerald-400">
+                <div className="absolute inset-0 pointer-events-none opacity-[0.05] text-blue-400">
                   <svg width="100%" height="100%" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <circle cx="85%" cy="15%" r="50" stroke="currentColor" strokeWidth="1.2" />
                     <circle cx="90%" cy="20%" r="80" stroke="currentColor" strokeWidth="1" strokeDasharray="3 3" />
@@ -1955,8 +2013,8 @@ function AppContent() {
                   </svg>
                 </div>
 
-                <div className="flex justify-between items-center pb-2 border-b border-emerald-900/10 relative z-10">
-                  <h3 className="text-sm font-bold text-emerald-300 uppercase tracking-wider">Account Details</h3>
+                <div className="flex justify-between items-center pb-2 border-b border-slate-800/10 relative z-10">
+                  <h3 className="text-sm font-bold text-blue-300 uppercase tracking-wider">Account Details</h3>
                   <button 
                     onClick={() => setShowAdminAccountModal(false)} 
                     className="text-slate-400 hover:text-white font-bold text-sm cursor-pointer border-0 bg-transparent"
@@ -1967,26 +2025,26 @@ function AppContent() {
                 
                 <div className="space-y-3 font-sans text-xs relative z-10">
                   <div>
-                    <span className="text-emerald-500/80 font-mono text-[9px] block uppercase">User ID</span>
-                    <span className="text-emerald-100 font-mono text-[10px] bg-emerald-950/40 border border-emerald-900/30 px-2 py-1 rounded block truncate">{currentUser?.uid}</span>
+                    <span className="text-blue-500/80 font-mono text-[9px] block uppercase">User ID</span>
+                    <span className="text-blue-100 font-mono text-[10px] bg-slate-900/40 border border-slate-800/30 px-2 py-1 rounded block truncate">{currentUser?.uid}</span>
                   </div>
                   <div>
-                    <span className="text-emerald-500/80 font-mono text-[9px] block uppercase">Display Name</span>
-                    <span className="text-emerald-300 font-bold text-sm">{currentUser?.displayName}</span>
+                    <span className="text-blue-500/80 font-mono text-[9px] block uppercase">Display Name</span>
+                    <span className="text-blue-300 font-bold text-sm">{currentUser?.displayName}</span>
                   </div>
                   <div>
-                    <span className="text-emerald-500/80 font-mono text-[9px] block uppercase">Email Address</span>
-                    <span className="text-emerald-100 font-medium">{currentUser?.email}</span>
+                    <span className="text-blue-500/80 font-mono text-[9px] block uppercase">Email Address</span>
+                    <span className="text-blue-100 font-medium">{currentUser?.email}</span>
                   </div>
                   <div>
-                    <span className="text-emerald-500/80 font-mono text-[9px] block uppercase">Access Role</span>
-                    <span className="inline-block bg-emerald-500/20 text-emerald-300 font-mono px-2 py-0.5 rounded font-bold border border-emerald-500/30">{currentUser?.role?.toUpperCase()}</span>
+                    <span className="text-blue-500/80 font-mono text-[9px] block uppercase">Access Role</span>
+                    <span className="inline-block bg-blue-500/20 text-blue-300 font-mono px-2 py-0.5 rounded font-bold border border-blue-500/30">{currentUser?.role?.toUpperCase()}</span>
                   </div>
                 </div>
                 
                 <button
                   onClick={() => setShowAdminAccountModal(false)}
-                  className="w-full py-2.5 bg-[#0F5132] hover:bg-emerald-700 text-white text-xs font-bold rounded-xl cursor-pointer mt-2 relative z-10 transition-colors border-0"
+                  className="w-full py-2.5 bg-[#1E88E5] hover:bg-blue-700 text-white text-xs font-bold rounded-xl cursor-pointer mt-2 relative z-10 transition-colors border-0"
                 >
                   Close Settings
                 </button>
@@ -2010,10 +2068,10 @@ function AppContent() {
                 initial={{ opacity: 0, scale: 0.95, y: 15 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95, y: 15 }}
-                className="relative bg-[#051812] text-white border border-emerald-800/40 rounded-[24px] shadow-2xl p-6 w-full max-w-sm z-[70] space-y-3 text-left overflow-hidden"
+                className="relative bg-[#111827] text-white border border-blue-800/40 rounded-[24px] shadow-2xl p-6 w-full max-w-sm z-[70] space-y-3 text-left overflow-hidden"
               >
                 {/* Cool vector background */}
-                <div className="absolute inset-0 pointer-events-none opacity-[0.05] text-emerald-400">
+                <div className="absolute inset-0 pointer-events-none opacity-[0.05] text-blue-400">
                   <svg width="100%" height="100%" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <circle cx="85%" cy="15%" r="50" stroke="currentColor" strokeWidth="1.2" />
                     <circle cx="90%" cy="20%" r="80" stroke="currentColor" strokeWidth="1" strokeDasharray="3 3" />
@@ -2021,8 +2079,8 @@ function AppContent() {
                   </svg>
                 </div>
 
-                <div className="flex justify-between items-center pb-2 border-b border-emerald-900/10 relative z-10">
-                  <h3 className="text-sm font-bold text-emerald-300 uppercase tracking-wider">About Our Workspace</h3>
+                <div className="flex justify-between items-center pb-2 border-b border-slate-800/10 relative z-10">
+                  <h3 className="text-sm font-bold text-blue-300 uppercase tracking-wider">About Our Workspace</h3>
                   <button 
                     onClick={() => setShowAdminAboutModal(false)} 
                     className="text-slate-400 hover:text-white font-bold text-sm cursor-pointer border-0 bg-transparent"
@@ -2031,16 +2089,16 @@ function AppContent() {
                   </button>
                 </div>
                 
-                <p className="text-[11px] leading-relaxed font-sans text-emerald-100 relative z-10">
+                <p className="text-[11px] leading-relaxed font-sans text-blue-100 relative z-10">
                   Valley Reigns is a full-cycle recruitment management workspace designed to unite ambitious talent with forward-thinking organizations.
                 </p>
-                <p className="text-[11px] leading-relaxed font-sans font-semibold text-emerald-400 relative z-10">
+                <p className="text-[11px] leading-relaxed font-sans font-semibold text-blue-400 relative z-10">
                   Recruitment for everyone — streamlined, collaborative, and secure.
                 </p>
                 
                 <button
                   onClick={() => setShowAdminAboutModal(false)}
-                  className="w-full py-2.5 bg-[#0F5132] hover:bg-emerald-700 text-white text-xs font-bold rounded-xl cursor-pointer mt-2 relative z-10 transition-colors border-0"
+                  className="w-full py-2.5 bg-[#1E88E5] hover:bg-blue-700 text-white text-xs font-bold rounded-xl cursor-pointer mt-2 relative z-10 transition-colors border-0"
                 >
                   Confirm
                 </button>

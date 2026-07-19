@@ -4,6 +4,7 @@ import { JobCard } from "./JobCard";
 import { JobCardSkeleton } from "./JobCardSkeleton";
 import { getJobs, subscribeToJobs } from "../lib/services";
 import { Job } from "../types";
+import { getCategoryImage, getCategoryThemeColor } from "../lib/categories";
 import { 
   Search, 
   Briefcase, 
@@ -56,12 +57,57 @@ const getCategoryIcon = (categoryName: string) => {
   }
 };
 
+export const getCategoryStyles = (catName: string) => {
+  const name = catName.trim().toLowerCase();
+  
+  if (name === "all") {
+    return {
+      primary: "#334155",
+      bgSelected: "bg-slate-100 text-slate-900 border-slate-400 font-semibold",
+      bgUnselected: "bg-slate-800 text-white border-slate-800 hover:bg-slate-700/90",
+      iconBgSelected: "bg-slate-800 text-white",
+      iconBgUnselected: "bg-white text-slate-800",
+      style: undefined
+    };
+  }
+  
+  if (name === "new") {
+    return {
+      primary: "#1E88E5",
+      bgSelected: "bg-blue-50 text-blue-950 border-blue-300 font-semibold",
+      bgUnselected: "bg-[#1E88E5] text-white border-[#1E88E5] hover:bg-blue-600",
+      iconBgSelected: "bg-[#1E88E5] text-white",
+      iconBgUnselected: "bg-white text-[#1E88E5]",
+      style: undefined
+    };
+  }
+
+  const categoryColor = getCategoryThemeColor(catName);
+  return {
+    primary: categoryColor,
+    bgSelected: "bg-slate-50 text-slate-900 border-slate-300 font-semibold",
+    bgUnselected: "text-white hover:opacity-95",
+    iconBgSelected: "bg-white text-slate-800",
+    iconBgUnselected: "bg-white/20 text-white",
+    style: {
+      backgroundColor: categoryColor,
+      borderColor: categoryColor
+    }
+  };
+};
+
 export const SeekerDashboardView: React.FC = () => {
   const { currentUser } = useAuth();
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
+  const [visibleCount, setVisibleCount] = useState(10);
+  const sentinelRef = React.useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setVisibleCount(10);
+  }, [selectedCategory, searchQuery]);
 
   useEffect(() => {
     setLoading(true);
@@ -73,8 +119,7 @@ export const SeekerDashboardView: React.FC = () => {
   }, []);
 
   // Dynamically derive categories from current listings in database
-  const uniqueCategoryNames: string[] = Array.from(new Set<string>(jobs.map(j => (j.category as string || "")).filter(Boolean)))
-    .filter((name: string) => !["Tech", "Healthcare", "Finance", "AI & Analytics", "New"].includes(name));
+  const uniqueCategoryNames: string[] = Array.from(new Set<string>(jobs.map(j => (j.category as string || "")).filter(Boolean)));
 
   const CATEGORIES = [
     { 
@@ -86,26 +131,6 @@ export const SeekerDashboardView: React.FC = () => {
       name: "New", 
       label: "New", 
       icon: Clock,
-    },
-    { 
-      name: "Tech", 
-      label: "Technology", 
-      icon: Cpu,
-    },
-    { 
-      name: "Healthcare", 
-      label: "Medical & Health", 
-      icon: HeartPulse,
-    },
-    { 
-      name: "Finance", 
-      label: "Money & Finance", 
-      icon: Banknote,
-    },
-    { 
-      name: "AI & Analytics", 
-      label: "Smart AI Systems", 
-      icon: Sparkles,
     },
     ...uniqueCategoryNames.map(name => ({
       name,
@@ -147,23 +172,29 @@ export const SeekerDashboardView: React.FC = () => {
     return list;
   })();
 
+  useEffect(() => {
+    if (!sentinelRef.current) return;
+    const observer = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting) {
+        setVisibleCount((prev) => prev + 10);
+      }
+    }, {
+      rootMargin: "250px"
+    });
+    observer.observe(sentinelRef.current);
+    return () => observer.disconnect();
+  }, [sentinelRef, filteredJobs.length]);
+
+  const displayedJobs = filteredJobs.slice(0, visibleCount);
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-10 pb-8 sm:pb-16 space-y-6">
       
       {/* Personalized Welcome Header Section */}
       <section className="space-y-4 text-slate-900 border-b border-slate-100 pb-3 text-left md:text-center md:flex md:flex-col md:items-center">
-        <div className="flex items-center gap-2">
-          <div className="p-1.5 bg-[#0F5132]/10 text-[#0F5132] rounded-lg">
-            <Sparkle className="w-4 h-4" />
-          </div>
-          <span className="text-xs font-mono font-bold text-[#0F5132] uppercase tracking-wider">
-            Verified Job Seeker Dashboard
-          </span>
-        </div>
-        
         <div>
           <h1 className="text-3xl sm:text-4xl font-display font-black tracking-tight text-slate-900">
-            Welcome back, <span className="text-[#0F5132]">{currentUser?.displayName || "Seeker"}</span>!
+            Welcome back, <span className="text-[#1E88E5]">{currentUser?.displayName || "Seeker"}</span>!
           </h1>
         </div>
       </section>
@@ -171,8 +202,8 @@ export const SeekerDashboardView: React.FC = () => {
       {/* Main Discover Workspace Section */}
       <div id="jobs-explore" className="space-y-6 pt-0">
         {/* Search Input bar - Hover & Focus scale / shadow enhancements */}
-        <div className="relative max-w-lg bg-white border border-[#0F5132] p-1.5 rounded-[24px] shadow-[0_16px_36px_-6px_rgba(15,81,50,0.03)] hover:border-[#0F5132] hover:shadow-[0_16px_40px_rgba(15,81,50,0.06)] focus-within:ring-4 focus-within:ring-[#0F5132]/10 focus-within:scale-[1.015] transition-all duration-300 flex items-center gap-2 md:mx-auto">
-          <Search className="w-4.5 h-4.5 text-[#0F5132] ml-3 shrink-0" />
+        <div className="relative max-w-lg bg-white border border-[#1E88E5] p-1.5 rounded-[24px] shadow-[0_16px_36px_-6px_rgba(30, 136, 229, 0.03)] hover:border-[#1E88E5] hover:shadow-[0_16px_40px_rgba(30, 136, 229, 0.06)] focus-within:ring-4 focus-within:ring-[#1E88E5]/10 focus-within:scale-[1.015] transition-all duration-300 flex items-center gap-2 md:mx-auto">
+          <Search className="w-4.5 h-4.5 text-[#1E88E5] ml-3 shrink-0" />
           <input
             type="text"
             placeholder="Type any job title, skill, or company name..."
@@ -180,7 +211,7 @@ export const SeekerDashboardView: React.FC = () => {
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full py-1 bg-transparent text-xs font-medium focus:outline-none text-slate-800 placeholder-slate-400"
           />
-          <span className="text-[10px] font-mono font-bold bg-[#FAFDFB] border border-emerald-150 text-[#0F5132] px-3 py-1.5 rounded-xl uppercase tracking-wider shrink-0 hidden sm:inline">
+          <span className="text-[10px] font-mono font-bold bg-[#FAFDFB] border border-blue-200 text-[#1E88E5] px-3 py-1.5 rounded-xl uppercase tracking-wider shrink-0 hidden sm:inline">
             {filteredJobs.length} Matches
           </span>
         </div>
@@ -196,30 +227,52 @@ export const SeekerDashboardView: React.FC = () => {
             {CATEGORIES.map((cat) => {
               const IconComp = cat.icon;
               const isSelected = selectedCategory === cat.name;
+              const styles = getCategoryStyles(cat.name);
+              const bgImg = getCategoryImage(cat.name);
               return (
                 <motion.button
                   whileHover={{ 
                     scale: 1.05, 
                     y: -2,
-                    boxShadow: isSelected ? "none" : "0 8px 20px -8px rgba(11, 60, 45, 0.2)"
+                    boxShadow: isSelected ? `0 8px 20px -8px ${styles.primary}33` : "0 8px 20px -8px rgba(0, 0, 0, 0.15)"
                   }}
                   whileTap={{ scale: 0.95 }}
                   key={cat.name}
                   onClick={() => setSelectedCategory(isSelected ? "All" : cat.name)}
-                  className={`w-[20%] min-w-[80px] sm:w-auto sm:flex-1 flex-shrink-0 flex flex-col items-center justify-center p-2 sm:p-2.5 rounded-lg cursor-pointer transition-all snap-start select-none border text-center space-y-1.5 ${
-                    isSelected
-                      ? "bg-[#0B3C2D] text-white border-[#0B3C2D] shadow-none"
-                      : "bg-white text-[#0B3C2D] border-[#0B3C2D]/40 hover:bg-slate-50"
-                  }`}
+                  className={`w-[18%] min-w-[80px] sm:w-[9%] sm:min-w-[85px] h-16 sm:h-18 flex-shrink-0 flex flex-col items-center justify-center rounded-xl cursor-pointer transition-all snap-start select-none bg-cover bg-center border text-center relative overflow-hidden group`}
+                  style={{
+                    backgroundImage: `url(${bgImg})`,
+                    borderColor: isSelected ? styles.primary : "rgba(226, 232, 240, 0.2)",
+                    borderWidth: isSelected ? "3px" : "1px"
+                  }}
                 >
-                  <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${
-                    isSelected ? "bg-white text-[#0B3C2D]" : "bg-[#0B3C2D] text-white"
-                  }`}>
-                    <IconComp className="w-3 h-3" />
+                  {/* Category accent color transparent overlay */}
+                  <div 
+                    className={`absolute inset-0 transition-all duration-200 z-0 ${
+                      isSelected 
+                        ? "opacity-85" 
+                        : "opacity-65 group-hover:opacity-45"
+                    }`}
+                    style={{
+                      backgroundColor: styles.primary
+                    }}
+                  />
+                  
+                  {/* Overlay content */}
+                  <div className="relative z-10 flex flex-col items-center justify-center space-y-1.5 w-full h-full p-1 text-white">
+                    <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 transition-colors ${
+                      isSelected ? "bg-white text-slate-950 shadow-sm" : "bg-white/20 text-white backdrop-blur-sm"
+                    }`}>
+                      {IconComp ? (
+                        <IconComp className="w-3.5 h-3.5" />
+                      ) : (
+                        <Briefcase className="w-3.5 h-3.5" />
+                      )}
+                    </div>
+                    <span className="text-[9px] sm:text-[11px] font-sans font-black tracking-tight block text-white drop-shadow-sm px-1 line-clamp-2 leading-tight">
+                      {cat.label}
+                    </span>
                   </div>
-                  <span className="text-[9px] sm:text-[11px] font-sans font-extrabold tracking-tight block">
-                    {cat.label}
-                  </span>
                 </motion.button>
               );
             })}
@@ -249,11 +302,18 @@ export const SeekerDashboardView: React.FC = () => {
               </p>
             </div>
           ) : (
-            filteredJobs.map((job) => (
-              <motion.div key={job.id} variants={itemVariants}>
-                <JobCard job={job} />
-              </motion.div>
-            ))
+            <>
+              {displayedJobs.map((job) => (
+                <motion.div key={job.id} variants={itemVariants}>
+                  <JobCard job={job} />
+                </motion.div>
+              ))}
+              {filteredJobs.length > visibleCount && (
+                <div ref={sentinelRef} className="h-14 flex items-center justify-center pt-4">
+                  <div className="w-6 h-6 border-2 border-[#1E88E5] border-t-transparent rounded-full animate-spin" />
+                </div>
+              )}
+            </>
           )}
         </motion.div>
       </div>

@@ -2,7 +2,7 @@ import React from "react";
 
 export const JobCardSkeleton: React.FC = () => {
   return (
-    <div className="bg-white border border-[#0B3C2D]/40 rounded-2xl overflow-hidden shadow-[0_4px_20px_rgba(0,0,0,0.03),0_2px_8px_rgba(0,0,0,0.02)] p-4 sm:p-5 relative select-none">
+    <div className="bg-white border border-[#111827]/40 rounded-2xl overflow-hidden shadow-[0_4px_20px_rgba(0,0,0,0.03),0_2px_8px_rgba(0,0,0,0.02)] p-4 sm:p-5 relative select-none">
       <div className="space-y-2.5 w-full pr-28 sm:pr-32 text-left">
         {/* Title skeleton */}
         <div className="h-5 animate-shimmer rounded-md w-[70%]" />

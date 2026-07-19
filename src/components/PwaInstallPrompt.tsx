@@ -125,7 +125,7 @@ export const PwaInstallPrompt: React.FC = () => {
             <div className="space-y-3">
               <div className="flex items-center gap-3">
                 {/* App Logo Emblem */}
-                <div className="w-10 h-10 rounded-xl bg-emerald-50 text-[#0F5132] flex items-center justify-center border border-emerald-100 shrink-0">
+                <div className="w-10 h-10 rounded-xl bg-blue-50 text-[#1E88E5] flex items-center justify-center border border-blue-100 shrink-0">
                   <Smartphone className="w-5 h-5" />
                 </div>
                 
@@ -147,7 +147,7 @@ export const PwaInstallPrompt: React.FC = () => {
                 </button>
                 <button
                   onClick={handleInstallClick}
-                  className="flex-1 py-2 bg-[#0F5132] hover:bg-[#0c4027] active:bg-[#0a3520] text-white rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center justify-center gap-1.5 group"
+                  className="flex-1 py-2 bg-[#1E88E5] hover:bg-[#1565C0] active:bg-[#0a3520] text-white rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center justify-center gap-1.5 group"
                 >
                   <Download className="w-3.5 h-3.5 group-hover:scale-110 transition-transform" />
                   <span>Install</span>
@@ -158,7 +158,7 @@ export const PwaInstallPrompt: React.FC = () => {
             // iOS share prompt guidance
             <div className="space-y-3">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-emerald-50 text-[#0F5132] flex items-center justify-center border border-emerald-100 shrink-0">
+                <div className="w-10 h-10 rounded-xl bg-blue-50 text-[#1E88E5] flex items-center justify-center border border-blue-100 shrink-0">
                   <Monitor className="w-5 h-5" />
                 </div>
                 <div className="flex-1 text-left">
@@ -169,13 +169,13 @@ export const PwaInstallPrompt: React.FC = () => {
               {/* iOS Step Guide */}
               <div className="bg-slate-50 border border-slate-100 rounded-xl p-3 space-y-2 text-left text-xs text-slate-600 leading-normal">
                 <div className="flex items-start gap-2">
-                  <div className="w-4 h-4 rounded-full bg-emerald-100 text-[#0F5132] font-semibold flex items-center justify-center text-[10px] shrink-0 mt-0.5">1</div>
+                  <div className="w-4 h-4 rounded-full bg-blue-100 text-[#1E88E5] font-semibold flex items-center justify-center text-[10px] shrink-0 mt-0.5">1</div>
                   <p>
                     Tap <strong className="text-slate-800">Share</strong> in Safari (<span className="bg-white border border-slate-200 px-1 py-0.5 rounded text-[11px]">⎋</span> at bottom).
                   </p>
                 </div>
                 <div className="flex items-start gap-2">
-                  <div className="w-4 h-4 rounded-full bg-emerald-100 text-[#0F5132] font-semibold flex items-center justify-center text-[10px] shrink-0 mt-0.5">2</div>
+                  <div className="w-4 h-4 rounded-full bg-blue-100 text-[#1E88E5] font-semibold flex items-center justify-center text-[10px] shrink-0 mt-0.5">2</div>
                   <p>
                     Tap <strong className="text-slate-800">Add to Home Screen</strong> (<span className="bg-white border border-slate-200 px-1 py-0.5 rounded text-[11px]">＋</span>).
                   </p>
@@ -191,7 +191,7 @@ export const PwaInstallPrompt: React.FC = () => {
                 </button>
                 <button
                   onClick={handleDismiss}
-                  className="w-full py-2 bg-[#0F5132] hover:bg-[#0c4027] text-white rounded-lg text-xs font-semibold transition-all cursor-pointer"
+                  className="w-full py-2 bg-[#1E88E5] hover:bg-[#1565C0] text-white rounded-lg text-xs font-semibold transition-all cursor-pointer"
                 >
                   Got It
                 </button>

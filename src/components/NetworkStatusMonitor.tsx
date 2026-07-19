@@ -154,9 +154,9 @@ export const NetworkStatusMonitor: React.FC = () => {
       case "online":
       default:
         return {
-          bg: "bg-emerald-50 border-emerald-200/80",
-          text: "text-emerald-800",
-          icon: <Wifi className="w-4 h-4 text-emerald-600" />,
+          bg: "bg-blue-50 border-blue-200/80",
+          text: "text-blue-800",
+          icon: <Wifi className="w-4 h-4 text-blue-600" />,
           title: "Back Online",
           desc: "Connection restored successfully.",
         };
