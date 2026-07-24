@@ -199,12 +199,15 @@ export const ChatInbox: React.FC<ChatInboxProps> = ({ jobsList, searchQuery: ext
     }
   };
 
+  const [sendError, setSendError] = useState<string | null>(null);
+
   // Send Message
   const handleSendMessage = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!activeChatId || !messageInput.trim() || !currentUser || isSending) return;
 
     setIsSending(true);
+    setSendError(null);
     try {
       if (activeConversation && activeConversation.status === "pending") {
         await claimConversation(activeChatId, currentUser.uid, currentUser.displayName);
@@ -212,6 +215,9 @@ export const ChatInbox: React.FC<ChatInboxProps> = ({ jobsList, searchQuery: ext
       }
       await sendChatMessage(activeChatId, "staff", messageInput.trim());
       setMessageInput("");
+    } catch (err: any) {
+      console.error("Failed to send message:", err);
+      setSendError(err?.message || "Failed to deliver message via WhatsApp.");
     } finally {
       setIsSending(false);
     }
@@ -379,9 +385,11 @@ export const ChatInbox: React.FC<ChatInboxProps> = ({ jobsList, searchQuery: ext
                     }`}
                   >
                     <div className="flex items-center justify-between gap-2 mb-1.5">
-                      <span className="text-xs font-mono font-bold text-slate-900 flex items-center gap-1">
-                        <Smartphone className="w-3.5 h-3.5 text-slate-400" />
-                        {conv.customerPhone}
+                      <span className="text-xs font-mono font-bold text-slate-900 flex items-center gap-1 truncate">
+                        <Smartphone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                        {conv.name && conv.name !== conv.customerPhone && !conv.name.startsWith("WhatsApp Customer") 
+                          ? `${conv.name} (${conv.customerPhone})` 
+                          : conv.customerPhone}
                       </span>
                       {activeTab === "available" ? (
                         <span className="h-2 w-2 rounded-full bg-amber-500 animate-ping"></span>
@@ -456,7 +464,9 @@ export const ChatInbox: React.FC<ChatInboxProps> = ({ jobsList, searchQuery: ext
                   </div>
                   <div className="min-w-0 leading-tight">
                     <h4 className="text-sm font-sans font-black text-slate-800 tracking-tight truncate">
-                      {activeConversation.customerPhone}
+                      {activeConversation.name && activeConversation.name !== activeConversation.customerPhone && !activeConversation.name.startsWith("WhatsApp Customer")
+                        ? `${activeConversation.name} (${activeConversation.customerPhone})`
+                        : activeConversation.customerPhone}
                     </h4>
                   </div>
                 </div>
@@ -794,33 +804,51 @@ export const ChatInbox: React.FC<ChatInboxProps> = ({ jobsList, searchQuery: ext
                   }
 
                   return (
-                    <form onSubmit={handleSendMessage} className="flex gap-2">
-                      <input
-                        ref={inputRef}
-                        type="text"
-                        required
-                        value={messageInput}
-                        onChange={(e) => setMessageInput(e.target.value)}
-                        placeholder={exp.isInApp ? "Type in-app message securely..." : "Type WhatsApp dispatch message..."}
-                        className={`w-full px-4 py-3 rounded-xl border text-xs font-sans font-medium focus:outline-none focus:border-[#1E88E5] ${
-                          exp.isUrgent 
-                            ? "border-red-300 bg-red-50/10 focus:border-red-500 animate-[pulse_2s_infinite]" 
-                            : "border-slate-200"
-                        }`}
-                      />
-                      <button
-                        type="submit"
-                        disabled={isSending}
-                        className="px-5 py-3 bg-[#1E88E5] hover:bg-[#1565C0] text-white rounded-xl text-xs font-sans font-extrabold flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm shrink-0 disabled:opacity-75 disabled:cursor-not-allowed"
-                      >
-                        {isSending ? (
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        ) : (
-                          <Send className="w-3.5 h-3.5" />
-                        )}
-                        <span>{isSending ? "Sending..." : "Send"}</span>
-                      </button>
-                    </form>
+                    <div className="space-y-2">
+                      {sendError && (
+                        <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+                            <span>{sendError}</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setSendError(null)}
+                            className="text-red-500 hover:text-red-800 text-xs font-bold"
+                          >
+                            Dismiss
+                          </button>
+                        </div>
+                      )}
+
+                      <form onSubmit={handleSendMessage} className="flex gap-2">
+                        <input
+                          ref={inputRef}
+                          type="text"
+                          required
+                          value={messageInput}
+                          onChange={(e) => { setMessageInput(e.target.value); if (sendError) setSendError(null); }}
+                          placeholder={exp.isInApp ? "Type in-app message securely..." : "Type WhatsApp dispatch message..."}
+                          className={`w-full px-4 py-3 rounded-xl border text-xs font-sans font-medium focus:outline-none focus:border-[#1E88E5] ${
+                            exp.isUrgent 
+                              ? "border-red-300 bg-red-50/10 focus:border-red-500 animate-[pulse_2s_infinite]" 
+                              : "border-slate-200"
+                          }`}
+                        />
+                        <button
+                          type="submit"
+                          disabled={isSending}
+                          className="px-5 py-3 bg-[#1E88E5] hover:bg-[#1565C0] text-white rounded-xl text-xs font-sans font-extrabold flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm shrink-0 disabled:opacity-75 disabled:cursor-not-allowed"
+                        >
+                          {isSending ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <Send className="w-3.5 h-3.5" />
+                          )}
+                          <span>{isSending ? "Sending..." : "Send"}</span>
+                        </button>
+                      </form>
+                    </div>
                   );
                 })()}
               </div>

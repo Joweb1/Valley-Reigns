@@ -1071,8 +1071,11 @@ export async function sendChatMessage(chatId: string, sender: "customer" | "staf
 
   // 1. Memory State Fallback
   let currentMessages: ChatMessage[] = [];
+  let targetPhone: string | null = null;
+
   const conv = memoryStore.conversations[chatId];
   if (conv) {
+    if (conv.customerPhone) targetPhone = conv.customerPhone;
     if ((sender === "customer" || sender === "guest") && (conv.status === "abandoned" || conv.status === "finished")) {
       const routed = await routeToAvailableStaff();
       freshStaffUids = routed.selectedStaffUids;
@@ -1115,6 +1118,7 @@ export async function sendChatMessage(chatId: string, sender: "customer" | "staf
     const docSnap = await getDoc(convRef);
     if (docSnap.exists()) {
       const data = docSnap.data() as Conversation;
+      if (data.customerPhone) targetPhone = data.customerPhone;
       const messagesArray = Array.isArray(data.messages) ? data.messages : [];
       const isFsAbandoned = data.status === "abandoned" || data.status === "finished" || isReinitiated;
 
@@ -1225,18 +1229,29 @@ export async function sendChatMessage(chatId: string, sender: "customer" | "staf
 
   // 4. Outbound WhatsApp Message Dispatch for Staff/System replies
   if ((sender === "staff" || sender === "system") && text) {
-    const isWhatsApp = chatId.startsWith("whatsapp-") || Boolean(conv && conv.customerPhone && (conv.customerPhone.startsWith("+") || /^\d+$/.test(conv.customerPhone)));
-    if (isWhatsApp) {
-      const targetPhone = conv?.customerPhone || chatId.replace("whatsapp-", "");
-      if (targetPhone) {
-        fetch("/api/whatsapp/send", {
+    const phoneToUse = targetPhone || (chatId.startsWith("whatsapp-") ? chatId.replace("whatsapp-", "") : null);
+    const isWhatsApp = chatId.startsWith("whatsapp-") || Boolean(phoneToUse && (phoneToUse.startsWith("+") || /^\d+$/.test(phoneToUse)));
+    
+    if (isWhatsApp && phoneToUse) {
+      try {
+        const res = await fetch("/api/whatsapp/send", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            toPhone: targetPhone,
+            toPhone: phoneToUse,
             text: text
           })
-        }).catch(err => console.warn("[sendChatMessage] Outbound WhatsApp dispatch failed:", err));
+        });
+        const resData = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          console.warn("[sendChatMessage] Outbound WhatsApp dispatch failed:", resData);
+          throw new Error(resData.error || "Failed to deliver message via WhatsApp.");
+        } else {
+          console.log("[sendChatMessage] Outbound WhatsApp message delivered successfully to", phoneToUse);
+        }
+      } catch (err: any) {
+        console.error("[sendChatMessage] WhatsApp dispatch error:", err);
+        throw err;
       }
     }
   }

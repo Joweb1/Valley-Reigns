@@ -6,11 +6,12 @@ import { initializeApp } from "firebase/app";
 import { getFirestore, doc, getDoc, updateDoc, setDoc, collection, getDocs, onSnapshot, deleteDoc } from "firebase/firestore";
 import { getDatabase, ref, set } from "firebase/database";
 import webpush from "web-push";
-import makeWASocket, { useMultiFileAuthState, DisconnectReason } from "@whiskeysockets/baileys";
+import makeWASocket, { useMultiFileAuthState, DisconnectReason, Browsers } from "@whiskeysockets/baileys";
 import QRCode from "qrcode";
 
 const makeWASocketFn = (makeWASocket as any)?.default || makeWASocket;
 const useMultiFileAuthStateFn = (useMultiFileAuthState as any)?.default || useMultiFileAuthState;
+const BrowsersFn = (Browsers as any)?.default || Browsers;
 
 const app = express();
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
@@ -197,10 +198,25 @@ const silentLogger = {
 };
 
 let baileysSocket: any = null;
+let baileysPresenceInterval: NodeJS.Timeout | null = null;
+let baileysReconnectTimer: NodeJS.Timeout | null = null;
 let baileysStatus: "disconnected" | "connecting" | "qr_ready" | "connected" | "error" = "disconnected";
 let baileysQrCode: string | null = null;
+let baileysPairingCode: string | null = null;
 let baileysUserPhone: string | null = null;
 let baileysError: string | null = null;
+
+interface ReceivedWhatsAppMessageLog {
+  id: string;
+  chatId: string;
+  customerPhone: string;
+  name: string;
+  text: string;
+  timestamp: number;
+  provider: "baileys" | "official" | "simulated";
+  status: string;
+}
+const recentReceivedWhatsAppMessages: ReceivedWhatsAppMessageLog[] = [];
 
 async function getActiveWhatsAppMode(): Promise<"official" | "baileys"> {
   try {
@@ -272,12 +288,49 @@ function extractMessageText(msgContent: any): string {
   return "Media or Unsupported Message";
 }
 
-async function syncIncomingBaileysMessage(fromJid: string, name: string, text: string) {
+async function resolveContactName(rawPhone: string, pushName?: string): Promise<string> {
+  const formattedPhone = rawPhone.startsWith("+") ? rawPhone : `+${rawPhone}`;
+  
+  const isGeneric = (str?: string | null) => {
+    if (!str) return true;
+    const s = str.trim();
+    if (!s) return true;
+    if (s === "WhatsApp Customer" || s === "WhatsApp User" || s === "WhatsApp Contact") return true;
+    if (s.startsWith("WhatsApp Customer (") || s === formattedPhone || s === rawPhone) return true;
+    return false;
+  };
+
+  // 1. If pushName is a real custom name, preference pushName
+  if (!isGeneric(pushName)) {
+    return pushName!.trim();
+  }
+
+  // 2. Otherwise check if a contact already exists in Firestore contacts collection with a real name
   try {
-    const rawPhone = fromJid.split("@")[0].split(":")[0].replace(/[^0-9]/g, "");
+    const contactRef = doc(db, "contacts", formattedPhone.replace(/[^0-9+]/g, ""));
+    const contactSnap = await getDoc(contactRef);
+    if (contactSnap.exists()) {
+      const cData = contactSnap.data();
+      if (!isGeneric(cData.name)) {
+        return cData.name;
+      }
+    }
+  } catch (e) {
+    // ignore
+  }
+
+  return formattedPhone;
+}
+
+async function syncIncomingBaileysMessage(fromJid: string, name: string, text: string, provider: "baileys" | "official" | "simulated" = "baileys") {
+  try {
+    let rawPhone = fromJid.split("@")[0].split(":")[0].replace(/[^0-9]/g, "");
+    if (lidToPnMap.has(rawPhone)) {
+      rawPhone = lidToPnMap.get(rawPhone)!;
+    }
     if (!rawPhone || rawPhone.length < 5) return;
 
-    const formattedPhone = rawPhone.startsWith("+") ? rawPhone : `+${rawPhone}`;
+    const formattedPhone = `+${rawPhone}`;
     const chatId = `whatsapp-${rawPhone}`;
     const convRef = doc(db, "conversations", chatId);
     const docSnap = await getDoc(convRef);
@@ -288,11 +341,20 @@ async function syncIncomingBaileysMessage(fromJid: string, name: string, text: s
       timestamp: Date.now()
     };
 
+    let resolvedName = await resolveContactName(rawPhone, name);
+
     if (docSnap.exists()) {
       const currentData = docSnap.data();
       const messages = Array.isArray(currentData.messages) ? currentData.messages : [];
       
+      const isGenericName = (str?: string) => !str || str === "WhatsApp Customer" || str.startsWith("WhatsApp Customer (") || str === formattedPhone || str === rawPhone;
+      
+      if (!isGenericName(currentData.name) && isGenericName(name)) {
+        resolvedName = currentData.name;
+      }
+      
       const updateData: any = {
+        name: resolvedName,
         text: text,
         lastMessageAt: Date.now(),
         messages: [...messages, newMessage]
@@ -307,11 +369,10 @@ async function syncIncomingBaileysMessage(fromJid: string, name: string, text: s
 
       await updateDoc(convRef, updateData);
     } else {
-      const displayName = name && name !== "WhatsApp User" ? `${name} (${formattedPhone})` : formattedPhone;
       await setDoc(convRef, {
         chatId: chatId,
         customerPhone: formattedPhone,
-        name: displayName,
+        name: resolvedName,
         category: "WhatsApp Inquiry",
         text: text,
         status: "pending",
@@ -323,10 +384,144 @@ async function syncIncomingBaileysMessage(fromJid: string, name: string, text: s
       });
     }
 
-    console.log(`[Baileys Message Sync] Successfully routed incoming message from ${formattedPhone} (${name}) -> Chat ${chatId}`);
+    // Auto save/update contact record
+    try {
+      const contactRef = doc(db, "contacts", formattedPhone.replace(/[^0-9+]/g, ""));
+      await setDoc(contactRef, {
+        id: formattedPhone.replace(/[^0-9+]/g, ""),
+        customerPhone: formattedPhone,
+        name: resolvedName,
+        lastJobTitle: "WhatsApp Inquiry",
+        lastSeenAt: Date.now()
+      }, { merge: true });
+    } catch (e) {}
+
+    // Append to live inspector buffer
+    recentReceivedWhatsAppMessages.unshift({
+      id: "msg-" + Date.now() + "-" + Math.random().toString(36).substring(2, 7),
+      chatId,
+      customerPhone: formattedPhone,
+      name: resolvedName,
+      text,
+      timestamp: Date.now(),
+      provider,
+      status: "pending"
+    });
+    if (recentReceivedWhatsAppMessages.length > 50) {
+      recentReceivedWhatsAppMessages.pop();
+    }
+
+    console.log(`[Baileys Message Sync] Successfully routed incoming message from ${formattedPhone} (${resolvedName}) -> Chat ${chatId}`);
   } catch (err) {
     console.error("[Baileys Message Sync Error]:", err);
   }
+}
+
+const lidToPnMap = new Map<string, string>([
+  ["258793304776823", "2348145348665"]
+]);
+
+async function checkAndMigrateLidConversations() {
+  try {
+    for (const [lidNum, realPn] of lidToPnMap.entries()) {
+      if (lidNum === realPn) continue;
+      const lidConvRef = doc(db, "conversations", `whatsapp-${lidNum}`);
+      const lidSnap = await getDoc(lidConvRef);
+      if (lidSnap.exists()) {
+        const lidData = lidSnap.data();
+        const lidMsgs = Array.isArray(lidData.messages) ? lidData.messages : [];
+        
+        const realConvRef = doc(db, "conversations", `whatsapp-${realPn}`);
+        const realSnap = await getDoc(realConvRef);
+        
+        if (realSnap.exists()) {
+          const realData = realSnap.data();
+          const realMsgs = Array.isArray(realData.messages) ? realData.messages : [];
+          const allMsgs = [...lidMsgs, ...realMsgs].sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+          await updateDoc(realConvRef, {
+            messages: allMsgs,
+            text: allMsgs[allMsgs.length - 1]?.text || realData.text || "",
+            lastMessageAt: Math.max(lidData.lastMessageAt || 0, realData.lastMessageAt || 0)
+          });
+        } else {
+          await setDoc(realConvRef, {
+            ...lidData,
+            chatId: `whatsapp-${realPn}`,
+            customerPhone: `+${realPn}`
+          });
+        }
+        await deleteDoc(lidConvRef);
+        console.log(`[LID Auto-Migrate] Successfully migrated whatsapp-${lidNum} -> whatsapp-${realPn}`);
+      }
+    }
+  } catch (err) {
+    console.warn("[LID Auto-Migrate Error]:", err);
+  }
+}
+
+function extractBestPhoneJid(msg: any): string {
+  const candidates: string[] = [
+    msg.key?.remoteJidAlt,
+    msg.key?.participantAlt,
+    msg.key?.remoteJid,
+    msg.key?.participant,
+    msg.participant,
+    msg.sender,
+    msg.key?.user
+  ].filter((j) => typeof j === "string" && j.length > 0);
+
+  // Auto record LID -> PN mapping if both exist in message envelope
+  const lidJid = candidates.find((c) => c.endsWith("@lid"));
+  const pnJid = candidates.find((c) => c.endsWith("@s.whatsapp.net"));
+  if (lidJid && pnJid) {
+    const lidNum = lidJid.split("@")[0].split(":")[0].replace(/[^0-9]/g, "");
+    const pnNum = pnJid.split("@")[0].split(":")[0].replace(/[^0-9]/g, "");
+    if (lidNum && pnNum && lidNum !== pnNum) {
+      lidToPnMap.set(lidNum, pnNum);
+      lidToPnMap.set(lidJid, pnJid);
+      console.log(`[LID Mapper] Dynamic mapping learned: LID ${lidNum} -> Phone ${pnNum}`);
+    }
+  }
+
+  // 1. First priority: any candidate JID ending with @s.whatsapp.net (and NOT @lid)
+  for (const cand of candidates) {
+    if (cand.endsWith("@s.whatsapp.net") && !cand.endsWith("@lid")) {
+      return cand;
+    }
+  }
+
+  // 2. Second priority: check lidToPnMap if candidate is @lid
+  for (const cand of candidates) {
+    const raw = cand.split("@")[0].split(":")[0].replace(/[^0-9]/g, "");
+    if (lidToPnMap.has(raw)) {
+      const mapped = lidToPnMap.get(raw)!;
+      return `${mapped}@s.whatsapp.net`;
+    }
+    if (lidToPnMap.has(cand)) {
+      return lidToPnMap.get(cand)!;
+    }
+  }
+
+  return candidates[0] || msg.key?.remoteJid || "";
+}
+
+function normalizeWhatsAppPhone(rawInput: string): string {
+  let clean = String(rawInput || "").replace(/[^0-9]/g, "");
+  if (lidToPnMap.has(clean)) {
+    clean = lidToPnMap.get(clean)!;
+  }
+  // Handle Nigerian local number format starting with 0 (e.g. 080..., 070..., 090..., 081..., 091...)
+  if (/^0[789][01]\d{8}$/.test(clean)) {
+    clean = "234" + clean.substring(1);
+  }
+  // Handle cases where user entered country code + leading zero (e.g. 234080... or 4407...)
+  if (clean.startsWith("2340") && clean.length === 14) {
+    clean = "234" + clean.substring(4);
+  }
+  if (clean.startsWith("440") && clean.length === 13) {
+    clean = "44" + clean.substring(3);
+  }
+  return clean;
 }
 
 async function initBaileysSocket(forceReconnect = false) {
@@ -335,31 +530,60 @@ async function initBaileysSocket(forceReconnect = false) {
     return;
   }
 
-  // Close existing socket if forced
-  if (baileysSocket && forceReconnect) {
-    try {
-      baileysSocket.end(undefined);
-    } catch (e) {}
+  if (baileysPresenceInterval) {
+    clearInterval(baileysPresenceInterval);
+    baileysPresenceInterval = null;
+  }
+
+  if (baileysReconnectTimer) {
+    clearTimeout(baileysReconnectTimer);
+    baileysReconnectTimer = null;
+  }
+
+  baileysStatus = "connecting";
+  baileysError = null;
+  baileysQrCode = null;
+
+  // Safely detach listeners and end previous socket if forced or replacing
+  if (baileysSocket) {
+    const oldSock = baileysSocket;
     baileysSocket = null;
+    try {
+      if (oldSock.ev && typeof oldSock.ev.removeAllListeners === "function") {
+        oldSock.ev.removeAllListeners("connection.update");
+        oldSock.ev.removeAllListeners("creds.update");
+        oldSock.ev.removeAllListeners("messages.upsert");
+      }
+      oldSock.end(undefined);
+    } catch (e) {}
   }
 
   try {
-    baileysStatus = "connecting";
-    baileysError = null;
-    baileysQrCode = null;
-
     if (!fs.existsSync(BAILEYS_AUTH_DIR)) {
       fs.mkdirSync(BAILEYS_AUTH_DIR, { recursive: true });
     }
 
     const { state, saveCreds } = await useMultiFileAuthStateFn(BAILEYS_AUTH_DIR);
 
+    // Note: WhatsApp Pairing Code requires standard WhatsApp Web browser signature (e.g. Ubuntu / Chrome)
+    const browserTuple = BrowsersFn && typeof BrowsersFn.ubuntu === "function" 
+      ? BrowsersFn.ubuntu("Chrome") 
+      : ["Ubuntu", "Chrome", "20.0.04"];
+
     const sock = makeWASocketFn({
       auth: state,
       logger: silentLogger as any,
       printQRInTerminal: false,
-      browser: ["Valley Reigns Recruiting", "Chrome", "1.0.0"],
-      syncFullHistory: false
+      browser: browserTuple,
+      syncFullHistory: false,
+      markOnlineOnConnect: true,
+      connectTimeoutMs: 60000,
+      defaultQueryTimeoutMs: 60000,
+      keepAliveIntervalMs: 25000,
+      retryRequestDelayMs: 250,
+      getMessage: async (key: any) => {
+        return { conversation: "" };
+      }
     });
 
     baileysSocket = sock;
@@ -382,10 +606,39 @@ async function initBaileysSocket(forceReconnect = false) {
       if (connection === "open") {
         baileysStatus = "connected";
         baileysQrCode = null;
+        baileysPairingCode = null;
         baileysError = null;
         const userJid = sock.user?.id || "";
         baileysUserPhone = userJid.split("@")[0].split(":")[0] || "Connected";
         console.log(`[Baileys] Successfully connected to WhatsApp Web as +${baileysUserPhone}!`);
+
+        // Send initial 'available' presence update so WhatsApp shows number Online
+        try {
+          await sock.sendPresenceUpdate("available");
+          console.log("[Baileys] Dispatched initial 'available' presence update.");
+        } catch (presErr) {
+          console.warn("[Baileys] Warning sending initial presence update:", presErr);
+        }
+
+        // Keep presence 'available' with a safe heartbeat interval
+        if (baileysPresenceInterval) {
+          clearInterval(baileysPresenceInterval);
+          baileysPresenceInterval = null;
+        }
+        baileysPresenceInterval = setInterval(async () => {
+          if (baileysSocket === sock && baileysStatus === "connected") {
+            try {
+              await sock.sendPresenceUpdate("available");
+            } catch (e) {
+              // Ignore transient socket presence errors
+            }
+          } else {
+            if (baileysPresenceInterval) {
+              clearInterval(baileysPresenceInterval);
+              baileysPresenceInterval = null;
+            }
+          }
+        }, 120000);
 
         try {
           await setDoc(doc(db, "settings", "whatsapp"), {
@@ -396,7 +649,14 @@ async function initBaileysSocket(forceReconnect = false) {
         } catch (e) {
           console.warn("[Baileys] Failed to update Firestore connected status:", e);
         }
+
+        checkAndMigrateLidConversations().catch(console.error);
       } else if (connection === "close") {
+        if (baileysPresenceInterval) {
+          clearInterval(baileysPresenceInterval);
+          baileysPresenceInterval = null;
+        }
+
         const statusCode = lastDisconnect?.error?.output?.statusCode;
         const errMessage = lastDisconnect?.error?.message || String(lastDisconnect?.error || "");
         const credsExist = fs.existsSync(path.join(BAILEYS_AUTH_DIR, "creds.json"));
@@ -404,7 +664,10 @@ async function initBaileysSocket(forceReconnect = false) {
         const isRestartRequired = statusCode === DisconnectReason?.restartRequired;
         const isQrExpired = !credsExist && (errMessage.includes("QR refs attempts ended") || errMessage.includes("timed out"));
 
-        baileysSocket = null;
+        // Only clear baileysSocket if THIS closed socket is still the active one
+        if (baileysSocket === sock) {
+          baileysSocket = null;
+        }
 
         if (isLoggedOut) {
           baileysStatus = "disconnected";
@@ -428,9 +691,45 @@ async function initBaileysSocket(forceReconnect = false) {
           baileysQrCode = null;
           const delay = isRestartRequired ? 500 : 1500;
           console.log(`[Baileys] Handshake socket closed (code ${statusCode}). Reconnecting authenticated session in ${delay}ms...`);
-          setTimeout(() => {
+          
+          if (baileysReconnectTimer) {
+            clearTimeout(baileysReconnectTimer);
+            baileysReconnectTimer = null;
+          }
+          baileysReconnectTimer = setTimeout(() => {
+            baileysReconnectTimer = null;
             initBaileysSocket(true).catch(console.error);
           }, delay);
+        }
+      }
+    });
+
+    sock.ev.on("contacts.upsert", (contacts: any[]) => {
+      if (Array.isArray(contacts)) {
+        for (const c of contacts) {
+          if (c.lid && c.id && c.id.endsWith("@s.whatsapp.net")) {
+            const lidNum = c.lid.split("@")[0].split(":")[0].replace(/[^0-9]/g, "");
+            const pnNum = c.id.split("@")[0].split(":")[0].replace(/[^0-9]/g, "");
+            if (lidNum && pnNum && lidNum !== pnNum) {
+              lidToPnMap.set(lidNum, pnNum);
+              lidToPnMap.set(c.lid, c.id);
+            }
+          }
+        }
+      }
+    });
+
+    sock.ev.on("contacts.update", (updates: any[]) => {
+      if (Array.isArray(updates)) {
+        for (const c of updates) {
+          if (c.lid && c.id && c.id.endsWith("@s.whatsapp.net")) {
+            const lidNum = c.lid.split("@")[0].split(":")[0].replace(/[^0-9]/g, "");
+            const pnNum = c.id.split("@")[0].split(":")[0].replace(/[^0-9]/g, "");
+            if (lidNum && pnNum && lidNum !== pnNum) {
+              lidToPnMap.set(lidNum, pnNum);
+              lidToPnMap.set(c.lid, c.id);
+            }
+          }
         }
       }
     });
@@ -440,11 +739,13 @@ async function initBaileysSocket(forceReconnect = false) {
         if (Array.isArray(m.messages)) {
           for (const msg of m.messages) {
             if (!msg.message || msg.key.fromMe) continue;
-            const jid = msg.key.remoteJid || msg.key.participant || "";
+            const rawJid = msg.key.remoteJid || msg.key.participant || "";
 
             // Exempt Groups (@g.us), Communities (@g.us), Broadcasts (@broadcast), and Newsletters/Channels (@newsletter)
-            const isExempt = jid.endsWith("@g.us") || jid.includes("@g.us") || jid.includes("@broadcast") || jid.includes("@newsletter");
+            const isExempt = rawJid.endsWith("@g.us") || rawJid.includes("@g.us") || rawJid.includes("@broadcast") || rawJid.includes("@newsletter");
             if (isExempt) continue;
+
+            const jid = extractBestPhoneJid(msg);
 
             const text = extractMessageText(msg.message);
             if (!text) continue;
@@ -469,8 +770,13 @@ async function initBaileysSocket(forceReconnect = false) {
 }
 
 async function disconnectBaileys() {
+  if (baileysPresenceInterval) {
+    clearInterval(baileysPresenceInterval);
+    baileysPresenceInterval = null;
+  }
   if (baileysSocket) {
     try {
+      await baileysSocket.sendPresenceUpdate("unavailable");
       await baileysSocket.logout();
     } catch (e) {
       console.warn("[Baileys] Error during socket logout:", e);
@@ -501,16 +807,109 @@ async function disconnectBaileys() {
 
 async function sendWhatsAppMessage(toPhone: string, text: string) {
   const mode = await getActiveWhatsAppMode();
-  const cleanedPhone = toPhone.replace(/[^0-9]/g, "");
+  const cleanedPhone = normalizeWhatsAppPhone(toPhone);
+
+  if (!cleanedPhone || cleanedPhone.length < 7) {
+    throw new Error("Invalid phone number format. Please include country code (e.g. 2348012345678).");
+  }
+
+  const dispatchViaBaileys = async (attempt = 1): Promise<any> => {
+    // If socket is not connected, check if saved creds exist and auto-reconnect
+    if (!baileysSocket || baileysStatus !== "connected") {
+      const credsFile = path.join(BAILEYS_AUTH_DIR, "creds.json");
+      if (fs.existsSync(credsFile)) {
+        console.log(`[WhatsApp Dispatch: Baileys] Socket status is '${baileysStatus}'. Attempting auto-reconnect (Attempt ${attempt})...`);
+        await initBaileysSocket(!baileysSocket || baileysStatus === "error" || baileysStatus === "disconnected");
+        let attempts = 0;
+        while ((!baileysSocket || baileysStatus !== "connected") && attempts < 50) {
+          await new Promise((r) => setTimeout(r, 200));
+          attempts++;
+        }
+      }
+    }
+
+    const activeSocket = baileysSocket;
+    if (!activeSocket || baileysStatus !== "connected") {
+      const displayStatus = !activeSocket ? (baileysStatus === "connected" ? "reconnecting" : baileysStatus || "disconnected") : baileysStatus;
+      throw new Error(`Baileys WhatsApp Web is not connected (Current Status: ${displayStatus}). Please ensure your WhatsApp account is paired in Admin Settings.`);
+    }
+
+    let targetJid = `${cleanedPhone}@s.whatsapp.net`;
+    let realCleanPhone = cleanedPhone;
+
+    try {
+      if (typeof activeSocket.onWhatsApp === "function") {
+        const checkResults = await activeSocket.onWhatsApp(cleanedPhone);
+        if (Array.isArray(checkResults) && checkResults.length > 0 && checkResults[0]?.exists && checkResults[0]?.jid) {
+          targetJid = checkResults[0].jid;
+          realCleanPhone = targetJid.split("@")[0].split(":")[0];
+        } else if (cleanedPhone.length > 11) {
+          // If phone number had extra appended device digits (e.g. 232968085889128 -> 23296808588)
+          // Try truncating to standard phone number lengths
+          for (const testLen of [11, 12, 13, 10, 8, 9]) {
+            if (cleanedPhone.length > testLen) {
+              const candidate = cleanedPhone.substring(0, testLen);
+              const candResults = await activeSocket.onWhatsApp(candidate);
+              if (Array.isArray(candResults) && candResults.length > 0 && candResults[0]?.exists && candResults[0]?.jid) {
+                targetJid = candResults[0].jid;
+                realCleanPhone = candidate;
+                console.log(`[WhatsApp Dispatch: Baileys] Successfully resolved corrupted phone +${cleanedPhone} to valid WhatsApp JID ${targetJid}`);
+                
+                // Self-correct corrupted conversation record in Firestore if old chatId/customerPhone had device suffix
+                try {
+                  const oldConvRef = doc(db, "conversations", `whatsapp-${cleanedPhone}`);
+                  const newConvRef = doc(db, "conversations", `whatsapp-${realCleanPhone}`);
+                  const oldSnap = await getDoc(oldConvRef);
+                  if (oldSnap.exists()) {
+                    const data = oldSnap.data();
+                    await setDoc(newConvRef, {
+                      ...data,
+                      chatId: `whatsapp-${realCleanPhone}`,
+                      customerPhone: `+${realCleanPhone}`
+                    }, { merge: true });
+                  }
+                } catch (errCorr) {
+                  console.warn("[WhatsApp Dispatch: Baileys] Failed to update corrected conversation doc:", errCorr);
+                }
+                break;
+              }
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.warn("[WhatsApp Dispatch: Baileys] onWhatsApp check notice:", e);
+    }
+
+    console.log(`[WhatsApp Dispatch: Baileys] Dispatching (Attempt ${attempt}) to ${targetJid}: "${text}"`);
+    try {
+      if (!activeSocket || typeof activeSocket.sendMessage !== "function") {
+        throw new Error("Baileys connection closed or null during dispatch.");
+      }
+      await activeSocket.sendMessage(targetJid, { text });
+      return { success: true, provider: "baileys", toPhone: realCleanPhone, jid: targetJid };
+    } catch (sendErr: any) {
+      console.error(`[WhatsApp Dispatch: Baileys Error Attempt ${attempt}]:`, sendErr);
+      const errMessage = String(sendErr?.message || sendErr || "");
+      const isClosedErr = errMessage.includes("Closed") || errMessage.includes("closed") || errMessage.includes("Boom") || errMessage.includes("Connection") || errMessage.includes("disconnect") || errMessage.includes("reset") || errMessage.includes("not open") || errMessage.includes("null") || errMessage.includes("properties of null") || errMessage.includes("closed or null");
+
+      if (attempt < 3 && isClosedErr) {
+        console.log(`[WhatsApp Dispatch: Baileys] Socket connection was interrupted (${errMessage}). Re-initializing Baileys socket and retrying send...`);
+        await initBaileysSocket(true);
+        let reconnectAttempts = 0;
+        while ((!baileysSocket || baileysStatus !== "connected") && reconnectAttempts < 50) {
+          await new Promise((r) => setTimeout(r, 200));
+          reconnectAttempts++;
+        }
+        return await dispatchViaBaileys(attempt + 1);
+      }
+
+      throw new Error(`Failed to send message to +${realCleanPhone}: ${sendErr?.message || sendErr}`);
+    }
+  };
 
   if (mode === "baileys") {
-    if (!baileysSocket || baileysStatus !== "connected") {
-      throw new Error(`Baileys WhatsApp Web is not connected (Status: ${baileysStatus}). Please scan QR code in Admin Settings.`);
-    }
-    const jid = `${cleanedPhone}@s.whatsapp.net`;
-    console.log(`[WhatsApp Dispatch: Baileys] Dispatching to ${jid}: "${text}"`);
-    await baileysSocket.sendMessage(jid, { text });
-    return { success: true, provider: "baileys", toPhone: cleanedPhone };
+    return await dispatchViaBaileys(1);
   } else {
     const configDoc = await getDoc(doc(db, "settings", "whatsapp"));
     const config = configDoc.exists() ? configDoc.data() : null;
@@ -518,7 +917,13 @@ async function sendWhatsAppMessage(toPhone: string, text: string) {
     const accessToken = config?.accessToken || process.env.WHATSAPP_ACCESS_TOKEN;
 
     if (!phoneAccountId || !accessToken) {
-      throw new Error("Official Meta WhatsApp API credentials are missing. Switch to Baileys WhatsApp Web mode in Admin Settings.");
+      // Check if Baileys is available as fallback
+      const credsFile = path.join(BAILEYS_AUTH_DIR, "creds.json");
+      if (baileysSocket || fs.existsSync(credsFile)) {
+        console.log("[WhatsApp Dispatch] Official Meta credentials missing. Falling back to Baileys WhatsApp Web mode...");
+        return await dispatchViaBaileys(1);
+      }
+      throw new Error("Official Meta WhatsApp API credentials are missing and Baileys WhatsApp Web is not connected. Please connect WhatsApp Web or enter Meta credentials in Admin Settings.");
     }
 
     console.log(`[WhatsApp Dispatch: Meta API] Dispatching to ${cleanedPhone}: "${text}"`);
@@ -568,11 +973,174 @@ app.get("/api/whatsapp/provider-status", async (req, res) => {
       },
       baileysStatus,
       baileysQrCode,
+      baileysPairingCode,
       baileysUserPhone,
       baileysError
     });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+// Request Baileys WhatsApp Pairing Code Endpoint
+app.post("/api/baileys/request-pairing-code", async (req, res) => {
+  try {
+    const { phoneNumber } = req.body;
+    if (!phoneNumber) {
+      res.status(400).json({ error: "Missing required field 'phoneNumber'." });
+      return;
+    }
+
+    const cleanedPhone = normalizeWhatsAppPhone(phoneNumber);
+    if (!cleanedPhone || cleanedPhone.length < 7) {
+      res.status(400).json({ error: "Invalid phone number format. Please include full country code (e.g. 2348012345678)." });
+      return;
+    }
+
+    // Check if auth folder exists with unregistered creds - if so, perform a clean wipe so fresh keys are issued
+    const credsFile = path.join(BAILEYS_AUTH_DIR, "creds.json");
+    if (fs.existsSync(credsFile)) {
+      try {
+        const rawCreds = JSON.parse(fs.readFileSync(credsFile, "utf-8"));
+        if (!rawCreds.registered) {
+          console.log("[Baileys Pairing Code] Purging old unregistered credentials before fresh pairing code request...");
+          if (baileysSocket) {
+            try { baileysSocket.end(undefined); } catch (e) {}
+            baileysSocket = null;
+          }
+          fs.rmSync(BAILEYS_AUTH_DIR, { recursive: true, force: true });
+        }
+      } catch (e) {}
+    }
+
+    // Always ensure socket is cleanly initialized when requesting a fresh pairing code
+    if (!baileysSocket || baileysStatus === "disconnected" || baileysStatus === "error") {
+      await initBaileysSocket(true);
+    }
+
+    // Wait up to 3 seconds for socket initialization and WS handshake
+    let attempts = 0;
+    while ((!baileysSocket || baileysStatus === "connecting") && attempts < 15) {
+      await new Promise((r) => setTimeout(r, 200));
+      attempts++;
+    }
+
+    if (!baileysSocket) {
+      res.status(500).json({ error: "Failed to initialize Baileys connection socket." });
+      return;
+    }
+
+    if (baileysSocket?.authState?.creds?.registered) {
+      res.status(400).json({ error: "WhatsApp account is already linked and registered. Please disconnect session before requesting a new pairing code." });
+      return;
+    }
+
+    console.log(`[Baileys Pairing Code] Requesting pairing code for phone number +${cleanedPhone}...`);
+    
+    // Pause to allow socket WS frame handshakes to settle
+    await new Promise((r) => setTimeout(r, 800));
+
+    let code: string | null = null;
+    try {
+      code = await baileysSocket.requestPairingCode(cleanedPhone);
+    } catch (firstErr: any) {
+      console.warn("[Baileys Pairing Code] Initial attempt failed:", firstErr?.message || firstErr);
+      // Purge auth dir, re-initialize socket cleanly and retry
+      if (baileysSocket) {
+        try { baileysSocket.end(undefined); } catch (e) {}
+        baileysSocket = null;
+      }
+      fs.rmSync(BAILEYS_AUTH_DIR, { recursive: true, force: true });
+      await initBaileysSocket(true);
+      await new Promise((r) => setTimeout(r, 1200));
+      if (baileysSocket) {
+        code = await baileysSocket.requestPairingCode(cleanedPhone);
+      } else {
+        throw firstErr;
+      }
+    }
+
+    baileysPairingCode = code;
+    baileysStatus = "qr_ready";
+
+    console.log(`[Baileys Pairing Code] Successfully generated pairing code: ${code} for +${cleanedPhone}`);
+    res.json({ 
+      success: true, 
+      pairingCode: code, 
+      phoneNumber: cleanedPhone,
+      formattedPhone: `+${cleanedPhone}`
+    });
+  } catch (err: any) {
+    console.error("[Baileys Pairing Code Error]:", err);
+    res.status(500).json({ error: err.message || "Failed to generate WhatsApp pairing code." });
+  }
+});
+
+// Get Live Received WhatsApp Messages Endpoint
+app.get("/api/whatsapp/received-messages", async (req, res) => {
+  try {
+    // If in-memory buffer has messages, return them
+    if (recentReceivedWhatsAppMessages.length > 0) {
+      res.json({ messages: recentReceivedWhatsAppMessages, source: "live_buffer" });
+      return;
+    }
+
+    // Fallback: Query Firestore recent WhatsApp conversations
+    const convsColl = collection(db, "conversations");
+    const snap = await getDocs(convsColl);
+    const dbMessages: ReceivedWhatsAppMessageLog[] = [];
+
+    snap.docs.forEach((docSnap) => {
+      const data = docSnap.data();
+      if (data.chatId && data.chatId.startsWith("whatsapp-")) {
+        const lastMsg = Array.isArray(data.messages) && data.messages.length > 0
+          ? data.messages[data.messages.length - 1]
+          : null;
+
+        dbMessages.push({
+          id: data.chatId + "-" + (data.lastMessageAt || Date.now()),
+          chatId: data.chatId,
+          customerPhone: data.customerPhone || data.chatId.replace("whatsapp-", "+"),
+          name: data.name || "WhatsApp Contact",
+          text: lastMsg ? lastMsg.text : data.text || "(No content)",
+          timestamp: data.lastMessageAt || data.createdAt || Date.now(),
+          provider: "baileys",
+          status: data.status || "pending"
+        });
+      }
+    });
+
+    dbMessages.sort((a, b) => b.timestamp - a.timestamp);
+    res.json({ messages: dbMessages.slice(0, 30), source: "firestore_backup" });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || "Failed to fetch received WhatsApp messages." });
+  }
+});
+
+// Simulate Incoming WhatsApp Message Endpoint
+app.post("/api/whatsapp/simulate-incoming", async (req, res) => {
+  try {
+    const { customerPhone, name, text } = req.body;
+    if (!customerPhone || !text) {
+      res.status(400).json({ error: "Missing required fields 'customerPhone' and 'text'." });
+      return;
+    }
+
+    const cleanPhone = String(customerPhone).replace(/[^0-9]/g, "");
+    if (!cleanPhone || cleanPhone.length < 5) {
+      res.status(400).json({ error: "Invalid customer phone number." });
+      return;
+    }
+
+    const jid = `${cleanPhone}@s.whatsapp.net`;
+    const senderName = name || `Simulated Contact (+${cleanPhone})`;
+
+    console.log(`[Simulated Incoming WA] Message from ${senderName}: "${text}"`);
+    await syncIncomingBaileysMessage(jid, senderName, text, "simulated");
+
+    res.json({ success: true, message: `Simulated incoming message processed for +${cleanPhone}` });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || "Failed to simulate incoming message." });
   }
 });
 
@@ -1064,6 +1632,16 @@ async function startServer() {
   await initVapidKeys();
   startConversationsListener();
   startSystemNotificationsListener();
+  
+  // Auto-restore active WhatsApp Baileys session if credentials exist
+  const credsFile = path.join(BAILEYS_AUTH_DIR, "creds.json");
+  if (fs.existsSync(credsFile)) {
+    console.log("[Baileys Boot] Found existing WhatsApp session credentials. Auto-connecting...");
+    initBaileysSocket(false).catch((err) => {
+      console.warn("[Baileys Boot] Auto-connect failed:", err);
+    });
+  }
+
   await setupVite();
 }
 

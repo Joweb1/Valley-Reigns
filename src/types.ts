@@ -58,6 +58,7 @@ export interface ChatMessage {
 export interface Conversation {
   chatId: string;
   customerPhone: string;
+  name?: string;
   status: "pending" | "ongoing" | "finished" | "abandoned";
   assignedTo: string | null;
   assignedToName: string | null;
