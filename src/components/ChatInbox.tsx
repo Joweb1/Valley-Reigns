@@ -142,6 +142,10 @@ export const ChatInbox: React.FC<ChatInboxProps> = ({ jobsList, searchQuery: ext
     }
     // Dispatch custom event to let AppContent know if a conversation is active
     window.dispatchEvent(new CustomEvent("toggle-chat-view", { detail: { active: !!activeConversation } }));
+
+    return () => {
+      window.dispatchEvent(new CustomEvent("toggle-chat-view", { detail: { active: false } }));
+    };
   }, [activeConversation, onActiveChatChange]);
 
   // Get matching Job Description for active chat
@@ -153,8 +157,13 @@ export const ChatInbox: React.FC<ChatInboxProps> = ({ jobsList, searchQuery: ext
   // 1. Available/Unassigned Requests shared with this staff member
   const availableConversations = conversationsList.filter(c => 
     c.status === "pending" && 
-    (!c.assignedTo) &&
-    (currentUser ? c.sharedWith?.includes(currentUser.uid) : true)
+    (currentUser ? (
+      !c.sharedWith || 
+      c.sharedWith.length === 0 || 
+      c.sharedWith.includes(currentUser.uid) ||
+      currentUser.role === "staff" ||
+      currentUser.role === "admin"
+    ) : true)
   );
 
   // 2. Active conversations claimed by current logged-in Staff Member
@@ -197,6 +206,10 @@ export const ChatInbox: React.FC<ChatInboxProps> = ({ jobsList, searchQuery: ext
 
     setIsSending(true);
     try {
+      if (activeConversation && activeConversation.status === "pending") {
+        await claimConversation(activeChatId, currentUser.uid, currentUser.displayName);
+        setActiveTab("my-chats");
+      }
       await sendChatMessage(activeChatId, "staff", messageInput.trim());
       setMessageInput("");
     } finally {
@@ -213,13 +226,16 @@ export const ChatInbox: React.FC<ChatInboxProps> = ({ jobsList, searchQuery: ext
 
   const handleSendTemplate = async (templateText: string) => {
     if (!activeChatId || !currentUser) return;
+    if (activeConversation && activeConversation.status === "pending") {
+      await claimConversation(activeChatId, currentUser.uid, currentUser.displayName);
+    }
     await sendChatMessage(activeChatId, "staff", templateText);
   };
 
   // Expiration Clock Calculations (24-Hour window based on arrival timestamp vs current time)
   const getExpirationState = (conv: Conversation) => {
     // Check if conversation is an in-app conversation (not standard WhatsApp)
-    const isInApp = !conv.customerPhone.startsWith("+");
+    const isInApp = conv?.isInApp || (conv?.customerPhone ? !conv.customerPhone.startsWith("+") : true);
     if (isInApp) {
       return { isExpired: false, text: "In-App Chat", hoursLeft: 999, isUrgent: false, isInApp: true };
     }
@@ -352,13 +368,9 @@ export const ChatInbox: React.FC<ChatInboxProps> = ({ jobsList, searchQuery: ext
                   <div
                     key={conv.chatId}
                     onClick={() => {
-                      if (activeTab === "my-chats") {
-                        setActiveChatId(conv.chatId);
-                      }
+                      setActiveChatId(conv.chatId);
                     }}
-                    className={`w-full text-left p-5 rounded-3xl transition-all duration-300 border ${
-                      activeTab === "my-chats" ? "cursor-pointer" : ""
-                    } ${
+                    className={`w-full text-left p-5 rounded-3xl transition-all duration-300 border cursor-pointer ${
                       isSelected
                         ? "bg-[#FAFDFB] border-2 border-[#1E88E5] shadow-md scale-[1.01]"
                         : activeTab === "available"
@@ -423,11 +435,8 @@ export const ChatInbox: React.FC<ChatInboxProps> = ({ jobsList, searchQuery: ext
           activeConversation ? "translate-x-0 md:translate-x-0" : "translate-x-full md:translate-x-0"
         }`}>
           {activeConversation ? (
-            <motion.div
+            <div
               key={activeConversation.chatId}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.25 }}
               className="flex-grow flex flex-col overflow-y-auto h-full relative pt-16 pb-48 md:overflow-y-hidden md:h-auto md:min-h-0 md:pt-0 md:pb-0"
             >
               {/* Active Conversation Metadata Header */}
@@ -580,7 +589,7 @@ export const ChatInbox: React.FC<ChatInboxProps> = ({ jobsList, searchQuery: ext
                     );
                   }
 
-                  const firstCustomerMsg = messagesArray.find(m => m.sender === "customer");
+                  const firstCustomerMsg = messagesArray.find(m => m.sender === "customer" || m.sender === "guest");
 
                   return messagesArray.map((msg, index) => {
                     if (msg.sender === "system") {
@@ -815,7 +824,7 @@ export const ChatInbox: React.FC<ChatInboxProps> = ({ jobsList, searchQuery: ext
                   );
                 })()}
               </div>
-            </motion.div>
+            </div>
           ) : (
             <div className="flex-1 flex flex-col items-center justify-center text-center p-8">
               <div className="w-14 h-14 bg-slate-100 rounded-2xl flex items-center justify-center text-slate-400 mb-3 shadow-inner">

@@ -23,8 +23,10 @@ import { AdminPostJobPage } from "./components/AdminPostJobPage";
 import { JobManagement } from "./components/JobManagement";
 import { PwaInstallPrompt } from "./components/PwaInstallPrompt";
 import { WhatsAppConfigPage } from "./components/WhatsAppConfigPage";
+import { ContactsPage } from "./components/ContactsPage";
 import { NetworkStatusMonitor } from "./components/NetworkStatusMonitor";
 import { StaffReportForm } from "./components/StaffReportForm";
+import { GuestChatWidget } from "./components/GuestChatWidget";
 import { getJobs, subscribeToJobs, checkAndEnforceSLAs } from "./lib/services";
 import { getCategoryImage } from "./lib/categories";
 import { Job } from "./types";
@@ -56,7 +58,8 @@ import {
   Info,
   Download,
   LogOut,
-  Clock
+  Clock,
+  BookUser
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
@@ -79,7 +82,7 @@ const itemVariants = {
     opacity: 1, 
     y: 0,
     transition: {
-      type: "spring",
+      type: "spring" as const,
       stiffness: 110,
       damping: 15,
     },
@@ -327,7 +330,7 @@ const JobSeekerDashboard: React.FC = () => {
 
   return (
     <div className="flex flex-col justify-between bg-[#FAFCFD]">
-      <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 pt-16 sm:pt-24 pb-8 sm:pb-16 space-y-16 flex-grow">
+      <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 pt-8 sm:pt-12 pb-8 sm:pb-16 space-y-6 flex-grow">
         {/* Sleek Minimalist Header & Information Section matching Image Style */}
         <section className="space-y-6 text-slate-900 text-center flex flex-col items-center">
           <div className="space-y-2.5">
@@ -403,7 +406,7 @@ const JobSeekerDashboard: React.FC = () => {
                 />
                 {/* Main Solid Button */}
                 <Link
-                  to={currentUser.role === "admin" || currentUser.role === "staff" ? "/staff" : "/seeker"}
+                  to={currentUser.role === "admin" ? "/admin" : currentUser.role === "staff" ? "/staff" : "/seeker"}
                   className="inline-flex"
                 >
                   <motion.div
@@ -465,110 +468,11 @@ const JobSeekerDashboard: React.FC = () => {
             </motion.button>
           </div>
   
-          {/* Beautiful Bento-Grid Metrics arranged in the requested unique layout, smaller and elegant */}
-          <div className="grid grid-cols-6 gap-3 max-w-4xl mx-auto pt-4">
-            {/* Box 1: Deep Navy - Row 1, Left (col-span-3) */}
-            <motion.div 
-              initial={{ opacity: 0, y: 25, scale: 0.93 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              transition={{ type: "spring", stiffness: 80, damping: 12, delay: 0.45 }}
-              whileHover={{ y: -4, scale: 1.02 }}
-              className="col-span-3 bg-[#1e3a8a] text-white p-4 sm:p-5 rounded-2xl flex flex-col justify-between min-h-[100px] sm:min-h-[110px] shadow-sm hover:shadow-md transition-shadow duration-300"
-            >
-              <span className="text-xl sm:text-2xl font-display font-extrabold tracking-tight leading-none">
-                1,200+
-              </span>
-              <span className="text-[10px] sm:text-xs font-medium opacity-90 leading-tight">
-                Cool jobs found for our happy visitors
-              </span>
-            </motion.div>
-  
-            {/* Box 2: Primary Brand Blue - Row 1, Right (col-span-3) */}
-            <motion.div 
-              initial={{ opacity: 0, y: 25, scale: 0.93 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              transition={{ type: "spring", stiffness: 80, damping: 12, delay: 0.52 }}
-              whileHover={{ y: -4, scale: 1.02 }}
-              className="col-span-3 bg-[#1E88E5] text-white p-4 sm:p-5 rounded-2xl flex flex-col justify-between min-h-[100px] sm:min-h-[110px] shadow-sm hover:shadow-md transition-shadow duration-300"
-            >
-              <span className="text-xl sm:text-2xl font-display font-extrabold tracking-tight leading-none">
-                10,000+
-              </span>
-              <span className="text-[10px] sm:text-xs font-medium opacity-90 leading-tight">
-                Friendly chats completed on WhatsApp
-              </span>
-            </motion.div>
-  
-            {/* Box 3: Vibrant Orange - Row 2, Card 1 (col-span-2) */}
-            <motion.div 
-              initial={{ opacity: 0, y: 25, scale: 0.93 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              transition={{ type: "spring", stiffness: 80, damping: 12, delay: 0.59 }}
-              whileHover={{ y: -4, scale: 1.02 }}
-              className="col-span-2 bg-[#EA580C] text-white p-4 sm:p-5 rounded-2xl flex flex-col justify-between min-h-[100px] sm:min-h-[110px] shadow-sm hover:shadow-md transition-shadow duration-300"
-            >
-              <span className="text-xl sm:text-2xl font-display font-extrabold tracking-tight leading-none">
-                150+
-              </span>
-              <span className="text-[10px] sm:text-xs font-medium opacity-90 leading-tight">
-                Excellent top-paying companies hiring now
-              </span>
-            </motion.div>
-  
-            {/* Box 4: Midnight Dark Slate - Row 2, Card 2 (col-span-2) */}
-            <motion.div 
-              initial={{ opacity: 0, y: 25, scale: 0.93 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              transition={{ type: "spring", stiffness: 80, damping: 12, delay: 0.66 }}
-              whileHover={{ y: -4, scale: 1.02 }}
-              className="col-span-2 bg-[#0F172A] text-white p-4 sm:p-5 rounded-2xl flex flex-col justify-between min-h-[100px] sm:min-h-[110px] shadow-sm hover:shadow-md transition-shadow duration-300"
-            >
-              <span className="text-xl sm:text-2xl font-display font-extrabold tracking-tight leading-none">
-                24/7 Live
-              </span>
-              <span className="text-[10px] sm:text-xs font-medium opacity-90 leading-tight">
-                Helpful agents ready to guide you anytime
-              </span>
-            </motion.div>
-  
-            {/* Box 5: Emerald Green - Row 2, Card 3 (col-span-2, row-span-2) */}
-            {/* Extends downwards through row 2 and row 3 on the right */}
-            <motion.div 
-              initial={{ opacity: 0, y: 25, scale: 0.93 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              transition={{ type: "spring", stiffness: 80, damping: 12, delay: 0.73 }}
-              whileHover={{ y: -4, scale: 1.02 }}
-              className="col-span-2 row-span-2 bg-[#15803d] text-white p-4 sm:p-5 rounded-2xl flex flex-col justify-between min-h-[210px] sm:min-h-[230px] shadow-sm hover:shadow-md transition-shadow duration-300"
-            >
-              <span className="text-xl sm:text-2xl font-display font-extrabold tracking-tight leading-none">
-                Verified Jobs
-              </span>
-              <span className="text-[10px] sm:text-xs font-medium opacity-90 leading-tight">
-                All opportunities are manually vetted for safety and quality
-              </span>
-            </motion.div>
-  
-            {/* Box 6: Royal Purple - Row 3, Card 1 (col-span-4) */}
-            {/* Extends to meet Box 5's vertical extension */}
-            <motion.div 
-              initial={{ opacity: 0, y: 25, scale: 0.93 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              transition={{ type: "spring", stiffness: 80, damping: 12, delay: 0.8 }}
-              whileHover={{ y: -4, scale: 1.01 }}
-              className="col-span-4 bg-[#7E22CE] text-white p-4 sm:p-5 rounded-2xl flex flex-col justify-between min-h-[100px] sm:min-h-[110px] shadow-sm hover:shadow-md transition-shadow duration-300"
-            >
-              <span className="text-xl sm:text-2xl font-display font-extrabold tracking-tight leading-none">
-                Direct Response
-              </span>
-              <span className="text-[10px] sm:text-xs font-medium opacity-90 leading-tight">
-                Connect with hiring managers directly via WhatsApp for quick answers!
-              </span>
-            </motion.div>
-          </div>
+          {/* Find Jobs action */}
         </section>
   
         {/* Main Discover Workspace Section */}
-        <div id="jobs-explore" className="space-y-6 pt-4 text-left">
+        <div id="jobs-explore" className="space-y-6 text-left">
           {/* Search Input bar - Hover & Focus scale / shadow enhancements */}
           <div className="relative max-w-lg bg-white border border-slate-900 p-1.5 rounded-[24px] shadow-[0_16px_36px_-6px_rgba(30, 136, 229, 0.05),0_10px_20px_-10px_rgba(30, 136, 229, 0.03)] hover:border-[#1E88E5] hover:shadow-[0_16px_40px_rgba(30, 136, 229, 0.08)] focus-within:ring-4 focus-within:ring-[#1E88E5]/10 focus-within:border-[#1E88E5] focus-within:scale-[1.015] transition-all duration-300 flex items-center gap-2 md:mx-auto">
             <Search className="w-4.5 h-4.5 text-[#1E88E5] ml-3 shrink-0" />
@@ -700,10 +604,6 @@ const StaffDashboardView: React.FC = () => {
   const { currentUser } = useAuth();
   const navigate = useNavigate();
 
-  if (currentUser?.role === "admin") {
-    return <Navigate to="/admin" replace />;
-  }
-
   const [jobs, setJobs] = useState<Job[]>([]);
   const location = useLocation();
   const searchParams = new URLSearchParams(location.search);
@@ -724,13 +624,7 @@ const StaffDashboardView: React.FC = () => {
   const isInbox = staffTab === "inbox";
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 15 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -15 }}
-      transition={{ duration: 0.35, ease: "easeOut" }}
-      className={isInbox ? (hasActiveChat ? "w-full h-full flex flex-col bg-white min-h-0 md:max-w-7xl md:mx-auto md:px-4 sm:md:px-6 lg:md:px-8 md:pt-12 md:pb-12 md:h-auto" : "w-full min-h-screen bg-white pb-12 md:max-w-7xl md:mx-auto md:px-4 sm:md:px-6 lg:md:px-8 md:pt-12 md:pb-12") : "max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10 space-y-6"}
-    >
+    <div className={isInbox ? (hasActiveChat ? "w-full h-full flex flex-col bg-white min-h-0 md:max-w-7xl md:mx-auto md:px-4 sm:px-6 lg:px-8 md:pt-12 md:pb-12 md:h-auto" : "w-full min-h-screen bg-white pb-12 md:max-w-7xl md:mx-auto md:px-4 sm:px-6 lg:px-8 md:pt-12 md:pb-12") : "max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10 space-y-6"}>
       
       {/* Modern homepage-style navigation and headers */}
       {!hasActiveChat && staffTab !== "report" && staffTab !== "post-job" && (
@@ -752,33 +646,24 @@ const StaffDashboardView: React.FC = () => {
       )}
 
       {/* Render selected workspace tabs */}
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={staffTab}
-          initial={{ opacity: 0, y: 15 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -15 }}
-          transition={{ duration: 0.25, ease: "easeInOut" }}
-          className={isInbox && hasActiveChat ? "w-full h-full flex flex-col min-h-0" : "w-full"}
-        >
-          {staffTab === "inbox" && (
-            <ChatInbox jobsList={jobs} searchQuery={searchQuery} onActiveChatChange={setHasActiveChat} />
-          )}
-          
-          {staffTab === "post-job" && (
-            <div className="max-w-3xl mx-auto">
-              <JobPostingForm onJobAdded={refreshJobs} />
-            </div>
-          )}
+      <div className={isInbox && hasActiveChat ? "w-full h-full flex flex-col min-h-0" : "w-full"}>
+        {staffTab === "inbox" && (
+          <ChatInbox jobsList={jobs} searchQuery={searchQuery} onActiveChatChange={setHasActiveChat} />
+        )}
+        
+        {staffTab === "post-job" && (
+          <div className="max-w-3xl mx-auto">
+            <JobPostingForm onJobAdded={refreshJobs} />
+          </div>
+        )}
 
-          {staffTab === "report" && (
-            <div className="py-2">
-              <StaffReportForm />
-            </div>
-          )}
-        </motion.div>
-      </AnimatePresence>
-    </motion.div>
+        {staffTab === "report" && (
+          <div className="py-2">
+            <StaffReportForm />
+          </div>
+        )}
+      </div>
+    </div>
   );
 };
 
@@ -1019,8 +904,6 @@ function AppContent() {
         } else {
           navigate("/seeker", { replace: true });
         }
-      } else {
-        navigate("/seeker", { replace: true });
       }
     }
   }, [currentUser, loading, isHomePage, isStandaloneOrFs, navigate]);
@@ -1171,9 +1054,16 @@ function AppContent() {
     return () => window.removeEventListener("toggle-chat-view", handleToggle);
   }, []);
 
+  // Reset hideFloating and scroll position on route change so header/layout state never gets stuck across navigations
+  useEffect(() => {
+    setHideFloating(false);
+    window.scrollTo(0, 0);
+  }, [location.pathname]);
+
   const noHeaderPaths = [
     "/admin/notifications",
     "/admin/whatsapp-config",
+    "/admin/contacts",
     "/admin/diagnostics",
   ];
   const shouldHideHeader = (hideFloating && !isDesktop) || noHeaderPaths.includes(location.pathname);
@@ -1223,18 +1113,12 @@ function AppContent() {
         {!shouldHideHeader && <Header />}
 
         {/* Main Workspace Router Feed */}
-        <main className={`flex-grow ${(hideFloating && !isDesktop) ? "h-full min-h-0 flex flex-col" : ""} ${(!shouldHideHeader && !isHomePage) ? "pb-24" : ""}`}>
+        <main className={`flex-grow ${(hideFloating && !isDesktop) ? "h-full min-h-0 flex flex-col" : "w-full min-h-[calc(100vh-80px)]"} ${(!shouldHideHeader && !isHomePage) ? "pb-24" : ""}`}>
           <Routes>
-            {/* Public route - Render a clean transition background if we are in PWA/Fullscreen mode and redirecting to the dashboard */}
+            {/* Public route */}
             <Route 
               path="/" 
-              element={
-                isStandaloneOrFs ? (
-                  <div className="min-h-screen bg-[#FAFCFD]" />
-                ) : (
-                  <JobSeekerDashboard />
-                )
-              } 
+              element={<JobSeekerDashboard />} 
             />
             
             {/* Staff invited route */}
@@ -1288,6 +1172,14 @@ function AppContent() {
               element={
                 <ProtectedRoute allowedRoles={["admin"]}>
                   <WhatsAppConfigPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/contacts"
+              element={
+                <ProtectedRoute allowedRoles={["admin"]}>
+                  <ContactsPage />
                 </ProtectedRoute>
               }
             />
@@ -1353,8 +1245,8 @@ function AppContent() {
           </Routes>
         </main>
 
-        {/* Authentication Gateway Portal Popup - forced open in standalone/fullscreen mode if unauthenticated */}
-        <AuthModal forcedOpen={isStandaloneOrFs && !currentUser && !loading} />
+        {/* Authentication Gateway Portal Popup */}
+        <AuthModal forcedOpen={false} />
 
         {/* Progressive Web App Install Banner Overlay */}
         <PwaInstallPrompt />
@@ -1364,8 +1256,8 @@ function AppContent() {
 
         {/* Admin Sticky Fixed Bottom Navigation Pill */}
         {currentUser && currentUser.role === "admin" && !shouldHideHeader && (
-          <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-40 w-full max-w-[200px] px-2 animate-none">
-            <div className="bg-[#0b1b3d]/85 backdrop-blur-lg border border-[#0084FF] shadow-[0_10px_30px_rgba(0,132,255,0.15)] rounded-full px-4 py-1.5 flex items-center justify-around transition-all duration-300">
+          <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-40 w-full max-w-[260px] px-2 animate-none">
+            <div className="bg-[#0b1b3d]/85 backdrop-blur-lg border border-[#0084FF] shadow-[0_10px_30px_rgba(0,132,255,0.15)] rounded-full px-3 py-1.5 flex items-center justify-around transition-all duration-300">
               {/* Search Icon Component (Left) */}
               <button
                 onClick={() => {
@@ -1382,7 +1274,7 @@ function AppContent() {
                 <Search className="w-5 h-5" />
               </button>
 
-              {/* Home Icon Component (Center) */}
+              {/* Home Icon Component */}
               <button
                 onClick={() => {
                   setIsAdminSettingsOpen(false);
@@ -1397,6 +1289,22 @@ function AppContent() {
                 title="Admin Dashboard"
               >
                 <Home className="w-5 h-5" />
+              </button>
+
+              {/* Chat Inbox Button */}
+              <button
+                onClick={() => {
+                  setIsAdminSettingsOpen(false);
+                  navigate("/staff?tab=inbox");
+                }}
+                className={`p-2 border cursor-pointer transition-all duration-200 hover:scale-110 active:scale-95 flex items-center justify-center ${
+                  location.pathname === "/staff" && (new URLSearchParams(location.search).get("tab") === "inbox" || !new URLSearchParams(location.search).get("tab"))
+                    ? "bg-[#0084FF]/30 border-[#0084FF]/25 text-white rounded-full"
+                    : "bg-transparent border-transparent text-blue-300 hover:text-white rounded-full"
+                }`}
+                title="Live Chat Inbox"
+              >
+                <MessageSquare className="w-5 h-5" />
               </button>
 
               {/* Settings Icon Component (Right) */}
@@ -1646,6 +1554,20 @@ function AppContent() {
                   >
                     <span className="text-sm font-bold text-slate-700 group-hover:text-blue-600 transition-colors">WhatsApp Config</span>
                     <MessageCircle className="w-4 h-4 text-blue-500 group-hover:scale-110 transition-transform" />
+                  </button>
+
+                  <div className="border-t border-slate-100 my-1" />
+
+                  {/* Saved Customer Contacts Row */}
+                  <button
+                    onClick={() => {
+                      setIsAdminSettingsOpen(false);
+                      navigate("/admin/contacts");
+                    }}
+                    className="w-full flex items-center justify-between py-3.5 px-2.5 hover:bg-blue-50/55 rounded-xl transition-all duration-200 group border-0 bg-transparent cursor-pointer"
+                  >
+                    <span className="text-sm font-bold text-slate-700 group-hover:text-blue-600 transition-colors">Saved Contacts</span>
+                    <BookUser className="w-4 h-4 text-blue-500 group-hover:scale-110 transition-transform" />
                   </button>
 
                   <div className="border-t border-slate-100 my-1" />
@@ -2106,6 +2028,9 @@ function AppContent() {
             </div>
           )}
         </AnimatePresence>
+
+        {/* Floating Guest Live Chat Widget (Visible to non-logged-in visitors) */}
+        <GuestChatWidget />
       </div>
     </>
   );

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Job, UserProfile, Conversation, DailyStat, StaffDailyReport } from "../types";
+import { SLACountdownTimer } from "./SLACountdownTimer";
 import { 
   getStaffProfiles, 
   toggleStaffJobPosting, 
@@ -9,7 +10,10 @@ import {
   getStaffStatuses,
   getDailyStats,
   subscribeToDailyReports,
-  getAllUserProfiles
+  getAllUserProfiles,
+  batchDeleteConversations,
+  batchResetConversations,
+  deleteConversation
 } from "../lib/services";
 import { 
   BarChart3, 
@@ -37,12 +41,19 @@ import {
   MessageSquare,
   LayoutGrid,
   List,
-  Filter
+  Filter,
+  Trash2,
+  RotateCcw,
+  CheckSquare,
+  Square,
+  BookUser,
+  AlertCircle
 } from "lucide-react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "motion/react";
 import { JobManagement } from "./JobManagement";
 import { AdminPostJobPage } from "./AdminPostJobPage";
+import { ContactsView } from "./ContactsView";
 import { 
   ResponsiveContainer, 
   LineChart, 
@@ -150,8 +161,9 @@ const RecruiterDropdown: React.FC<{
 
 export const AdminPanel: React.FC<AdminPanelProps> = ({ jobsList }) => {
   // Navigation State
-  const [activeView, setActiveView] = useState<"overview" | "staff" | "routing" | "reports" | "jobs" | "post-job">("overview");
+  const [activeView, setActiveView] = useState<"overview" | "staff" | "routing" | "reports" | "jobs" | "post-job" | "contacts">("overview");
   const location = useLocation();
+  const navigate = useNavigate();
 
   useEffect(() => {
     const handleHomeClick = () => {
@@ -176,8 +188,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ jobsList }) => {
       setActiveView("reports");
     } else if (viewParam === "post-job") {
       setActiveView("post-job");
+    } else if (viewParam === "contacts") {
+      navigate("/admin/contacts", { replace: true });
     }
-  }, [location.search]);
+  }, [location.search, navigate]);
 
   // Global State
   const [staffList, setStaffList] = useState<UserProfile[]>([]);
@@ -250,6 +264,54 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ jobsList }) => {
   const [routingTab, setRoutingTab] = useState<"pending" | "ongoing" | "finished" | "abandoned">("pending");
   const [chartFilter, setChartFilter] = useState<"daily" | "weekly" | "monthly" | "yearly">("daily");
 
+  // Abandoned chats batch action states
+  const [selectedAbandonedChatIds, setSelectedAbandonedChatIds] = useState<Set<string>>(new Set());
+  const [confirmBatchModal, setConfirmBatchModal] = useState<{
+    isOpen: boolean;
+    action: "delete" | "reset";
+    chatIds: string[];
+  } | null>(null);
+
+  const handleToggleSelectAbandoned = (chatId: string) => {
+    setSelectedAbandonedChatIds(prev => {
+      const next = new Set(prev);
+      if (next.has(chatId)) {
+        next.delete(chatId);
+      } else {
+        next.add(chatId);
+      }
+      return next;
+    });
+  };
+
+  const handleSelectAllAbandoned = (abandonedChatsList: Conversation[]) => {
+    if (selectedAbandonedChatIds.size === abandonedChatsList.length && abandonedChatsList.length > 0) {
+      setSelectedAbandonedChatIds(new Set());
+    } else {
+      setSelectedAbandonedChatIds(new Set(abandonedChatsList.map(c => c.chatId)));
+    }
+  };
+
+  const handleExecuteBatchAction = async () => {
+    if (!confirmBatchModal) return;
+    const { action, chatIds } = confirmBatchModal;
+    try {
+      if (action === "delete") {
+        await batchDeleteConversations(chatIds);
+        setActionSuccess(`Successfully deleted ${chatIds.length} abandoned ticket(s).`);
+      } else if (action === "reset") {
+        await batchResetConversations(chatIds);
+        setActionSuccess(`Successfully reset ${chatIds.length} ticket(s) back to pending queue.`);
+      }
+      setSelectedAbandonedChatIds(new Set());
+      setTimeout(() => setActionSuccess(null), 3000);
+    } catch (err) {
+      console.error("Batch action failed:", err);
+    } finally {
+      setConfirmBatchModal(null);
+    }
+  };
+
   const notifiedChatsRef = useRef<Set<string>>(new Set());
 
   // Load staff profiles from Firestore
@@ -289,7 +351,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ jobsList }) => {
   // Unclaimed routed chats (available requests in recruiter pending inbox)
   const getUnclaimedRoutedChatsCount = (staffUid: string) => {
     return (Object.values(conversations) as Conversation[]).filter(
-      c => c.status === "pending" && c.sharedWith?.includes(staffUid)
+      c => c.status === "pending" && (!c.assignedTo) && (!c.sharedWith || c.sharedWith.length === 0 || c.sharedWith.includes(staffUid))
     ).length;
   };
 
@@ -616,22 +678,17 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ jobsList }) => {
 
 
       {/* Main Workspace Render Transition Engine */}
-      <AnimatePresence mode="wait">
-        {loading ? (
-          <div className="space-y-8" key="main-loading">
-            <KPIGridSkeleton />
-            <NavigationCardsSkeleton />
-            <ChartSkeleton />
-          </div>
-        ) : activeView === "overview" ? (
-          <motion.div
-            key="overview"
-            initial={{ opacity: 0, y: 15 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -15 }}
-            transition={{ duration: 0.25 }}
-            className="space-y-8"
-          >
+      {loading ? (
+        <div className="space-y-8" key="main-loading">
+          <KPIGridSkeleton />
+          <NavigationCardsSkeleton />
+          <ChartSkeleton />
+        </div>
+      ) : activeView === "overview" ? (
+        <div
+          key="overview"
+          className="space-y-8"
+        >
             {/* 1. KPI Grid Dashboard */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6">
               {/* Card 1: Job Impressions */}
@@ -962,14 +1019,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ jobsList }) => {
                 </div>
               )}
             </div>
-          </motion.div>
+          </div>
         ) : activeView === "staff" ? (
-          <motion.div
+          <div
             key="staff"
-            initial={{ opacity: 0, y: 15 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -15 }}
-            transition={{ duration: 0.25 }}
             className="space-y-6"
           >
             {/* Header with Back Button */}
@@ -1290,14 +1343,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ jobsList }) => {
                 </div>
               )}
             </div>
-          </motion.div>
+          </div>
         ) : activeView === "routing" ? (
-          <motion.div
+          <div
             key="routing"
-            initial={{ opacity: 0, y: 15 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -15 }}
-            transition={{ duration: 0.25 }}
             className="space-y-6"
           >
             {/* Header with Back Button */}
@@ -1451,6 +1500,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ jobsList }) => {
                                 </div>
                               </div>
 
+                              {/* SLA 24-hour Countdown Timer */}
+                              <div className="relative z-10 pt-1">
+                                <SLACountdownTimer 
+                                  createdAt={c.createdAt} 
+                                  label="Claim Countdown" 
+                                  isInApp={c.isInApp || (c.customerPhone ? !c.customerPhone.startsWith("+") : true)}
+                                  customerPhone={c.customerPhone}
+                                />
+                              </div>
+
                               {isExpanded && (
                                 <div className="pt-2.5 border-t border-dashed border-slate-100 space-y-2 relative z-10">
                                   <span className="text-[9px] font-mono text-slate-400 font-bold uppercase tracking-wider block text-left">
@@ -1547,6 +1606,17 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ jobsList }) => {
                               <p className="text-sm font-sans font-black text-black leading-snug relative z-10">
                                 {c.jobTitle}
                               </p>
+
+                              {/* SLA 24-hour Countdown Timer */}
+                              <div className="relative z-10 pt-1">
+                                <SLACountdownTimer 
+                                  createdAt={c.createdAt} 
+                                  label="Ongoing SLA Timer" 
+                                  isInApp={c.isInApp || (c.customerPhone ? !c.customerPhone.startsWith("+") : true)}
+                                  customerPhone={c.customerPhone}
+                                />
+                              </div>
+
                               <div className="flex items-center gap-1.5 bg-[#1E88E5]/10 text-[#1E88E5] px-3 py-2 rounded-xl text-[10px] font-sans font-bold border border-[#1E88E5]/25 shadow-xs relative z-10">
                                 <Users className="w-3.5 h-3.5 text-[#1E88E5] shrink-0" />
                                 <span className="truncate">
@@ -1630,43 +1700,120 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ jobsList }) => {
                           <span>No Abandoned Sessions Reported</span>
                         </div>
                       ) : (
-                        abandonedChats.map((c) => (
-                          <div key={c.chatId} className="p-6 bg-white rounded-none border-y border-[#1E88E5] space-y-4 relative transition-all duration-300 z-10 w-full">
-                            {/* Vector graphic pattern background design */}
-                            <div className="absolute inset-0 pointer-events-none opacity-[0.03] text-[#1E88E5]">
-                              <svg width="100%" height="100%" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <circle cx="85%" cy="15%" r="50" stroke="currentColor" strokeWidth="1.2" />
-                                <circle cx="90%" cy="20%" r="80" stroke="currentColor" strokeWidth="1" strokeDasharray="3 3" />
-                                <path d="M-10,80 C30,40 80,100 150,60" stroke="currentColor" strokeWidth="1.2" />
-                              </svg>
-                            </div>
-
-                            <div className="flex items-center justify-between gap-1 relative z-10">
-                              <span className="text-xs font-mono font-bold text-slate-800">
-                                {c.customerPhone}
+                        <div className="col-span-full space-y-4">
+                          {/* Batch Action Toolbar */}
+                          <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 bg-rose-50/60 border border-rose-200/80 rounded-2xl shadow-xs">
+                            <button
+                              onClick={() => handleSelectAllAbandoned(abandonedChats)}
+                              className="flex items-center gap-2 text-xs font-bold text-slate-700 hover:text-rose-700 transition-colors cursor-pointer border-0 bg-transparent"
+                            >
+                              {selectedAbandonedChatIds.size === abandonedChats.length && abandonedChats.length > 0 ? (
+                                <CheckSquare className="w-4.5 h-4.5 text-rose-600" />
+                              ) : (
+                                <Square className="w-4.5 h-4.5 text-slate-400" />
+                              )}
+                              <span>
+                                {selectedAbandonedChatIds.size === abandonedChats.length && abandonedChats.length > 0
+                                  ? "Deselect All"
+                                  : `Select All (${abandonedChats.length})`}
                               </span>
-                            </div>
-                            <p className="text-sm font-sans font-black text-black leading-snug relative z-10">
-                              {c.jobTitle}
-                            </p>
-                            <div className="pt-3 border-t border-slate-100 flex flex-row items-center justify-between gap-2 relative z-10">
-                              <span className="flex items-center gap-1 text-[10px] font-mono text-rose-200 font-bold bg-rose-950 px-2.5 py-1.5 rounded-xl border border-rose-900/40 shadow-sm">✖ ABANDONED TICKET</span>
-                              <button
-                                onClick={() => handleForceReassign(c.chatId)}
-                                className="text-rose-600 hover:text-rose-800 flex items-center gap-1 cursor-pointer border-0 bg-transparent text-[10px] font-sans font-bold hover:underline"
-                              >
-                                Reset Queue <ArrowRight className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
+                            </button>
+
+                            {selectedAbandonedChatIds.size > 0 && (
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-mono font-bold text-rose-800 bg-rose-100 px-2.5 py-1 rounded-lg">
+                                  {selectedAbandonedChatIds.size} Selected
+                                </span>
+                                <button
+                                  onClick={() => setConfirmBatchModal({ isOpen: true, action: "reset", chatIds: Array.from(selectedAbandonedChatIds) })}
+                                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-extrabold rounded-xl transition-all flex items-center gap-1.5 shadow-xs cursor-pointer border-0"
+                                >
+                                  <RotateCcw className="w-3.5 h-3.5" /> Reset Selected
+                                </button>
+                                <button
+                                  onClick={() => setConfirmBatchModal({ isOpen: true, action: "delete", chatIds: Array.from(selectedAbandonedChatIds) })}
+                                  className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-extrabold rounded-xl transition-all flex items-center gap-1.5 shadow-xs cursor-pointer border-0"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" /> Delete Selected
+                                </button>
+                              </div>
+                            )}
                           </div>
-                        ))
+
+                          {/* Cards Grid */}
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {abandonedChats.map((c) => (
+                              <div
+                                key={c.chatId}
+                                className={`p-5 bg-white rounded-2xl border ${
+                                  selectedAbandonedChatIds.has(c.chatId)
+                                    ? "border-rose-500 ring-2 ring-rose-100 shadow-sm"
+                                    : "border-slate-200"
+                                } space-y-4 relative transition-all duration-300 z-10 w-full shadow-xs hover:shadow-md flex flex-col justify-between`}
+                              >
+                                {/* Vector graphic pattern background design */}
+                                <div className="absolute inset-0 pointer-events-none opacity-[0.03] text-rose-600">
+                                  <svg width="100%" height="100%" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <circle cx="85%" cy="15%" r="50" stroke="currentColor" strokeWidth="1.2" />
+                                    <circle cx="90%" cy="20%" r="80" stroke="currentColor" strokeWidth="1" strokeDasharray="3 3" />
+                                    <path d="M-10,80 C30,40 80,100 150,60" stroke="currentColor" strokeWidth="1.2" />
+                                  </svg>
+                                </div>
+
+                                <div className="space-y-2 relative z-10">
+                                  <div className="flex items-center justify-between gap-2">
+                                    <div className="flex items-center gap-2">
+                                      <button
+                                        onClick={() => handleToggleSelectAbandoned(c.chatId)}
+                                        className="text-slate-400 hover:text-rose-600 transition-colors cursor-pointer border-0 bg-transparent p-0"
+                                      >
+                                        {selectedAbandonedChatIds.has(c.chatId) ? (
+                                          <CheckSquare className="w-4.5 h-4.5 text-rose-600" />
+                                        ) : (
+                                          <Square className="w-4.5 h-4.5 text-slate-300" />
+                                        )}
+                                      </button>
+                                      <span className="text-xs font-mono font-bold text-slate-900">
+                                        {c.customerPhone}
+                                      </span>
+                                    </div>
+
+                                    <button
+                                      onClick={() => setConfirmBatchModal({ isOpen: true, action: "delete", chatIds: [c.chatId] })}
+                                      className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all cursor-pointer border-0 bg-transparent"
+                                      title="Delete abandoned chat permanently"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </button>
+                                  </div>
+
+                                  <p className="text-xs font-extrabold text-slate-800 leading-snug">
+                                    {c.jobTitle}
+                                  </p>
+                                </div>
+
+                                <div className="pt-3 border-t border-slate-100 flex flex-row items-center justify-between gap-2 relative z-10">
+                                  <span className="flex items-center gap-1 text-[10px] font-mono text-rose-700 font-bold bg-rose-50 px-2.5 py-1 rounded-xl border border-rose-200 shadow-xs">
+                                    ✖ ABANDONED
+                                  </span>
+                                  <button
+                                    onClick={() => setConfirmBatchModal({ isOpen: true, action: "reset", chatIds: [c.chatId] })}
+                                    className="text-blue-600 hover:text-blue-800 flex items-center gap-1 cursor-pointer border-0 bg-transparent text-[11px] font-extrabold hover:underline"
+                                  >
+                                    <RotateCcw className="w-3.5 h-3.5" /> Reset Queue
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
                       )
                     )}
                   </motion.div>
                 </AnimatePresence>
               </div>
             </div>
-          </motion.div>
+          </div>
         ) : activeView === "reports" ? (() => {
           const reportsByDate = dailyReports.filter(r => r.date === selectedReportsDate);
           
@@ -1701,12 +1848,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ jobsList }) => {
           });
 
           return (
-            <motion.div
+            <div
               key="reports"
-              initial={{ opacity: 0, y: 15 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -15 }}
-              transition={{ duration: 0.25 }}
               className="space-y-6 text-left"
             >
               {/* Header with Back Button */}
@@ -2010,35 +2153,94 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ jobsList }) => {
                   )}
                 </div>
               </div>
-            </motion.div>
+            </div>
           );
         })() : activeView === "jobs" ? (
-          <motion.div
-            key="jobs"
-            initial={{ opacity: 0, y: 15 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -15 }}
-            transition={{ duration: 0.25 }}
-          >
+          <div key="jobs">
             <JobManagement 
               onBack={() => setActiveView("overview")} 
               onPostJob={() => setActiveView("post-job")} 
             />
-          </motion.div>
+          </div>
         ) : activeView === "post-job" ? (
-          <motion.div
-            key="post-job"
-            initial={{ opacity: 0, y: 15 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -15 }}
-            transition={{ duration: 0.25 }}
-          >
+          <div key="post-job">
             <AdminPostJobPage 
               onBack={() => setActiveView("jobs")} 
               onJobAdded={() => setActiveView("jobs")} 
             />
-          </motion.div>
+          </div>
+        ) : activeView === "contacts" ? (
+          <div key="contacts">
+            <ContactsView onBack={() => setActiveView("overview")} />
+          </div>
         ) : null}
+
+      {/* Batch Action Confirmation Popup */}
+      <AnimatePresence>
+        {confirmBatchModal && confirmBatchModal.isOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setConfirmBatchModal(null)}
+              className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs cursor-pointer"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              className="relative w-full max-w-md bg-white border border-slate-200 rounded-3xl p-6 shadow-2xl space-y-4 z-10"
+            >
+              <div className="flex items-center gap-3">
+                <div className={`p-3 rounded-2xl border ${confirmBatchModal.action === "delete" ? "bg-rose-50 border-rose-100 text-rose-600" : "bg-blue-50 border-blue-100 text-blue-600"}`}>
+                  {confirmBatchModal.action === "delete" ? <Trash2 className="w-6 h-6" /> : <RotateCcw className="w-6 h-6" />}
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-slate-900 leading-tight">
+                    {confirmBatchModal.action === "delete" ? "Delete Abandoned Ticket(s)" : "Reset Queue Ticket(s)"}
+                  </h3>
+                  <p className="text-xs font-mono text-slate-500">
+                    {confirmBatchModal.chatIds.length} item(s) selected
+                  </p>
+                </div>
+              </div>
+
+              <p className="text-xs font-medium text-slate-600 leading-relaxed">
+                {confirmBatchModal.action === "delete"
+                  ? `Are you sure you want to permanently delete ${confirmBatchModal.chatIds.length} abandoned conversation(s)? This action cannot be undone.`
+                  : `Are you sure you want to reset ${confirmBatchModal.chatIds.length} abandoned conversation(s) back to the pending queue for available staff to claim?`}
+              </p>
+
+              <div className="pt-2 flex items-center justify-end gap-2">
+                <button
+                  onClick={() => setConfirmBatchModal(null)}
+                  className="px-4 py-2 border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-all cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleExecuteBatchAction}
+                  className={`px-4 py-2 text-white text-xs font-extrabold rounded-xl transition-all shadow-xs cursor-pointer flex items-center gap-1.5 ${
+                    confirmBatchModal.action === "delete"
+                      ? "bg-rose-600 hover:bg-rose-700"
+                      : "bg-blue-600 hover:bg-blue-700"
+                  }`}
+                >
+                  {confirmBatchModal.action === "delete" ? (
+                    <>
+                      <Trash2 className="w-3.5 h-3.5" /> Delete Permanently
+                    </>
+                  ) : (
+                    <>
+                      <RotateCcw className="w-3.5 h-3.5" /> Confirm Reset
+                    </>
+                  )}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
       </AnimatePresence>
 
       {/* Lightbox Modal */}

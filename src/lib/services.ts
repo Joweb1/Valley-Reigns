@@ -29,7 +29,7 @@ import {
 } from "firebase/database";
 import { auth, db, rtdb } from "./firebase";
 export { auth, db, rtdb };
-import { Job, UserProfile, Conversation, ChatMessage, DailyStat, SystemNotification, StaffDailyReport } from "../types";
+import { Job, UserProfile, Conversation, ChatMessage, DailyStat, SystemNotification, StaffDailyReport, CustomerContact } from "../types";
 import { SEEDED_JOBS_LIST } from "./defaultJobs";
 
 // ==========================================
@@ -157,6 +157,7 @@ class MemoryStorage {
   currentUser: UserProfile | null = null;
   systemNotifications: SystemNotification[] = [];
   dailyReports: StaffDailyReport[] = [];
+  contacts: Record<string, CustomerContact> = {};
   listeners: Set<() => void> = new Set();
 
   constructor() {
@@ -166,6 +167,7 @@ class MemoryStorage {
     const savedUsers = localStorage.getItem("vr_users");
     const savedNotifications = localStorage.getItem("vr_system_notifications");
     const savedReports = localStorage.getItem("vr_daily_reports");
+    const savedContacts = localStorage.getItem("vr_contacts");
     if (savedJobs) {
       try {
         const parsed = JSON.parse(savedJobs);
@@ -209,6 +211,13 @@ class MemoryStorage {
         console.warn("Could not load daily reports from localStorage", e);
       }
     }
+    if (savedContacts) {
+      try {
+        this.contacts = JSON.parse(savedContacts);
+      } catch (e) {
+        console.warn("Could not load contacts from localStorage", e);
+      }
+    }
   }
 
   save() {
@@ -217,6 +226,7 @@ class MemoryStorage {
     localStorage.setItem("vr_users", JSON.stringify(this.users));
     localStorage.setItem("vr_system_notifications", JSON.stringify(this.systemNotifications));
     localStorage.setItem("vr_daily_reports", JSON.stringify(this.dailyReports));
+    localStorage.setItem("vr_contacts", JSON.stringify(this.contacts));
     this.listeners.forEach(l => l());
   }
 
@@ -519,12 +529,12 @@ export async function getStaffProfiles(): Promise<UserProfile[]> {
     const collRef = collection(db, "users");
     const snapshot = await getDocs(collRef);
     const users = snapshot.docs.map(doc => doc.data() as UserProfile);
-    const staff = users.filter(u => u.role === "staff");
+    const staff = users.filter(u => u.role === "staff" || u.role === "admin");
     if (staff.length > 0) return staff;
   } catch (error) {
     console.warn("Firestore getStaffProfiles failing, using fallback:");
   }
-  return Object.values(memoryStore.users).filter(u => u.role === "staff");
+  return Object.values(memoryStore.users).filter(u => u.role === "staff" || u.role === "admin");
 }
 
 export async function getAllUserProfiles(): Promise<UserProfile[]> {
@@ -594,10 +604,22 @@ function normalizeConversation(id: string, data: any): Conversation {
       messages = Object.values(messages);
     }
   }
+
+  let finalMessages: ChatMessage[] = Array.isArray(messages) ? messages : [];
+
+  // Fallback: If messages list is empty but top-level text is present, construct initial message
+  if (finalMessages.length === 0 && data.text) {
+    finalMessages = [{
+      sender: data.sender || "customer",
+      text: data.text,
+      timestamp: data.createdAt || data.lastMessageAt || Date.now()
+    }];
+  }
+
   return {
     ...data,
     chatId: id || data.chatId,
-    messages: messages || []
+    messages: finalMessages
   };
 }
 
@@ -605,8 +627,18 @@ function normalizeConversation(id: string, data: any): Conversation {
 async function syncToRTDB(chatId: string, data: Partial<Conversation>): Promise<void> {
   if (!rtdb) return;
   try {
+    const authUid = auth?.currentUser?.uid || memoryStore.currentUser?.uid || chatId;
+    const authEmail = auth?.currentUser?.email || memoryStore.currentUser?.email || "user@valleyreigns.com";
+    const sessionToken = "session_" + (authUid || chatId);
+
     const rtdbRef = ref(rtdb, `conversations/${chatId}`);
-    await update(rtdbRef, data);
+    await update(rtdbRef, {
+      uid: authUid,
+      email: authEmail,
+      sessionToken,
+      sender: "system",
+      ...data
+    });
   } catch (error) {
     console.warn(`RTDB update failed for chat ${chatId}:`, error);
   }
@@ -615,8 +647,18 @@ async function syncToRTDB(chatId: string, data: Partial<Conversation>): Promise<
 async function writeNewToRTDB(chatId: string, data: Conversation): Promise<void> {
   if (!rtdb) return;
   try {
+    const authUid = auth?.currentUser?.uid || memoryStore.currentUser?.uid || chatId;
+    const authEmail = auth?.currentUser?.email || memoryStore.currentUser?.email || data.customerPhone || "user@valleyreigns.com";
+    const sessionToken = "session_" + (authUid || chatId);
+
     const rtdbRef = ref(rtdb, `conversations/${chatId}`);
-    await set(rtdbRef, data);
+    await set(rtdbRef, {
+      uid: authUid,
+      email: authEmail,
+      sessionToken,
+      sender: "customer",
+      ...data
+    });
   } catch (error) {
     console.warn(`RTDB set failed for chat ${chatId}:`, error);
   }
@@ -634,11 +676,14 @@ export async function setStaffOnlineStatus(uid: string, isOnline: boolean) {
     console.warn("Firestore setStaffOnlineStatus failing:", error);
   }
 
-  // Also sync to Realtime Database
+  // Also sync to Realtime Database with auth identifier fields
   if (rtdb) {
     try {
+      const authEmail = auth?.currentUser?.email || memoryStore.users[uid]?.email || `${uid}@valleyreigns.com`;
       const rtdbRef = ref(rtdb, `staff_statuses/${uid}`);
       await set(rtdbRef, {
+        uid,
+        email: authEmail,
         status: isOnline ? "online" : "offline",
         lastActive: Date.now()
       });
@@ -651,82 +696,158 @@ export async function setStaffOnlineStatus(uid: string, isOnline: boolean) {
   memoryStore.save();
 }
 
-// Firestore fallback subscription helper
-function subscribeToFirestoreConversations(callback: (conversations: Record<string, Conversation>) => void) {
+// Merge two conversation states for dual-query deduplication
+export function mergeConversations(c1: Conversation, c2: Conversation): Conversation {
+  const time1 = c1.lastMessageAt || c1.createdAt || 0;
+  const time2 = c2.lastMessageAt || c2.createdAt || 0;
+  const primary = time1 >= time2 ? c1 : c2;
+  const secondary = primary === c1 ? c2 : c1;
+
+  const msgs1 = Array.isArray(c1.messages)
+    ? c1.messages
+    : c1.messages
+    ? (Object.values(c1.messages) as ChatMessage[])
+    : [];
+  const msgs2 = Array.isArray(c2.messages)
+    ? c2.messages
+    : c2.messages
+    ? (Object.values(c2.messages) as ChatMessage[])
+    : [];
+
+  const combinedMsgs = [...msgs1, ...msgs2];
+  const uniqueMap = new Map<string, ChatMessage>();
+
+  combinedMsgs.forEach((m) => {
+    const key = `${m.timestamp || 0}_${m.sender || "system"}_${(m.text || "").trim()}`;
+    if (!uniqueMap.has(key)) {
+      uniqueMap.set(key, m);
+    }
+  });
+
+  const mergedMessages = Array.from(uniqueMap.values()).sort(
+    (a, b) => (a.timestamp || 0) - (b.timestamp || 0)
+  );
+
+  const mergedStatus = primary.status || secondary.status || "pending";
+  let mergedAssignedTo = primary.assignedTo !== undefined ? primary.assignedTo : secondary.assignedTo;
+  let mergedAssignedToName = primary.assignedToName !== undefined ? primary.assignedToName : secondary.assignedToName;
+
+  if (mergedStatus === "pending" && (primary.assignedTo === null || primary.status === "pending")) {
+    mergedAssignedTo = null;
+    mergedAssignedToName = null;
+  }
+
+  return {
+    ...secondary,
+    ...primary,
+    chatId: primary.chatId || secondary.chatId,
+    jobId: primary.jobId || secondary.jobId,
+    jobTitle: primary.jobTitle || secondary.jobTitle,
+    customerPhone: primary.customerPhone || secondary.customerPhone,
+    seekerUid: primary.seekerUid || secondary.seekerUid,
+    status: mergedStatus,
+    assignedTo: mergedAssignedTo,
+    assignedToName: mergedAssignedToName,
+    sharedWith: primary.sharedWith || secondary.sharedWith || [],
+    messages: mergedMessages
+  };
+}
+
+// Dual Query Listener: Subscribes to BOTH Firestore AND Realtime Database simultaneously
+export function subscribeToConversations(callback: (conversations: Record<string, Conversation>) => void) {
+  let latestFirestoreConvs: Record<string, Conversation> = {};
+  let latestRtdbConvs: Record<string, Conversation> = {};
+  let unsubFirestore: (() => void) | null = null;
+  let unsubRtdb: (() => void) | null = null;
+
+  const emitMerged = () => {
+    const merged: Record<string, Conversation> = {};
+
+    // 1. Initial memoryStore conversations
+    Object.entries(memoryStore.conversations).forEach(([id, c]) => {
+      merged[id] = normalizeConversation(id, c);
+    });
+
+    // 2. Merge Firestore conversations
+    Object.entries(latestFirestoreConvs).forEach(([id, c]) => {
+      if (!merged[id]) {
+        merged[id] = c;
+      } else {
+        merged[id] = mergeConversations(merged[id], c);
+      }
+    });
+
+    // 3. Merge Realtime Database conversations
+    Object.entries(latestRtdbConvs).forEach(([id, c]) => {
+      if (!merged[id]) {
+        merged[id] = c;
+      } else {
+        merged[id] = mergeConversations(merged[id], c);
+      }
+    });
+
+    callback(merged);
+  };
+
+  // Listen to Firestore (Guest and WhatsApp storage)
   try {
     const collRef = collection(db, "conversations");
-    return onSnapshot(collRef, (snapshot) => {
+    unsubFirestore = onSnapshot(collRef, (snapshot) => {
+      const convs: Record<string, Conversation> = {};
       if (!snapshot.empty) {
-        const convs: Record<string, Conversation> = {};
         snapshot.docs.forEach((d) => {
           convs[d.id] = normalizeConversation(d.id, d.data());
         });
-        callback(convs);
       } else {
-        // Seed default conversations in Firestore if empty
-        const seedPromises = Object.entries(DEFAULT_CONVERSATIONS).map(([id, conv]) => {
-          const messagesArray = Array.isArray(conv.messages) 
-            ? conv.messages 
-            : conv.messages 
-            ? Object.values(conv.messages) 
-            : [{ sender: "customer" as const, text: conv.text, timestamp: conv.createdAt }];
-          const firestoreConv: Conversation = {
-            ...conv,
-            messages: messagesArray
-          };
-          return setDoc(doc(db, "conversations", id), firestoreConv);
-        });
-        Promise.all(seedPromises).then(() => {
-          callback(DEFAULT_CONVERSATIONS);
-        }).catch((err) => {
-          console.warn("Seeding default conversations to Firestore failed:", err);
-          callback(DEFAULT_CONVERSATIONS);
+        Object.entries(DEFAULT_CONVERSATIONS).forEach(([id, conv]) => {
+          setDoc(doc(db, "conversations", id), conv).catch(() => {});
+          convs[id] = normalizeConversation(id, conv);
         });
       }
-    }, (error) => {
-      console.warn("Firestore collection listener failed, falling back to local simulation:", error);
-      callback(memoryStore.conversations);
+      latestFirestoreConvs = convs;
+      emitMerged();
+    }, (err) => {
+      console.warn("Firestore snapshot listener error in subscribeToConversations:", err);
     });
-  } catch (error) {
-    console.warn("Firestore subscribeToConversations failed, using fallback:", error);
-    return memoryStore.subscribe(() => {
-      callback(memoryStore.conversations);
-    });
+  } catch (err) {
+    console.warn("Firestore subscribeToConversations caught exception:", err);
   }
-}
 
-// Listen to conversations (RTDB first with Firestore fallback)
-export function subscribeToConversations(callback: (conversations: Record<string, Conversation>) => void) {
+  // Listen to Realtime Database (In-App conversation storage)
   if (rtdb) {
     try {
       const rtdbRef = ref(rtdb, "conversations");
-      const unsubscribe = onValue(rtdbRef, (snapshot) => {
+      unsubRtdb = onValue(rtdbRef, (snapshot) => {
+        const convs: Record<string, Conversation> = {};
         if (snapshot.exists()) {
           const rawData = snapshot.val();
-          const parsed: Record<string, Conversation> = {};
           Object.entries(rawData).forEach(([id, val]) => {
-            parsed[id] = normalizeConversation(id, val);
+            convs[id] = normalizeConversation(id, val);
           });
-          callback(parsed);
-        } else {
-          // If RTDB is empty, seed it with default conversations
-          const initialConvs = { ...DEFAULT_CONVERSATIONS };
-          Object.entries(initialConvs).forEach(([id, conv]) => {
-            writeNewToRTDB(id, conv);
-          });
-          callback(initialConvs);
         }
-      }, (error) => {
-        console.warn("RTDB subscribeToConversations failed or permission denied. Falling back to Firestore:", error);
-        subscribeToFirestoreConversations(callback);
+        latestRtdbConvs = convs;
+        emitMerged();
+      }, (err) => {
+        console.warn("RTDB onValue listener error in subscribeToConversations:", err);
       });
-      return unsubscribe;
     } catch (e) {
-      console.warn("RTDB subscribeToConversations threw an exception. Falling back to Firestore:", e);
+      console.warn("RTDB subscribeToConversations caught exception:", e);
     }
   }
 
-  return subscribeToFirestoreConversations(callback);
+  // Listen to local memory store updates
+  const unsubMemory = memoryStore.subscribe(() => {
+    emitMerged();
+  });
+
+  // Emit merged state initially
+  emitMerged();
+
+  return () => {
+    if (unsubFirestore) unsubFirestore();
+    if (unsubRtdb) unsubRtdb();
+    if (unsubMemory) unsubMemory();
+  };
 }
 
 // Claim a Conversation
@@ -771,7 +892,32 @@ export async function claimConversation(chatId: string, userUid: string, userNam
       }
       seekerUid = seekerUid || data.seekerUid;
       const messagesArray = Array.isArray(data.messages) ? data.messages : [];
-      currentMessages = [...messagesArray, systemMsg];
+      
+      // Auto-claim message for WhatsApp chats
+      const isWhatsApp = chatId.startsWith("whatsapp-") || Boolean(data.customerPhone && (data.customerPhone.startsWith("+") || /^\d+$/.test(data.customerPhone)));
+      const targetPhone = data.customerPhone || (chatId.startsWith("whatsapp-") ? chatId.replace("whatsapp-", "") : null);
+
+      if (isWhatsApp && targetPhone) {
+        const claimNoticeText = `Hello! Your request has been received. Staff member ${userName} is ready to discuss with you.`;
+        const claimNoticeMsg: ChatMessage = {
+          sender: "staff",
+          text: claimNoticeText,
+          timestamp: Date.now() + 10
+        };
+        currentMessages = [...messagesArray, systemMsg, claimNoticeMsg];
+
+        // Dispatch outbound WhatsApp message via Baileys WA / Meta API
+        fetch("/api/whatsapp/send", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            toPhone: targetPhone,
+            text: claimNoticeText
+          })
+        }).catch(err => console.warn("[claimConversation] Failed to dispatch WhatsApp claim notification:", err));
+      } else {
+        currentMessages = [...messagesArray, systemMsg];
+      }
       
       await updateDoc(convRef, {
         assignedTo: userUid,
@@ -816,20 +962,142 @@ export async function claimConversation(chatId: string, userUid: string, userNam
   return success;
 }
 
+// Helper function to dynamically route a conversation to 5 available staff members
+export async function routeToAvailableStaff(): Promise<{ selectedStaffUids: string[]; assignedToOffline: boolean }> {
+  const staff = await getStaffProfiles();
+  const statuses = await getStaffStatuses();
+
+  let conversationsList: Conversation[] = [];
+  try {
+    const collRef = collection(db, "conversations");
+    const snap = await getDocs(collRef);
+    conversationsList = snap.docs.map(doc => doc.data() as Conversation);
+  } catch (error) {
+    console.warn("Firestore get conversations for routing failed, using memory fallback:", error);
+    conversationsList = Object.values(memoryStore.conversations);
+  }
+
+  const activeChatsCount: Record<string, number> = {};
+  conversationsList.forEach((c) => {
+    if (c.status === "ongoing" && c.assignedTo) {
+      activeChatsCount[c.assignedTo] = (activeChatsCount[c.assignedTo] || 0) + 1;
+    }
+  });
+
+  const sortedStaff = [...staff].sort((a, b) => {
+    const countA = activeChatsCount[a.uid] || 0;
+    const countB = activeChatsCount[b.uid] || 0;
+    return countA - countB;
+  });
+
+  const onlineNotBusy: UserProfile[] = [];
+  const offlineNotBusy: UserProfile[] = [];
+  const onlineBusy: UserProfile[] = [];
+  const offlineBusy: UserProfile[] = [];
+
+  sortedStaff.forEach((s) => {
+    const isOnline = (statuses[s.uid] || memoryStore.staffStatuses[s.uid]) === "online";
+    const activeCount = activeChatsCount[s.uid] || 0;
+    const isBusy = activeCount >= 2;
+
+    if (isOnline) {
+      if (!isBusy) onlineNotBusy.push(s);
+      else onlineBusy.push(s);
+    } else {
+      if (!isBusy) offlineNotBusy.push(s);
+      else offlineBusy.push(s);
+    }
+  });
+
+  let selectedStaff: UserProfile[] = [];
+  let assignedToOffline = false;
+
+  if (onlineNotBusy.length > 0) {
+    selectedStaff = [...onlineNotBusy];
+
+    if (selectedStaff.length < 5) {
+      const remainingNeeded = 5 - selectedStaff.length;
+      const offlineToTake = offlineNotBusy.slice(0, remainingNeeded);
+      selectedStaff.push(...offlineToTake);
+      if (offlineToTake.length > 0) {
+        assignedToOffline = true;
+      }
+    }
+
+    if (selectedStaff.length < 5) {
+      const remainingNeeded = 5 - selectedStaff.length;
+      selectedStaff.push(...onlineBusy.slice(0, remainingNeeded));
+    }
+
+    if (selectedStaff.length < 5) {
+      const remainingNeeded = 5 - selectedStaff.length;
+      const offlineBusyToTake = offlineBusy.slice(0, remainingNeeded);
+      selectedStaff.push(...offlineBusyToTake);
+      if (offlineBusyToTake.length > 0) {
+        assignedToOffline = true;
+      }
+    }
+    selectedStaff = selectedStaff.slice(0, 5);
+  } else {
+    const busyOnlineToTake = onlineBusy.slice(0, 5);
+    const offlineAvailableToTake = offlineNotBusy.slice(0, 5);
+
+    selectedStaff = [...busyOnlineToTake, ...offlineAvailableToTake];
+    if (offlineAvailableToTake.length > 0) {
+      assignedToOffline = true;
+    }
+  }
+
+  let selectedStaffUids = selectedStaff.map(s => s.uid);
+  if (selectedStaffUids.length === 0) {
+    selectedStaffUids = ["staff-demo", "staff-1-seed", "staff-2-seed"];
+  }
+
+  return { selectedStaffUids, assignedToOffline };
+}
+
 // Send Chat Message
-export async function sendChatMessage(chatId: string, sender: "customer" | "staff" | "system", text: string): Promise<void> {
+export async function sendChatMessage(chatId: string, sender: "customer" | "staff" | "system" | "guest", text: string): Promise<void> {
+  const now = Date.now();
   const newMessage: ChatMessage = {
     sender,
     text,
-    timestamp: Date.now()
+    timestamp: now
   };
+
+  const sysMsgText = "Conversation re-opened by user and returned to Available Requests queue.";
+  let isReinitiated = false;
+  let freshStaffUids: string[] = [];
 
   // 1. Memory State Fallback
   let currentMessages: ChatMessage[] = [];
   const conv = memoryStore.conversations[chatId];
   if (conv) {
+    if ((sender === "customer" || sender === "guest") && (conv.status === "abandoned" || conv.status === "finished")) {
+      const routed = await routeToAvailableStaff();
+      freshStaffUids = routed.selectedStaffUids;
+      isReinitiated = true;
+      conv.status = "pending";
+      conv.assignedTo = null;
+      conv.assignedToName = null;
+      conv.sharedWith = freshStaffUids;
+      conv.createdAt = now;
+      delete conv.abandonedAt;
+      delete conv.finishedAt;
+
+      const sysMsg: ChatMessage = {
+        sender: "system",
+        text: sysMsgText,
+        timestamp: now
+      };
+      if (!conv.messages) conv.messages = [];
+      if (Array.isArray(conv.messages)) {
+        conv.messages.push(sysMsg);
+      }
+    }
+
     conv.text = text;
-    conv.lastMessageAt = Date.now();
+    conv.lastMessageAt = now;
     if (!conv.messages) conv.messages = [];
     if (Array.isArray(conv.messages)) {
       conv.messages.push(newMessage);
@@ -848,12 +1116,80 @@ export async function sendChatMessage(chatId: string, sender: "customer" | "staf
     if (docSnap.exists()) {
       const data = docSnap.data() as Conversation;
       const messagesArray = Array.isArray(data.messages) ? data.messages : [];
-      currentMessages = [...messagesArray, newMessage];
-      await updateDoc(convRef, {
-        text: text,
-        lastMessageAt: Date.now(),
+      const isFsAbandoned = data.status === "abandoned" || data.status === "finished" || isReinitiated;
+
+      if ((sender === "customer" || sender === "guest") && isFsAbandoned) {
+        isReinitiated = true;
+        if (freshStaffUids.length === 0) {
+          const routed = await routeToAvailableStaff();
+          freshStaffUids = routed.selectedStaffUids;
+        }
+
+        const sysMsg: ChatMessage = {
+          sender: "system",
+          text: sysMsgText,
+          timestamp: now
+        };
+
+        const newMessagesList = [...messagesArray];
+        if (!newMessagesList.some(m => m.sender === "system" && m.text === sysMsgText && Math.abs(m.timestamp - sysMsg.timestamp) < 5000)) {
+          newMessagesList.push(sysMsg);
+        }
+        newMessagesList.push(newMessage);
+        currentMessages = newMessagesList;
+
+        await updateDoc(convRef, {
+          text: text,
+          lastMessageAt: now,
+          createdAt: now,
+          status: "pending",
+          assignedTo: null,
+          assignedToName: null,
+          sharedWith: freshStaffUids,
+          abandonedAt: null,
+          finishedAt: null,
+          messages: currentMessages
+        });
+
+        // Trigger staff notifications for re-initiated chat
+        freshStaffUids.forEach(uid => {
+          addSystemNotification({
+            type: "awaiting_claim",
+            title: "Re-initiated Chat Awaiting Claim",
+            message: `Abandoned chat with ${data.customerPhone || "Customer"} (Job: ${data.jobTitle || "Job"}) was re-initiated by user and assigned to 5 available staff for claim.`,
+            metadata: { chatId, customerPhone: data.customerPhone, jobId: data.jobId, jobTitle: data.jobTitle },
+            staffUid: uid
+          }).catch(err => console.warn("Failed to log re-initiated notification", err));
+        });
+      } else {
+        currentMessages = [...messagesArray, newMessage];
+        await updateDoc(convRef, {
+          text: text,
+          lastMessageAt: now,
+          messages: currentMessages
+        });
+      }
+    } else {
+      const baseConv = memoryStore.conversations[chatId] || {
+        chatId,
+        customerPhone: chatId,
+        status: "pending",
+        text,
+        createdAt: now,
+        lastMessageAt: now,
+        messages: [newMessage]
+      };
+      const messagesArray = Array.isArray(baseConv.messages) ? [...baseConv.messages] : [];
+      if (!messagesArray.some(m => m.timestamp === newMessage.timestamp && m.text === newMessage.text)) {
+        messagesArray.push(newMessage);
+      }
+      currentMessages = messagesArray;
+      await setDoc(convRef, {
+        ...baseConv,
+        text,
+        lastMessageAt: now,
         messages: currentMessages
-      });
+      }, { merge: true });
     }
   } catch (error) {
     console.warn("Firestore sendChatMessage failed, writing to fallback/RTDB:", error);
@@ -862,13 +1198,46 @@ export async function sendChatMessage(chatId: string, sender: "customer" | "staf
   // 3. Dual Write: Realtime Database
   if (rtdb) {
     try {
-      await syncToRTDB(chatId, {
-        text: text,
-        lastMessageAt: Date.now(),
-        messages: currentMessages
-      });
+      if (isReinitiated) {
+        await syncToRTDB(chatId, {
+          text: text,
+          lastMessageAt: now,
+          createdAt: now,
+          status: "pending",
+          assignedTo: null,
+          assignedToName: null,
+          sharedWith: freshStaffUids.length > 0 ? freshStaffUids : (conv?.sharedWith || []),
+          abandonedAt: null,
+          finishedAt: null,
+          messages: currentMessages
+        });
+      } else {
+        await syncToRTDB(chatId, {
+          text: text,
+          lastMessageAt: now,
+          messages: currentMessages
+        });
+      }
     } catch (error) {
       console.warn("RTDB sendChatMessage sync failed:", error);
+    }
+  }
+
+  // 4. Outbound WhatsApp Message Dispatch for Staff/System replies
+  if ((sender === "staff" || sender === "system") && text) {
+    const isWhatsApp = chatId.startsWith("whatsapp-") || Boolean(conv && conv.customerPhone && (conv.customerPhone.startsWith("+") || /^\d+$/.test(conv.customerPhone)));
+    if (isWhatsApp) {
+      const targetPhone = conv?.customerPhone || chatId.replace("whatsapp-", "");
+      if (targetPhone) {
+        fetch("/api/whatsapp/send", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            toPhone: targetPhone,
+            text: text
+          })
+        }).catch(err => console.warn("[sendChatMessage] Outbound WhatsApp dispatch failed:", err));
+      }
     }
   }
 }
@@ -920,11 +1289,15 @@ export async function forceReassignConversation(chatId: string, targetStaffUid: 
   const oldStaffUid = conv?.assignedTo || null;
   const oldStaffName = conv?.assignedToName || null;
 
+  const now = Date.now();
   if (conv) {
     conv.assignedTo = targetStaffUid;
     conv.assignedToName = targetStaffName;
     conv.status = targetStaffUid ? "ongoing" : "pending";
-    conv.lastMessageAt = Date.now();
+    conv.createdAt = now; // Reset timer so SLA check doesn't move it back to abandoned!
+    conv.lastMessageAt = now;
+    delete conv.abandonedAt;
+    delete conv.finishedAt;
     if (!conv.messages) conv.messages = [];
     if (Array.isArray(conv.messages)) {
       conv.messages.push(sysMsg);
@@ -986,7 +1359,10 @@ export async function forceReassignConversation(chatId: string, targetStaffUid: 
         assignedTo: targetStaffUid,
         assignedToName: targetStaffName,
         status: targetStaffUid ? "ongoing" : ("pending" as const),
-        lastMessageAt: Date.now(),
+        createdAt: now,
+        lastMessageAt: now,
+        abandonedAt: null,
+        finishedAt: null,
         messages: currentMessages
       });
     }
@@ -1022,7 +1398,10 @@ export async function forceReassignConversation(chatId: string, targetStaffUid: 
         assignedTo: targetStaffUid,
         assignedToName: targetStaffName,
         status: targetStaffUid ? "ongoing" : "pending",
-        lastMessageAt: Date.now(),
+        createdAt: now,
+        lastMessageAt: now,
+        abandonedAt: null,
+        finishedAt: null,
         messages: currentMessages
       });
     } catch (error) {
@@ -1051,6 +1430,15 @@ export async function updateConversationStatus(chatId: string, status: "pending"
       conv.abandonedAt = now;
     } else if (status === "finished") {
       conv.finishedAt = now;
+    } else if (status === "pending" || status === "ongoing") {
+      conv.createdAt = now; // Reset timer benchmark for SLA
+      conv.lastMessageAt = now;
+      delete conv.abandonedAt;
+      delete conv.finishedAt;
+      if (status === "pending") {
+        conv.assignedTo = null;
+        conv.assignedToName = null;
+      }
     }
     if (!conv.messages) conv.messages = [];
     if (Array.isArray(conv.messages)) {
@@ -1078,11 +1466,20 @@ export async function updateConversationStatus(chatId: string, status: "pending"
   }
 
   // 2. Dual Write: Firestore
-  const additionalFields: Partial<Conversation> = {};
+  const additionalFields: Record<string, any> = {};
   if (status === "abandoned") {
     additionalFields.abandonedAt = now;
   } else if (status === "finished") {
     additionalFields.finishedAt = now;
+  } else if (status === "pending" || status === "ongoing") {
+    additionalFields.createdAt = now;
+    additionalFields.lastMessageAt = now;
+    additionalFields.abandonedAt = null;
+    additionalFields.finishedAt = null;
+    if (status === "pending") {
+      additionalFields.assignedTo = null;
+      additionalFields.assignedToName = null;
+    }
   }
 
   let seekerUid: string | undefined = conv?.seekerUid;
@@ -1139,12 +1536,12 @@ export async function updateConversationStatus(chatId: string, status: "pending"
 }
 
 // Automatically enforce SLA time limits for chats:
-// - Unclaimed by staff within 12 hours -> marked as abandoned + admin notification
-// - Unfinished within 24 hours -> marked as abandoned + admin notification
+// - WhatsApp Chats: Any WhatsApp conversation pending or ongoing moves to abandoned after 24 hours from initiation
+// - In-App Chats: Active for 1 month (30 days) before being automatically marked as abandoned
 export async function checkAndEnforceSLAs(): Promise<void> {
   const now = Date.now();
-  const twelveHours = 12 * 3600 * 1000;
   const twentyFourHours = 24 * 3600 * 1000;
+  const thirtyDays = 30 * 24 * 3600 * 1000;
 
   // Check local memoryStore
   const convs = Object.values(memoryStore.conversations);
@@ -1157,16 +1554,22 @@ export async function checkAndEnforceSLAs(): Promise<void> {
     let message = "";
     let title = "";
 
-    if (conv.status === "pending" && age > twelveHours) {
-      shouldAbandon = true;
-      reason = "unclaimed_12_hours";
-      title = "SLA: Unclaimed Chat Abandoned";
-      message = `Conversation with ${conv.customerPhone} (Job: ${conv.jobTitle}) was automatically marked as abandoned because it was not claimed by any staff within 12 hours.`;
-    } else if (conv.status === "ongoing" && age > twentyFourHours) {
-      shouldAbandon = true;
-      reason = "unfinished_24_hours";
-      title = "SLA: Unfinished Chat Abandoned";
-      message = `Conversation with ${conv.customerPhone} (Job: ${conv.jobTitle}) assigned to ${conv.assignedToName || "staff"} was automatically marked as abandoned because it was not finished within 24 hours.`;
+    const isInApp = conv.isInApp || (conv.customerPhone ? !conv.customerPhone.startsWith("+") : true) || Boolean(conv.seekerUid);
+
+    if (isInApp) {
+      if (age > thirtyDays) {
+        shouldAbandon = true;
+        reason = "in_app_unresolved_30_days";
+        title = "In-App Chat Abandoned (30 Days)";
+        message = `In-app conversation with ${conv.customerPhone} (Job: ${conv.jobTitle}) was automatically marked as abandoned after 1 month of initialization.`;
+      }
+    } else {
+      if (age > twentyFourHours) {
+        shouldAbandon = true;
+        reason = "whatsapp_24_hours";
+        title = "SLA: WhatsApp Chat Abandoned (24h)";
+        message = `WhatsApp conversation with ${conv.customerPhone} (Job: ${conv.jobTitle}) was automatically marked as abandoned after 24 hours of initialization.`;
+      }
     }
 
     if (shouldAbandon) {
@@ -1195,16 +1598,22 @@ export async function checkAndEnforceSLAs(): Promise<void> {
       let message = "";
       let title = "";
 
-      if (conv.status === "pending" && age > twelveHours) {
-        shouldAbandon = true;
-        reason = "unclaimed_12_hours";
-        title = "SLA: Unclaimed Chat Abandoned";
-        message = `Conversation with ${conv.customerPhone} (Job: ${conv.jobTitle}) was automatically marked as abandoned because it was not claimed by any staff within 12 hours.`;
-      } else if (conv.status === "ongoing" && age > twentyFourHours) {
-        shouldAbandon = true;
-        reason = "unfinished_24_hours";
-        title = "SLA: Unfinished Chat Abandoned";
-        message = `Conversation with ${conv.customerPhone} (Job: ${conv.jobTitle}) assigned to ${conv.assignedToName || "staff"} was automatically marked as abandoned because it was not finished within 24 hours.`;
+      const isInApp = conv.isInApp || (conv.customerPhone ? !conv.customerPhone.startsWith("+") : true) || Boolean(conv.seekerUid);
+
+      if (isInApp) {
+        if (age > thirtyDays) {
+          shouldAbandon = true;
+          reason = "in_app_unresolved_30_days";
+          title = "In-App Chat Abandoned (30 Days)";
+          message = `In-app conversation with ${conv.customerPhone} (Job: ${conv.jobTitle}) was automatically marked as abandoned after 1 month of initialization.`;
+        }
+      } else {
+        if (age > twentyFourHours) {
+          shouldAbandon = true;
+          reason = "whatsapp_24_hours";
+          title = "SLA: WhatsApp Chat Abandoned (24h)";
+          message = `WhatsApp conversation with ${conv.customerPhone} (Job: ${conv.jobTitle}) was automatically marked as abandoned after 24 hours of initialization.`;
+        }
       }
 
       if (shouldAbandon) {
@@ -1231,12 +1640,12 @@ export async function checkAndEnforceSLAs(): Promise<void> {
 }
 
 // Automatically prune finished and abandoned conversations based on the following rules:
-// - Abandoned conversations -> delete after 24 hours of being abandoned
+// - Abandoned conversations -> delete after 6 months (180 days) of being abandoned
 // - Finished conversations -> delete after 1 month (30 days) of being finished
 export async function pruneExpiredConversations(): Promise<void> {
   const now = Date.now();
-  const oneDay = 24 * 3600 * 1000;
   const thirtyDays = 30 * 24 * 3600 * 1000;
+  const sixMonths = 180 * 24 * 3600 * 1000;
 
   // 1. Process local memoryStore
   const localConvs = Object.values(memoryStore.conversations);
@@ -1245,7 +1654,7 @@ export async function pruneExpiredConversations(): Promise<void> {
   for (const conv of localConvs) {
     if (conv.status === "abandoned") {
       const abandonedTime = conv.abandonedAt || conv.lastMessageAt || conv.createdAt;
-      if (now - abandonedTime > oneDay) {
+      if (now - abandonedTime > sixMonths) {
         localChatsToDelete.push(conv.chatId);
       }
     } else if (conv.status === "finished") {
@@ -1274,7 +1683,7 @@ export async function pruneExpiredConversations(): Promise<void> {
 
       if (conv.status === "abandoned") {
         const abandonedTime = conv.abandonedAt || conv.lastMessageAt || conv.createdAt;
-        if (now - abandonedTime > oneDay) {
+        if (now - abandonedTime > sixMonths) {
           shouldDelete = true;
         }
       } else if (conv.status === "finished") {
@@ -1302,6 +1711,137 @@ export async function pruneExpiredConversations(): Promise<void> {
     }
   } catch (err) {
     console.warn("Firestore pruneExpiredConversations failed:", err);
+  }
+}
+
+// Delete single conversation completely
+export async function deleteConversation(chatId: string): Promise<void> {
+  if (memoryStore.conversations[chatId]) {
+    delete memoryStore.conversations[chatId];
+    memoryStore.save();
+  }
+
+  try {
+    const docRef = doc(db, "conversations", chatId);
+    await deleteDoc(docRef);
+  } catch (err) {
+    console.warn("Firestore deleteConversation failed:", err);
+  }
+
+  if (rtdb) {
+    try {
+      const rtdbRef = ref(rtdb, `conversations/${chatId}`);
+      await set(rtdbRef, null);
+    } catch (err) {
+      console.warn("RTDB deleteConversation failed:", err);
+    }
+  }
+}
+
+export async function batchDeleteConversations(chatIds: string[]): Promise<void> {
+  await Promise.all(chatIds.map(id => deleteConversation(id)));
+}
+
+export async function batchResetConversations(chatIds: string[]): Promise<void> {
+  await Promise.all(chatIds.map(id => updateConversationStatus(id, "pending")));
+}
+
+// ==========================================
+// CUSTOMER CONTACTS MANAGEMENT SERVICES
+// ==========================================
+export async function saveContact(customerPhone: string, jobTitle?: string, name?: string): Promise<void> {
+  if (!customerPhone || customerPhone.trim() === "") return;
+  const id = customerPhone.replace(/[^0-9+]/g, "") || `contact-${Date.now()}`;
+  const now = Date.now();
+
+  const existingInMem = memoryStore.contacts ? memoryStore.contacts[id] : undefined;
+  const contact: CustomerContact = {
+    id,
+    customerPhone,
+    name: name || existingInMem?.name || customerPhone,
+    lastJobTitle: jobTitle || existingInMem?.lastJobTitle || "General Inquiry",
+    firstSeenAt: existingInMem ? existingInMem.firstSeenAt : now,
+    lastSeenAt: now,
+    chatCount: existingInMem ? (existingInMem.chatCount || 1) + 1 : 1
+  };
+
+  if (!memoryStore.contacts) {
+    memoryStore.contacts = {};
+  }
+  memoryStore.contacts[id] = contact;
+  memoryStore.save();
+
+  try {
+    const docRef = doc(db, "contacts", id);
+    await setDoc(docRef, contact, { merge: true });
+  } catch (err) {
+    console.warn("Firestore saveContact failed:", err);
+  }
+}
+
+export async function getContacts(): Promise<CustomerContact[]> {
+  try {
+    const collRef = collection(db, "contacts");
+    const snap = await getDocs(collRef);
+    if (!snap.empty) {
+      const list = snap.docs.map(d => d.data() as CustomerContact);
+      const sorted = list.sort((a, b) => b.lastSeenAt - a.lastSeenAt);
+      if (!memoryStore.contacts) memoryStore.contacts = {};
+      sorted.forEach(c => { memoryStore.contacts[c.id] = c; });
+      memoryStore.save();
+      return sorted;
+    }
+  } catch (err) {
+    console.warn("Firestore getContacts failed, using memory fallback:", err);
+  }
+
+  // Seed default contacts if empty
+  if (!memoryStore.contacts || Object.keys(memoryStore.contacts).length === 0) {
+    memoryStore.contacts = {
+      "15550192834": {
+        id: "15550192834",
+        customerPhone: "+1 (555) 019-2834",
+        name: "Alex Rivera",
+        lastJobTitle: "Lead WhatsApp Solutions Architect",
+        firstSeenAt: Date.now() - 3600000 * 48,
+        lastSeenAt: Date.now() - 3600000 * 2,
+        chatCount: 3
+      },
+      "15550149872": {
+        id: "15550149872",
+        customerPhone: "+1 (555) 014-9872",
+        name: "Samantha Wright",
+        lastJobTitle: "Senior AI Integration Specialist",
+        firstSeenAt: Date.now() - 3600000 * 72,
+        lastSeenAt: Date.now() - 3600000 * 23.5,
+        chatCount: 1
+      },
+      "15550127643": {
+        id: "15550127643",
+        customerPhone: "+1 (555) 012-7643",
+        name: "David Chen",
+        lastJobTitle: "Staff Fintech Infrastructure Engineer",
+        firstSeenAt: Date.now() - 3600000 * 24,
+        lastSeenAt: Date.now() - 3600000 * 1,
+        chatCount: 5
+      }
+    };
+    memoryStore.save();
+  }
+
+  return Object.values(memoryStore.contacts).sort((a, b) => b.lastSeenAt - a.lastSeenAt);
+}
+
+export async function deleteContact(id: string): Promise<void> {
+  if (memoryStore.contacts && memoryStore.contacts[id]) {
+    delete memoryStore.contacts[id];
+    memoryStore.save();
+  }
+  try {
+    const docRef = doc(db, "contacts", id);
+    await deleteDoc(docRef);
+  } catch (err) {
+    console.warn("Firestore deleteContact failed:", err);
   }
 }
 
@@ -1406,6 +1946,37 @@ export async function reportConversation(chatId: string, reason: string): Promis
 
 // Webhook simulation / customer message generator
 export async function simulateIncomingChat(customerPhone: string, text: string, jobId: string, jobTitle: string, seekerUid?: string): Promise<string> {
+  // Check if an existing conversation exists for this seeker/customer and job
+  let existingConv: Conversation | undefined;
+  if (memoryStore.conversations) {
+    existingConv = Object.values(memoryStore.conversations).find(c =>
+      (seekerUid ? c.seekerUid === seekerUid : c.customerPhone === customerPhone) && c.jobId === jobId
+    );
+  }
+
+  if (!existingConv) {
+    try {
+      const collRef = collection(db, "conversations");
+      const snap = await getDocs(collRef);
+      const fsConvs = snap.docs.map(d => d.data() as Conversation);
+      existingConv = fsConvs.find(c =>
+        (seekerUid ? c.seekerUid === seekerUid : c.customerPhone === customerPhone) && c.jobId === jobId
+      );
+    } catch (err) {
+      console.warn("Failed to check existing conversations in Firestore:", err);
+    }
+  }
+
+  if (existingConv) {
+    // Re-use existing conversation; sendChatMessage handles reinitiating abandoned conversations to pending queue
+    await saveContact(customerPhone, jobTitle);
+    await sendChatMessage(existingConv.chatId, "customer", text);
+    return existingConv.chatId;
+  }
+
+  // Save/update customer contact
+  await saveContact(customerPhone, jobTitle);
+
   const chatId = `chat-${Date.now()}`;
   const initialMessage: ChatMessage = {
     sender: "customer",
@@ -1414,102 +1985,9 @@ export async function simulateIncomingChat(customerPhone: string, text: string, 
   };
 
   // --- Dynamic Chat Routing Logic ---
-  // 1. Get all staff profiles
-  const staff = await getStaffProfiles();
-
-  // 2. Get their online statuses
-  const statuses = await getStaffStatuses();
-
-  // 3. Count active (ongoing) chats currently assigned to each staff member
-  let conversationsList: Conversation[] = [];
-  try {
-    const collRef = collection(db, "conversations");
-    const snap = await getDocs(collRef);
-    conversationsList = snap.docs.map(doc => doc.data() as Conversation);
-  } catch (error) {
-    console.warn("Firestore get conversations for routing failed, using memory fallback:", error);
-    conversationsList = Object.values(memoryStore.conversations);
-  }
-
-  const activeChatsCount: Record<string, number> = {};
-  conversationsList.forEach((c) => {
-    if (c.status === "ongoing" && c.assignedTo) {
-      activeChatsCount[c.assignedTo] = (activeChatsCount[c.assignedTo] || 0) + 1;
-    }
-  });
-
-  // 4. Categorize all staff profiles by online status and busy state (busy is activeCount >= 2)
-  const sortedStaff = [...staff].sort((a, b) => {
-    const countA = activeChatsCount[a.uid] || 0;
-    const countB = activeChatsCount[b.uid] || 0;
-    return countA - countB;
-  });
-
-  const onlineNotBusy: UserProfile[] = [];
-  const offlineNotBusy: UserProfile[] = [];
-  const onlineBusy: UserProfile[] = [];
-  const offlineBusy: UserProfile[] = [];
-
-  sortedStaff.forEach((s) => {
-    const isOnline = (statuses[s.uid] || memoryStore.staffStatuses[s.uid]) === "online";
-    const activeCount = activeChatsCount[s.uid] || 0;
-    const isBusy = activeCount >= 2;
-
-    if (isOnline) {
-      if (!isBusy) onlineNotBusy.push(s);
-      else onlineBusy.push(s);
-    } else {
-      if (!isBusy) offlineNotBusy.push(s);
-      else offlineBusy.push(s);
-    }
-  });
-
-  let selectedStaff: UserProfile[] = [];
-  let assignedToOffline = false;
-
-  if (onlineNotBusy.length > 0) {
-    // Case A: At least one online staff member is not busy.
-    // Target is exactly 5 staff. Prioritize online, then fill with offline available, then online busy, then offline busy.
-    selectedStaff = [...onlineNotBusy];
-
-    if (selectedStaff.length < 5) {
-      const remainingNeeded = 5 - selectedStaff.length;
-      const offlineToTake = offlineNotBusy.slice(0, remainingNeeded);
-      selectedStaff.push(...offlineToTake);
-      if (offlineToTake.length > 0) {
-        assignedToOffline = true;
-      }
-    }
-
-    if (selectedStaff.length < 5) {
-      const remainingNeeded = 5 - selectedStaff.length;
-      selectedStaff.push(...onlineBusy.slice(0, remainingNeeded));
-    }
-
-    if (selectedStaff.length < 5) {
-      const remainingNeeded = 5 - selectedStaff.length;
-      const offlineBusyToTake = offlineBusy.slice(0, remainingNeeded);
-      selectedStaff.push(...offlineBusyToTake);
-      if (offlineBusyToTake.length > 0) {
-        assignedToOffline = true;
-      }
-    }
-    // Crop to 5 max
-    selectedStaff = selectedStaff.slice(0, 5);
-  } else {
-    // Case B: ALL online staff are busy (or there are no online staff).
-    // "assign the conversation to 5 online busy staffs and 5 offline available staff, making 10"
-    const busyOnlineToTake = onlineBusy.slice(0, 5);
-    const offlineAvailableToTake = offlineNotBusy.slice(0, 5);
-
-    selectedStaff = [...busyOnlineToTake, ...offlineAvailableToTake];
-    if (offlineAvailableToTake.length > 0) {
-      assignedToOffline = true;
-    }
-  }
-
-  const selectedStaffUids = selectedStaff.map(s => s.uid);
+  const { selectedStaffUids, assignedToOffline } = await routeToAvailableStaff();
   const actualSeekerUid = seekerUid || auth.currentUser?.uid || undefined;
+  const isAppChat = (customerPhone ? !customerPhone.startsWith("+") : true) || Boolean(actualSeekerUid);
 
   const conversation: Conversation = {
     chatId,
@@ -1525,6 +2003,7 @@ export async function simulateIncomingChat(customerPhone: string, text: string, 
     lastMessageAt: Date.now(),
     messages: [initialMessage],
     assignedToOffline,
+    isInApp: isAppChat,
     seekerUid: actualSeekerUid
   };
 

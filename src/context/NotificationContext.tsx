@@ -351,9 +351,9 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
           const lastMsg = messages[messages.length - 1] as ChatMessage | undefined;
 
           // STAFF RULES
-          if (currentUser.role === "staff") {
+          if (currentUser.role === "staff" || currentUser.role === "admin") {
             // A. New available unassigned chat to claim (routed to this staff member)
-            if (conv.status === "pending" && conv.sharedWith && conv.sharedWith.includes(currentUser.uid)) {
+            if (conv.status === "pending" && (!conv.sharedWith || conv.sharedWith.length === 0 || conv.sharedWith.includes(currentUser.uid) || currentUser.role === "staff" || currentUser.role === "admin")) {
               if (!prevAvailableChatsRef.current.has(conv.chatId)) {
                 // If created after we subscribed, notify
                 if (conv.createdAt > start) {

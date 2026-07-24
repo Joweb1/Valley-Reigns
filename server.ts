@@ -1,10 +1,16 @@
 import express from "express";
 import path from "path";
+import fs from "fs";
 import { createServer as createViteServer } from "vite";
 import { initializeApp } from "firebase/app";
 import { getFirestore, doc, getDoc, updateDoc, setDoc, collection, getDocs, onSnapshot, deleteDoc } from "firebase/firestore";
 import { getDatabase, ref, set } from "firebase/database";
 import webpush from "web-push";
+import makeWASocket, { useMultiFileAuthState, DisconnectReason } from "@whiskeysockets/baileys";
+import QRCode from "qrcode";
+
+const makeWASocketFn = (makeWASocket as any)?.default || makeWASocket;
+const useMultiFileAuthStateFn = (useMultiFileAuthState as any)?.default || useMultiFileAuthState;
 
 const app = express();
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
@@ -27,6 +33,13 @@ const firebaseConfig = {
 // Initialize Firebase App & Firestore
 const firebaseApp = initializeApp(firebaseConfig);
 const db = getFirestore(firebaseApp, firebaseConfig.firestoreDatabaseId);
+
+let rtdb: any = null;
+try {
+  rtdb = getDatabase(firebaseApp);
+} catch (e) {
+  console.warn("[Server] Realtime Database initialization notice:", e);
+}
 
 // Active Presence Sync checking for offline staff members based on heartbeat timeouts
 async function checkAndCleanStaffStatuses() {
@@ -153,41 +166,7 @@ app.post("/api/webhook/whatsapp", async (req, res) => {
         const name = changeValue.contacts && changeValue.contacts[0] ? changeValue.contacts[0].profile.name : "WhatsApp User";
 
         console.log(`[WHATSAPP WEBHOOK EVENT] Text message from ${name} (${from}): "${text}"`);
-
-        const chatId = `whatsapp-${from}`;
-        const convRef = doc(db, "conversations", chatId);
-        const docSnap = await getDoc(convRef);
-
-        const newMessage = {
-          sender: "customer" as const,
-          text: text,
-          timestamp: Date.now()
-        };
-
-        if (docSnap.exists()) {
-          const currentData = docSnap.data();
-          const messages = Array.isArray(currentData.messages) ? currentData.messages : [];
-          await updateDoc(convRef, {
-            text: text,
-            lastMessageAt: Date.now(),
-            messages: [...messages, newMessage]
-          });
-        } else {
-          // Create new chat session
-          await setDoc(convRef, {
-            chatId: chatId,
-            name: `${name} (${from})`,
-            category: "General",
-            text: text,
-            status: "unassigned",
-            assignedTo: "",
-            assignedToName: "",
-            lastMessageAt: Date.now(),
-            createdAt: Date.now(),
-            messages: [newMessage]
-          });
-        }
-        console.log(`[WHATSAPP WEBHOOK EVENT] Successfully synchronized message to Firestore conversation "${chatId}"`);
+        await syncIncomingBaileysMessage(`${from}@s.whatsapp.net`, name, text);
       }
       res.sendStatus(200);
       return;
@@ -200,6 +179,468 @@ app.post("/api/webhook/whatsapp", async (req, res) => {
 
   res.sendStatus(404);
 });
+
+// ---------------------------------------------------------
+// Baileys WhatsApp Web Engine & Dual Provider Router
+// ---------------------------------------------------------
+const BAILEYS_AUTH_DIR = path.join(process.cwd(), "baileys_auth");
+
+const silentLogger = {
+  level: "silent",
+  trace: () => {},
+  debug: () => {},
+  info: () => {},
+  warn: () => {},
+  error: () => {},
+  fatal: () => {},
+  child: () => silentLogger
+};
+
+let baileysSocket: any = null;
+let baileysStatus: "disconnected" | "connecting" | "qr_ready" | "connected" | "error" = "disconnected";
+let baileysQrCode: string | null = null;
+let baileysUserPhone: string | null = null;
+let baileysError: string | null = null;
+
+async function getActiveWhatsAppMode(): Promise<"official" | "baileys"> {
+  try {
+    const configDoc = await getDoc(doc(db, "settings", "whatsapp"));
+    if (configDoc.exists()) {
+      const data = configDoc.data();
+      const officialConfigured = Boolean(
+        (data.phoneAccountId || process.env.WHATSAPP_PHONE_ACCOUNT_ID) &&
+        (data.accessToken || process.env.WHATSAPP_ACCESS_TOKEN)
+      );
+      if (data.mode === "baileys") return "baileys";
+      if (data.mode === "official" && officialConfigured) return "official";
+      if (!officialConfigured) return "baileys";
+    }
+  } catch (err) {
+    console.warn("[WhatsApp Provider] Error reading mode from Firestore:", err);
+  }
+  const defaultOfficialConfigured = Boolean(process.env.WHATSAPP_PHONE_ACCOUNT_ID && process.env.WHATSAPP_ACCESS_TOKEN);
+  return defaultOfficialConfigured ? "official" : "baileys";
+}
+
+function extractMessageText(msgContent: any): string {
+  if (!msgContent) return "";
+
+  // Unwrap nested/wrapper messages
+  if (msgContent.ephemeralMessage) return extractMessageText(msgContent.ephemeralMessage.message);
+  if (msgContent.viewOnceMessage) return extractMessageText(msgContent.viewOnceMessage.message);
+  if (msgContent.viewOnceMessageV2) return extractMessageText(msgContent.viewOnceMessageV2.message);
+  if (msgContent.viewOnceMessageV2Extension) return extractMessageText(msgContent.viewOnceMessageV2Extension.message);
+  if (msgContent.documentWithCaptionMessage) return extractMessageText(msgContent.documentWithCaptionMessage.message);
+  if (msgContent.editedMessage) return extractMessageText(msgContent.editedMessage.message);
+
+  // Ignore protocol/system signals that carry no actual user content
+  if (
+    msgContent.protocolMessage ||
+    msgContent.senderKeyDistributionMessage ||
+    msgContent.messageContextInfo ||
+    msgContent.reactionMessage
+  ) {
+    if (
+      !msgContent.conversation &&
+      !msgContent.extendedTextMessage &&
+      !msgContent.imageMessage &&
+      !msgContent.videoMessage &&
+      !msgContent.audioMessage &&
+      !msgContent.documentMessage
+    ) {
+      return "";
+    }
+  }
+
+  if (msgContent.conversation) return msgContent.conversation;
+  if (msgContent.extendedTextMessage?.text) return msgContent.extendedTextMessage.text;
+  if (msgContent.imageMessage?.caption) return msgContent.imageMessage.caption;
+  if (msgContent.videoMessage?.caption) return msgContent.videoMessage.caption;
+  if (msgContent.imageMessage) return "[Photo]";
+  if (msgContent.videoMessage) return "[Video]";
+  if (msgContent.audioMessage || msgContent.ptvMessage) return "[Voice note]";
+  if (msgContent.documentMessage) return `[Document: ${msgContent.documentMessage.fileName || "File"}]`;
+  if (msgContent.stickerMessage) return "[Sticker]";
+  if (msgContent.contactMessage) return `[Contact: ${msgContent.contactMessage.displayName || "Contact"}]`;
+  if (msgContent.contactsArrayMessage) return "[Contacts]";
+  if (msgContent.locationMessage || msgContent.liveLocationMessage) return "[Location]";
+  if (msgContent.buttonsResponseMessage?.selectedDisplayText) return msgContent.buttonsResponseMessage.selectedDisplayText;
+  if (msgContent.listResponseMessage?.title) return msgContent.listResponseMessage.title;
+  if (msgContent.interactiveResponseMessage) return "[Interactive Response]";
+  if (msgContent.templateButtonReplyMessage?.selectedDisplayText) return msgContent.templateButtonReplyMessage.selectedDisplayText;
+
+  return "Media or Unsupported Message";
+}
+
+async function syncIncomingBaileysMessage(fromJid: string, name: string, text: string) {
+  try {
+    const rawPhone = fromJid.split("@")[0].split(":")[0].replace(/[^0-9]/g, "");
+    if (!rawPhone || rawPhone.length < 5) return;
+
+    const formattedPhone = rawPhone.startsWith("+") ? rawPhone : `+${rawPhone}`;
+    const chatId = `whatsapp-${rawPhone}`;
+    const convRef = doc(db, "conversations", chatId);
+    const docSnap = await getDoc(convRef);
+
+    const newMessage = {
+      sender: "customer" as const,
+      text: text,
+      timestamp: Date.now()
+    };
+
+    if (docSnap.exists()) {
+      const currentData = docSnap.data();
+      const messages = Array.isArray(currentData.messages) ? currentData.messages : [];
+      
+      const updateData: any = {
+        text: text,
+        lastMessageAt: Date.now(),
+        messages: [...messages, newMessage]
+      };
+
+      // Re-open/set to pending if unassigned or previously finished/abandoned
+      if (!currentData.assignedTo || currentData.status === "unassigned" || currentData.status === "abandoned" || currentData.status === "finished") {
+        updateData.status = "pending";
+        updateData.assignedTo = "";
+        updateData.assignedToName = "";
+      }
+
+      await updateDoc(convRef, updateData);
+    } else {
+      const displayName = name && name !== "WhatsApp User" ? `${name} (${formattedPhone})` : formattedPhone;
+      await setDoc(convRef, {
+        chatId: chatId,
+        customerPhone: formattedPhone,
+        name: displayName,
+        category: "WhatsApp Inquiry",
+        text: text,
+        status: "pending",
+        assignedTo: "",
+        assignedToName: "",
+        lastMessageAt: Date.now(),
+        createdAt: Date.now(),
+        messages: [newMessage]
+      });
+    }
+
+    console.log(`[Baileys Message Sync] Successfully routed incoming message from ${formattedPhone} (${name}) -> Chat ${chatId}`);
+  } catch (err) {
+    console.error("[Baileys Message Sync Error]:", err);
+  }
+}
+
+async function initBaileysSocket(forceReconnect = false) {
+  if (baileysSocket && !forceReconnect && baileysStatus === "connected") {
+    console.log("[Baileys] Socket already active and connected.");
+    return;
+  }
+
+  // Close existing socket if forced
+  if (baileysSocket && forceReconnect) {
+    try {
+      baileysSocket.end(undefined);
+    } catch (e) {}
+    baileysSocket = null;
+  }
+
+  try {
+    baileysStatus = "connecting";
+    baileysError = null;
+    baileysQrCode = null;
+
+    if (!fs.existsSync(BAILEYS_AUTH_DIR)) {
+      fs.mkdirSync(BAILEYS_AUTH_DIR, { recursive: true });
+    }
+
+    const { state, saveCreds } = await useMultiFileAuthStateFn(BAILEYS_AUTH_DIR);
+
+    const sock = makeWASocketFn({
+      auth: state,
+      logger: silentLogger as any,
+      printQRInTerminal: false,
+      browser: ["Valley Reigns Recruiting", "Chrome", "1.0.0"],
+      syncFullHistory: false
+    });
+
+    baileysSocket = sock;
+
+    sock.ev.on("creds.update", saveCreds);
+
+    sock.ev.on("connection.update", async (update: any) => {
+      const { connection, lastDisconnect, qr } = update;
+
+      if (qr) {
+        try {
+          baileysQrCode = await QRCode.toDataURL(qr);
+          baileysStatus = "qr_ready";
+          console.log("[Baileys] New QR Code generated successfully");
+        } catch (err) {
+          console.error("[Baileys] Error converting QR code to Data URL:", err);
+        }
+      }
+
+      if (connection === "open") {
+        baileysStatus = "connected";
+        baileysQrCode = null;
+        baileysError = null;
+        const userJid = sock.user?.id || "";
+        baileysUserPhone = userJid.split("@")[0].split(":")[0] || "Connected";
+        console.log(`[Baileys] Successfully connected to WhatsApp Web as +${baileysUserPhone}!`);
+
+        try {
+          await setDoc(doc(db, "settings", "whatsapp"), {
+            baileysConnected: true,
+            baileysUserPhone: `+${baileysUserPhone}`,
+            lastConnectedAt: Date.now()
+          }, { merge: true });
+        } catch (e) {
+          console.warn("[Baileys] Failed to update Firestore connected status:", e);
+        }
+      } else if (connection === "close") {
+        const statusCode = lastDisconnect?.error?.output?.statusCode;
+        const errMessage = lastDisconnect?.error?.message || String(lastDisconnect?.error || "");
+        const credsExist = fs.existsSync(path.join(BAILEYS_AUTH_DIR, "creds.json"));
+        const isLoggedOut = statusCode === DisconnectReason?.loggedOut;
+        const isRestartRequired = statusCode === DisconnectReason?.restartRequired;
+        const isQrExpired = !credsExist && (errMessage.includes("QR refs attempts ended") || errMessage.includes("timed out"));
+
+        baileysSocket = null;
+
+        if (isLoggedOut) {
+          baileysStatus = "disconnected";
+          baileysQrCode = null;
+          baileysUserPhone = null;
+          baileysError = "Session logged out.";
+          console.log("[Baileys] Session logged out.");
+          try {
+            fs.rmSync(BAILEYS_AUTH_DIR, { recursive: true, force: true });
+          } catch (e) {
+            console.warn("[Baileys] Error removing auth directory on logout:", e);
+          }
+        } else if (isQrExpired) {
+          baileysStatus = "disconnected";
+          baileysQrCode = null;
+          baileysUserPhone = null;
+          baileysError = "QR Code expired. Click 'Generate QR Code' in WhatsApp Settings to try again.";
+          console.log("[Baileys] QR code expired without pairing. Waiting for user action.");
+        } else {
+          baileysStatus = "connecting";
+          baileysQrCode = null;
+          const delay = isRestartRequired ? 500 : 1500;
+          console.log(`[Baileys] Handshake socket closed (code ${statusCode}). Reconnecting authenticated session in ${delay}ms...`);
+          setTimeout(() => {
+            initBaileysSocket(true).catch(console.error);
+          }, delay);
+        }
+      }
+    });
+
+    sock.ev.on("messages.upsert", async (m: any) => {
+      try {
+        if (Array.isArray(m.messages)) {
+          for (const msg of m.messages) {
+            if (!msg.message || msg.key.fromMe) continue;
+            const jid = msg.key.remoteJid || msg.key.participant || "";
+
+            // Exempt Groups (@g.us), Communities (@g.us), Broadcasts (@broadcast), and Newsletters/Channels (@newsletter)
+            const isExempt = jid.endsWith("@g.us") || jid.includes("@g.us") || jid.includes("@broadcast") || jid.includes("@newsletter");
+            if (isExempt) continue;
+
+            const text = extractMessageText(msg.message);
+            if (!text) continue;
+
+            const name = msg.pushName || "WhatsApp Customer";
+
+            console.log(`[Baileys] Received message from ${name} (${jid}): "${text}"`);
+            await syncIncomingBaileysMessage(jid, name, text);
+          }
+        }
+      } catch (err) {
+        console.error("[Baileys] Error processing incoming upsert message:", err);
+      }
+    });
+
+  } catch (err: any) {
+    console.error("[Baileys] Initialization error:", err);
+    baileysStatus = "error";
+    baileysError = err.message || "Failed to initialize Baileys engine";
+    baileysSocket = null;
+  }
+}
+
+async function disconnectBaileys() {
+  if (baileysSocket) {
+    try {
+      await baileysSocket.logout();
+    } catch (e) {
+      console.warn("[Baileys] Error during socket logout:", e);
+    }
+    baileysSocket = null;
+  }
+  baileysStatus = "disconnected";
+  baileysQrCode = null;
+  baileysUserPhone = null;
+
+  try {
+    if (fs.existsSync(BAILEYS_AUTH_DIR)) {
+      fs.rmSync(BAILEYS_AUTH_DIR, { recursive: true, force: true });
+    }
+  } catch (e) {
+    console.warn("[Baileys] Error wiping auth folder on disconnect:", e);
+  }
+
+  try {
+    await setDoc(doc(db, "settings", "whatsapp"), {
+      baileysConnected: false,
+      baileysUserPhone: null
+    }, { merge: true });
+  } catch (e) {
+    console.warn("[Baileys] Failed to update Firestore disconnect status:", e);
+  }
+}
+
+async function sendWhatsAppMessage(toPhone: string, text: string) {
+  const mode = await getActiveWhatsAppMode();
+  const cleanedPhone = toPhone.replace(/[^0-9]/g, "");
+
+  if (mode === "baileys") {
+    if (!baileysSocket || baileysStatus !== "connected") {
+      throw new Error(`Baileys WhatsApp Web is not connected (Status: ${baileysStatus}). Please scan QR code in Admin Settings.`);
+    }
+    const jid = `${cleanedPhone}@s.whatsapp.net`;
+    console.log(`[WhatsApp Dispatch: Baileys] Dispatching to ${jid}: "${text}"`);
+    await baileysSocket.sendMessage(jid, { text });
+    return { success: true, provider: "baileys", toPhone: cleanedPhone };
+  } else {
+    const configDoc = await getDoc(doc(db, "settings", "whatsapp"));
+    const config = configDoc.exists() ? configDoc.data() : null;
+    const phoneAccountId = config?.phoneAccountId || process.env.WHATSAPP_PHONE_ACCOUNT_ID;
+    const accessToken = config?.accessToken || process.env.WHATSAPP_ACCESS_TOKEN;
+
+    if (!phoneAccountId || !accessToken) {
+      throw new Error("Official Meta WhatsApp API credentials are missing. Switch to Baileys WhatsApp Web mode in Admin Settings.");
+    }
+
+    console.log(`[WhatsApp Dispatch: Meta API] Dispatching to ${cleanedPhone}: "${text}"`);
+    const res = await fetch(`https://graph.facebook.com/v18.0/${phoneAccountId}/messages`, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${accessToken}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        recipient_type: "individual",
+        to: cleanedPhone,
+        type: "text",
+        text: { preview_url: false, body: text }
+      })
+    });
+
+    const responseData = await res.json();
+    if (!res.ok) {
+      throw new Error(responseData?.error?.message || "Meta WhatsApp API dispatch failed");
+    }
+    return { success: true, provider: "official", metaData: responseData };
+  }
+}
+
+// WhatsApp Dual Provider Status Endpoint
+app.get("/api/whatsapp/provider-status", async (req, res) => {
+  try {
+    const configDoc = await getDoc(doc(db, "settings", "whatsapp"));
+    const config = configDoc.exists() ? configDoc.data() : {};
+
+    const officialConfigured = Boolean(
+      (config.phoneAccountId || process.env.WHATSAPP_PHONE_ACCOUNT_ID) &&
+      (config.accessToken || process.env.WHATSAPP_ACCESS_TOKEN)
+    );
+
+    const activeMode = config.mode || (officialConfigured ? "official" : "baileys");
+
+    res.json({
+      activeMode,
+      officialConfigured,
+      officialConfig: {
+        phoneAccountId: config.phoneAccountId || "",
+        businessAccountId: config.businessAccountId || "",
+        verifyToken: config.verifyToken || "valleyreigns_verify_token"
+      },
+      baileysStatus,
+      baileysQrCode,
+      baileysUserPhone,
+      baileysError
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Toggle Provider Mode Endpoint
+app.post("/api/whatsapp/toggle-mode", async (req, res) => {
+  try {
+    const { mode } = req.body;
+    if (mode !== "official" && mode !== "baileys") {
+      res.status(400).json({ error: "Invalid mode. Must be 'official' or 'baileys'." });
+      return;
+    }
+
+    await setDoc(doc(db, "settings", "whatsapp"), { mode }, { merge: true });
+
+    if (mode === "baileys" && baileysStatus === "disconnected") {
+      initBaileysSocket().catch(console.error);
+    }
+
+    res.json({ success: true, activeMode: mode });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Baileys Connect / Initialize Endpoint
+app.post("/api/baileys/connect", async (req, res) => {
+  try {
+    await initBaileysSocket(true);
+    res.json({ success: true, status: baileysStatus, qrCode: baileysQrCode });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Baileys Disconnect Endpoint
+app.post("/api/baileys/disconnect", async (req, res) => {
+  try {
+    await disconnectBaileys();
+    res.json({ success: true, status: "disconnected" });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Dispatch Outbound WhatsApp Message Endpoint
+app.post("/api/whatsapp/send", async (req, res) => {
+  try {
+    const { toPhone, text } = req.body;
+    if (!toPhone || !text) {
+      res.status(400).json({ error: "Missing required fields 'toPhone' and 'text'." });
+      return;
+    }
+
+    const result = await sendWhatsAppMessage(toPhone, text);
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || "Failed to dispatch WhatsApp message." });
+  }
+});
+
+// Auto-start Baileys on startup only if saved credentials exist
+const credsFilePath = path.join(BAILEYS_AUTH_DIR, "creds.json");
+if (fs.existsSync(credsFilePath)) {
+  console.log("[Baileys Boot] Saved session found. Initializing Baileys engine on server startup...");
+  initBaileysSocket().catch(err => console.warn("[Baileys Boot] Warning:", err));
+} else {
+  console.log("[Baileys Boot] No active Baileys session saved. Awaiting QR scan in WhatsApp config.");
+}
 
 // Vite & Static file serving setup
 async function setupVite() {

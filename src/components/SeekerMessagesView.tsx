@@ -111,6 +111,7 @@ export const SeekerMessagesView: React.FC = () => {
   // Filter conversations belonging to this seeker
   const seekerPhoneIdentifier = currentUser?.displayName || currentUser?.email || "Unknown Seeker";
   const myConversations = (Object.values(conversations) as Conversation[]).filter(c => 
+    (c.seekerUid && currentUser?.uid && c.seekerUid === currentUser.uid) ||
     c.customerPhone === seekerPhoneIdentifier || 
     c.customerPhone === currentUser?.email ||
     c.customerPhone === currentUser?.displayName
@@ -231,7 +232,7 @@ export const SeekerMessagesView: React.FC = () => {
   // Expiration Clock Calculations (24-Hour window based on arrival timestamp vs current time)
   const getExpirationState = (conv: Conversation) => {
     // Check if conversation is an in-app conversation (not standard WhatsApp)
-    const isInApp = !conv.customerPhone.startsWith("+");
+    const isInApp = conv?.isInApp || (conv?.customerPhone ? !conv.customerPhone.startsWith("+") : true);
     if (isInApp) {
       return { isExpired: false, text: "In-App Chat", hoursLeft: 999, isUrgent: false, isInApp: true };
     }
@@ -364,7 +365,7 @@ export const SeekerMessagesView: React.FC = () => {
                       </p>
                       {latestMsg && (
                         <p className="text-[11px] font-sans text-slate-400 line-clamp-1 italic">
-                          {latestMsg.sender === "customer" ? "You: " : "Recruiter: "}
+                          {latestMsg.sender === "customer" || latestMsg.sender === "guest" ? "You: " : "Recruiter: "}
                           "{latestMsg.text}"
                         </p>
                       )}
@@ -383,11 +384,8 @@ export const SeekerMessagesView: React.FC = () => {
           activeConversation ? "translate-x-0 md:translate-x-0" : "translate-x-full md:translate-x-0"
         }`}>
           {activeConversation ? (
-            <motion.div
+            <div
               key={activeConversation.chatId}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.25 }}
               className="flex-grow flex flex-col overflow-y-auto h-full relative pt-16 pb-48 md:overflow-y-hidden md:h-auto md:min-h-0 md:pt-0 md:pb-0 text-left"
             >
               {/* Active Conversation Metadata Header */}
@@ -538,7 +536,7 @@ export const SeekerMessagesView: React.FC = () => {
                     );
                   }
 
-                  const firstCustomerMsg = messagesArray.find(m => m.sender === "customer");
+                  const firstCustomerMsg = messagesArray.find(m => m.sender === "customer" || m.sender === "guest");
 
                   return messagesArray.map((msg, index) => {
                     if (msg.sender === "system") {
@@ -552,8 +550,8 @@ export const SeekerMessagesView: React.FC = () => {
                       );
                     }
 
-                    // Seeker is customer (current sender)
-                    const isSeeker = msg.sender === "customer";
+                    // Seeker is customer or guest (current sender)
+                    const isSeeker = msg.sender === "customer" || msg.sender === "guest";
                     const isFirstCustomerMessage = isSeeker && firstCustomerMsg && msg === firstCustomerMsg;
                     let matchedJob: Job | null = null;
                     if (isFirstCustomerMessage) {
@@ -792,7 +790,7 @@ export const SeekerMessagesView: React.FC = () => {
                   );
                 })()}
               </div>
-            </motion.div>
+            </div>
           ) : (
             <div className="flex-grow flex flex-col items-center justify-center text-center p-8">
               <div className="w-14 h-14 bg-slate-150 rounded-2xl flex items-center justify-center text-slate-400 mb-3 shadow-inner">

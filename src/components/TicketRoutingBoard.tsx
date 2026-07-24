@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { UserProfile, Conversation } from "../types";
+import { SLACountdownTimer } from "./SLACountdownTimer";
 import { 
   BarChart3, 
   ArrowLeft, 
@@ -307,6 +308,13 @@ export const TicketRoutingBoard: React.FC<TicketRoutingBoardProps> = ({
                         {/* Middle status section */}
                         {activeTab === "pending" && (
                           <div className="space-y-2.5 pt-2 border-t border-dashed border-slate-100">
+                            <SLACountdownTimer 
+                              createdAt={c.createdAt} 
+                              label="Claim Countdown" 
+                              isInApp={c.isInApp || (c.customerPhone ? !c.customerPhone.startsWith("+") : true)}
+                              customerPhone={c.customerPhone}
+                            />
+
                             <div 
                               onClick={() => setExpandedPendingChatId(isExpanded ? null : c.chatId)}
                               className="flex items-center justify-between text-[10px] text-slate-600 font-sans font-bold cursor-pointer hover:opacity-80 select-none"
@@ -355,6 +363,13 @@ export const TicketRoutingBoard: React.FC<TicketRoutingBoardProps> = ({
 
                         {activeTab === "ongoing" && (
                           <div className="space-y-3 pt-2 border-t border-dashed border-slate-100">
+                            <SLACountdownTimer 
+                              createdAt={c.createdAt} 
+                              label="Ongoing SLA Timer" 
+                              isInApp={c.isInApp || (c.customerPhone ? !c.customerPhone.startsWith("+") : true)}
+                              customerPhone={c.customerPhone}
+                            />
+
                             <div className="flex items-center gap-2 bg-blue-50/75 text-blue-800 p-2.5 rounded-xl text-[10px] font-sans font-bold border border-blue-100/50">
                               <Users className="w-3.5 h-3.5 text-blue-600 shrink-0" />
                               <span className="truncate">

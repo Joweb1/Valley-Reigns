@@ -35,7 +35,7 @@ export const StaffManagement: React.FC<StaffManagementProps> = ({
 
   const getAvailableRequestsCount = (staffUid: string) => {
     return conversationsList.filter(
-      c => c.status === "pending" && c.sharedWith?.includes(staffUid)
+      c => c.status === "pending" && (!c.assignedTo) && (!c.sharedWith || c.sharedWith.length === 0 || c.sharedWith.includes(staffUid))
     ).length;
   };
 

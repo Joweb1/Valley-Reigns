@@ -466,7 +466,7 @@ export const JobCard: React.FC<JobCardProps> = ({ job, onImpressionsUpdate }) =>
               style={{ color: theme.primary }}
               onClick={handleToggle}
             >
-              {shortTitle}
+              {isOpen ? job.title : shortTitle}
             </h3>
           </div>
 
@@ -578,7 +578,11 @@ export const JobCard: React.FC<JobCardProps> = ({ job, onImpressionsUpdate }) =>
             className="w-full border-t border-slate-100 bg-slate-50/50 rounded-b-[24px] sm:rounded-b-[32px] overflow-hidden"
           >
             <div className="p-5 sm:p-6 space-y-4 text-left">
-              <div className="flex flex-wrap items-center gap-1.5 border-b border-slate-100 pb-3">
+              <div className="border-b border-slate-100 pb-3 space-y-2">
+                <h2 className="text-sm sm:text-base font-sans font-black text-slate-900 uppercase tracking-wide leading-snug">
+                  {job.title}
+                </h2>
+                <div className="flex flex-wrap items-center gap-1.5">
                 <span 
                   className="px-2.5 py-0.5 text-white rounded-full text-[9px] font-sans font-extrabold tracking-wide shadow-sm"
                   style={{ backgroundColor: theme.primary }}
@@ -594,6 +598,7 @@ export const JobCard: React.FC<JobCardProps> = ({ job, onImpressionsUpdate }) =>
                     Popular ({localImpressions} Views)
                   </span>
                 )}
+                </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-white p-4 rounded-xl border border-slate-150">

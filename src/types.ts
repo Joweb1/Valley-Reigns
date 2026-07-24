@@ -25,6 +25,17 @@ export interface SystemNotification {
   seekerUid?: string;
 }
 
+export interface CustomerContact {
+  id: string;
+  customerPhone: string;
+  name?: string;
+  lastJobTitle?: string;
+  lastChatId?: string;
+  firstSeenAt: number;
+  lastSeenAt: number;
+  chatCount: number;
+}
+
 export interface UserProfile {
   uid: string;
   email: string;
@@ -39,7 +50,7 @@ export interface UserProfile {
 
 export interface ChatMessage {
   id?: string;
-  sender: "customer" | "staff" | "system";
+  sender: "customer" | "staff" | "system" | "guest";
   text: string;
   timestamp: number;
 }
@@ -59,6 +70,7 @@ export interface Conversation {
   messages?: Record<string, ChatMessage> | ChatMessage[];
   assignedToOffline?: boolean;
   isReported?: boolean;
+  isInApp?: boolean;
   abandonedAt?: number;
   finishedAt?: number;
   seekerUid?: string;

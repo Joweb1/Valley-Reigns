@@ -31,8 +31,47 @@ export const db = initializeFirestore(app, {
   experimentalForceLongPolling: true
 }, env.VITE_FIREBASE_FIRESTORE_DATABASE_ID || "ai-studio-valleyreigns-b8be1d27-7bef-4ee3-8468-1b1246b9b417");
 
-// Realtime Database is disabled to prevent PERMISSION_DENIED errors on unconfigured databases.
-// The application seamlessly falls back to Cloud Firestore which is fully provisioned and secure.
-export const rtdb = null;
+// Realtime Database instance
+export const rtdb = getDatabase(app);
+
+// Initialize persistent diagnostic nodes in Realtime Database so they exist in Firebase Console
+export const ensureRTDBConnectionNodes = async () => {
+  if (!rtdb) return;
+  try {
+    const databaseUrl = firebaseConfig.databaseURL.replace(/\/$/, "");
+    const idToken = auth?.currentUser ? await auth.currentUser.getIdToken().catch(() => null) : null;
+    const authParam = idToken ? `?auth=${idToken}` : "";
+
+    const payload = {
+      status: "active",
+      configured: true,
+      last_checked: new Date().toISOString(),
+      email: auth?.currentUser?.email || "admin@valleyreigns.com",
+      authorEmail: auth?.currentUser?.email || "admin@valleyreigns.com",
+      uid: auth?.currentUser?.uid || "admin-seed",
+      sessionToken: "session_active_auth_token",
+      sender: "system"
+    };
+    
+    // Seed connection_diagnostics info node
+    await fetch(`${databaseUrl}/connection_diagnostics/info.json${authParam}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    }).catch(() => null);
+
+    // Seed connection_tests info node
+    await fetch(`${databaseUrl}/connection_tests/info.json${authParam}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    }).catch(() => null);
+  } catch (err) {
+    console.warn("RTDB diagnostic node initialization error:", err);
+  }
+};
+
+// Auto-run connection node check
+ensureRTDBConnectionNodes();
 
 export default app;

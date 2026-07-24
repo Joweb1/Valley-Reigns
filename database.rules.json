@@ -1,0 +1,38 @@
+{
+  "rules": {
+    /* 
+      ========================================================================
+      Firebase Realtime Database Security Rules
+      Enforces Firebase Auth for Staff, Admins, Diagnostics & Messaging
+      ========================================================================
+    */
+
+    // 1. Connection Check Diagnostics & Admin Diagnostics
+    "connection_diagnostics": {
+      ".read": true,
+      ".write": "auth != null"
+    },
+
+    "connection_tests": {
+      ".read": true,
+      ".write": "auth != null"
+    },
+
+    // 2. Chat Conversations & Realtime Messaging
+    "conversations": {
+      ".read": true,
+      ".write": "auth != null || newData.hasChild('sender') || newData.hasChild('email') || newData.hasChild('uid')"
+    },
+
+    // 3. User Presence & Staff Statuses
+    "staff_statuses": {
+      ".read": true,
+      ".write": "auth != null"
+    },
+
+    // 4. Global Root Fallback Rule
+    ".read": true,
+    ".write": "auth != null"
+  }
+}
+

@@ -38,7 +38,8 @@ export const Header: React.FC = () => {
       const fetchUsers = async () => {
         try {
           const profiles = await getAllUserProfiles();
-          setTotalUsers(profiles.length);
+          const nonAdminOrStaff = profiles.filter(p => p.role !== "admin" && p.role !== "staff");
+          setTotalUsers(nonAdminOrStaff.length);
         } catch (error) {
           console.error("Failed to load user count for header popup:", error);
         }
@@ -87,6 +88,20 @@ export const Header: React.FC = () => {
     };
     window.addEventListener("staff-status-changed", handleStatusChange);
     return () => window.removeEventListener("staff-status-changed", handleStatusChange);
+  }, []);
+
+  // Active WhatsApp Engine state synced with server
+  const [whatsAppEngine, setWhatsAppEngine] = useState<"official" | "baileys">("baileys");
+
+  useEffect(() => {
+    fetch("/api/whatsapp/provider-status")
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.activeMode) {
+          setWhatsAppEngine(data.activeMode);
+        }
+      })
+      .catch(() => {});
   }, []);
 
   const isDashboardPage = location.pathname === "/seeker" || location.pathname === "/seeker/messages" || location.pathname === "/seeker/notifications" || location.pathname === "/staff" || location.pathname === "/admin" || location.pathname === "/staff/manage-jobs" || location.pathname === "/admin/manage-jobs" || location.pathname === "/staff/notifications" || location.pathname === "/admin/notifications";
@@ -310,6 +325,45 @@ export const Header: React.FC = () => {
                             <div
                               className={`w-4 h-4 rounded-full bg-white shadow-sm transform duration-200 ${
                                 currentUser.messagingPreference === "in-app" ? "translate-x-5" : "translate-x-0"
+                              }`}
+                            />
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* WhatsApp Engine Switch for Admins Only */}
+                    {currentUser?.role === "admin" && (
+                      <div className="px-1.5 py-1">
+                        <div className="px-3 py-2 bg-slate-50/50 border border-slate-100 rounded-2xl mx-1 mb-1 flex items-center justify-between">
+                          <div className="flex flex-col text-left">
+                            <span className="text-[10px] font-bold text-slate-700">WhatsApp Engine</span>
+                            <span className="text-[8px] font-mono font-medium text-slate-500">
+                              {whatsAppEngine === "baileys" ? "Baileys WA Web" : "Meta Official API"}
+                            </span>
+                          </div>
+                          <button
+                            onClick={async () => {
+                              const nextMode = whatsAppEngine === "baileys" ? "official" : "baileys";
+                              setWhatsAppEngine(nextMode);
+                              try {
+                                await fetch("/api/whatsapp/toggle-mode", {
+                                  method: "POST",
+                                  headers: { "Content-Type": "application/json" },
+                                  body: JSON.stringify({ mode: nextMode })
+                                });
+                              } catch (err) {
+                                console.error("Failed to toggle WhatsApp engine:", err);
+                              }
+                            }}
+                            className={`w-10 h-5 rounded-full p-0.5 transition-colors focus:outline-none flex items-center cursor-pointer ${
+                              whatsAppEngine === "baileys" ? "bg-emerald-600" : "bg-blue-600"
+                            }`}
+                            title="Toggle between Meta Official API and Baileys WhatsApp Web Engine"
+                          >
+                            <div
+                              className={`w-4 h-4 rounded-full bg-white shadow-sm transform duration-200 ${
+                                whatsAppEngine === "baileys" ? "translate-x-5" : "translate-x-0"
                               }`}
                             />
                           </button>

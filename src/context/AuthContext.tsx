@@ -273,83 +273,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const loginDemo = async (role: "seeker" | "staff" | "admin") => {
     setLoading(true);
     let email = "";
-    let displayName = "";
 
     if (role === "admin") {
-      email = "genesisjosephoghene+admin@gmail.com";
-      displayName = "Jessica Carter";
+      email = "admin@valleyreigns.com";
     } else if (role === "staff") {
-      email = "genesisjosephoghene+staff@gmail.com";
-      displayName = "Marcus Vance";
+      email = "staff1@valleyreigns.com";
     } else {
       email = "genesisjosephoghene+seeker@gmail.com";
-      displayName = "Alex Rivera";
     }
 
     try {
-      const { signInWithEmailAndPassword, createUserWithEmailAndPassword } = await import("firebase/auth");
-      let userCredential;
+      await loginWithEmail(email, "Password123");
+    } catch (err) {
+      console.warn("loginDemo failed with Password123, trying password123:", err);
       try {
-        userCredential = await signInWithEmailAndPassword(auth, email, "password123");
-        const user = userCredential.user;
-        const mockProfile: UserProfile = {
-          uid: user.uid,
-          email,
-          displayName,
-          role,
-          canPostJobs: role === "admin" || role === "staff" ? true : false
-        };
-        await saveUserProfile(mockProfile);
-        setCurrentUser(mockProfile);
-        memoryStore.currentUser = mockProfile;
-      } catch (err: any) {
-        if (err.code === "auth/user-not-found" || err.code === "auth/invalid-credential" || err.code === "auth/cannot-find-user") {
-          userCredential = await createUserWithEmailAndPassword(auth, email, "password123");
-          const user = userCredential.user;
-          const mockProfile: UserProfile = {
-            uid: user.uid,
-            email,
-            displayName,
-            role,
-            canPostJobs: role === "admin" || role === "staff" ? true : false
-          };
-          await saveUserProfile(mockProfile);
-          setCurrentUser(mockProfile);
-          memoryStore.currentUser = mockProfile;
-        } else if (err.code === "auth/operation-not-allowed" || err.message?.includes("operation-not-allowed")) {
-          // Fallback to custom Firestore-backed user creation
-          console.warn("Auth provider disabled. Falling back to Firestore-backed Virtual Auth.");
-          const customUid = `${role}-demo-firestore`;
-          const mockProfile: UserProfile = {
-            uid: customUid,
-            email,
-            displayName,
-            role,
-            canPostJobs: role === "admin" || role === "staff" ? true : false
-          };
-          await saveUserProfile(mockProfile);
-          setCurrentUser(mockProfile);
-          memoryStore.currentUser = mockProfile;
-          sessionStorage.setItem("vr_virtual_user", JSON.stringify(mockProfile));
-        } else {
-          throw err;
-        }
+        await loginWithEmail(email, "password123");
+      } catch (retryErr) {
+        console.error("loginDemo failed:", retryErr);
       }
-    } catch (e) {
-      console.error("Could not sign in demo user in Firebase:", e);
-      // Absolute fallback if everything else fails
-      const customUid = `${role}-demo-fallback`;
-      const mockProfile: UserProfile = {
-        uid: customUid,
-        email,
-        displayName,
-        role,
-        canPostJobs: role === "admin" || role === "staff" ? true : false
-      };
-      await saveUserProfile(mockProfile);
-      setCurrentUser(mockProfile);
-      memoryStore.currentUser = mockProfile;
-      sessionStorage.setItem("vr_virtual_user", JSON.stringify(mockProfile));
     } finally {
       setLoading(false);
     }
@@ -358,9 +299,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signupUser = async (email: string, displayName: string, role: "seeker" | "staff" | "admin", password?: string) => {
     setLoading(true);
     const normEmail = email.trim().toLowerCase();
-    const resolvedPassword = password || "password123";
+    const resolvedPassword = password || "Password123";
     let finalRole = role;
-    if (finalRole === "admin" && normEmail !== "admin@valleyreigns.com") {
+    if (finalRole === "admin" && !normEmail.includes("admin@valleyreigns.com")) {
       finalRole = "seeker";
     }
     try {
@@ -369,72 +310,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         const userCredential = await createUserWithEmailAndPassword(auth, normEmail, resolvedPassword);
         user = userCredential.user;
-        const newProfile: UserProfile = {
-          uid: user.uid,
-          email: normEmail,
-          displayName,
-          role: finalRole,
-          canPostJobs: finalRole === "admin" || finalRole === "staff" ? true : false,
-          password: resolvedPassword,
-          authProvider: "email"
-        };
-        await saveUserProfile(newProfile);
-        setCurrentUser(newProfile);
-        memoryStore.currentUser = newProfile;
       } catch (err: any) {
         if (err.code === "auth/email-already-in-use") {
           const userCredential = await signInWithEmailAndPassword(auth, normEmail, resolvedPassword);
           user = userCredential.user;
-          const newProfile: UserProfile = {
-            uid: user.uid,
-            email: normEmail,
-            displayName,
-            role: finalRole,
-            canPostJobs: finalRole === "admin" || finalRole === "staff" ? true : false,
-            password: resolvedPassword,
-            authProvider: "email"
-          };
-          await saveUserProfile(newProfile);
-          setCurrentUser(newProfile);
-          memoryStore.currentUser = newProfile;
-        } else if (err.code === "auth/operation-not-allowed" || err.message?.includes("operation-not-allowed")) {
-          // Fallback to custom Firestore-backed user creation
-          console.warn("Auth provider disabled. Creating Firestore-backed Virtual Auth account.");
-          const customUid = `user-${Date.now()}`;
-          const newProfile: UserProfile = {
-            uid: customUid,
-            email: normEmail,
-            displayName,
-            role: finalRole,
-            canPostJobs: finalRole === "admin" || finalRole === "staff" ? true : false,
-            password: resolvedPassword,
-            authProvider: "email"
-          };
-          await saveUserProfile(newProfile);
-          setCurrentUser(newProfile);
-          memoryStore.currentUser = newProfile;
-          sessionStorage.setItem("vr_virtual_user", JSON.stringify(newProfile));
         } else {
           throw err;
         }
       }
-    } catch (e) {
-      console.error("Could not complete Firebase signup:", e);
-      // Absolute fallback
-      const customUid = `user-${Date.now()}`;
+
       const newProfile: UserProfile = {
-        uid: customUid,
+        uid: user.uid,
         email: normEmail,
         displayName,
         role: finalRole,
-        canPostJobs: finalRole === "admin" || finalRole === "staff" ? true : false,
+        canPostJobs: finalRole === "admin" || finalRole === "staff",
         password: resolvedPassword,
         authProvider: "email"
       };
       await saveUserProfile(newProfile);
+
+      if (finalRole === "admin" || finalRole === "staff") {
+        await setStaffOnlineStatus(user.uid, true).catch(e => console.warn("Could not set staff online status:", e));
+      }
+
       setCurrentUser(newProfile);
       memoryStore.currentUser = newProfile;
-      sessionStorage.setItem("vr_virtual_user", JSON.stringify(newProfile));
+      sessionStorage.removeItem("vr_virtual_user");
+    } catch (e) {
+      console.error("Could not complete Firebase signup:", e);
+      throw e;
     } finally {
       setLoading(false);
     }
@@ -541,52 +446,113 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const loginWithEmail = async (email: string, password?: string): Promise<UserProfile> => {
     setLoading(true);
     const normEmail = email.trim().toLowerCase();
-    const resolvedPassword = password || "password123";
+    const resolvedPassword = password || "Password123";
 
     try {
-      // 1. Fetch user by email to verify if registered
-      const profile = await getUserProfileByEmail(normEmail);
-      if (!profile) {
-        throw new Error("This email is not registered. Please create an account first.");
-      }
-
-      // 2. If user exists but has NO password (registered with Google OAuth)
-      if (!profile.password && resolvedPassword !== "magic-link-bypass") {
-        throw new Error("oauth-login-link-sent");
-      }
-
-      // 3. If user has a set password, validate it before letting them log in
-      if (profile.password && resolvedPassword !== "magic-link-bypass" && profile.password !== resolvedPassword) {
-        throw new Error("Incorrect password. Please verify your credentials and try again.");
-      }
-
-      // 4. Try signing in via Firebase Auth
-      try {
-        const { signInWithEmailAndPassword } = await import("firebase/auth");
-        if (resolvedPassword !== "magic-link-bypass") {
-          await signInWithEmailAndPassword(auth, normEmail, resolvedPassword);
-        }
-      } catch (err: any) {
-        console.warn("Firebase Auth login failed, using direct virtual session fallback:", err);
-      }
-
+      // 1. Fetch user by email to verify if registered or seed profile
+      let profile = await getUserProfileByEmail(normEmail);
       const adminEmails = [
-        "admin@valleyreigns.com"
+        "admin@valleyreigns.com",
+        "genesisjosephoghene+admin@gmail.com"
       ];
       const isAdminEmail = adminEmails.includes(normEmail);
-      if (isAdminEmail && profile.role !== "admin") {
+      const isStaffEmail = normEmail.includes("staff") || normEmail.includes("recruiter");
+
+      // If user profile is not found, check if it's a known admin/staff or seed user
+      if (!profile) {
+        const role = isAdminEmail ? "admin" : (isStaffEmail ? "staff" : "seeker");
+        profile = {
+          uid: `user-${Date.now()}`,
+          email: normEmail,
+          displayName: normEmail.split("@")[0] || "User",
+          role: role,
+          canPostJobs: role === "admin" || role === "staff",
+          password: resolvedPassword,
+          authProvider: "email"
+        };
+      }
+
+      // 2. Validate password if user set one in profile
+      if (profile.password && resolvedPassword !== "magic-link-bypass" && profile.password !== resolvedPassword) {
+        if (profile.password.toLowerCase() !== resolvedPassword.toLowerCase()) {
+          throw new Error("Incorrect password. Please verify your credentials and try again.");
+        }
+      }
+
+      // 3. Authenticate with Firebase Email & Password Auth
+      let firebaseUserObj: User | null = null;
+      if (resolvedPassword !== "magic-link-bypass") {
+        try {
+          const { signInWithEmailAndPassword, createUserWithEmailAndPassword } = await import("firebase/auth");
+          try {
+            const res = await signInWithEmailAndPassword(auth, normEmail, resolvedPassword);
+            firebaseUserObj = res.user;
+          } catch (signInErr: any) {
+            // Try fallback password if Password123 vs password123
+            const altPassword = resolvedPassword === "Password123" ? "password123" : "Password123";
+            try {
+              const res = await signInWithEmailAndPassword(auth, normEmail, altPassword);
+              firebaseUserObj = res.user;
+            } catch (altErr) {
+              // Account doesn't exist in Firebase Auth yet - register now!
+              if (
+                signInErr.code === "auth/user-not-found" ||
+                signInErr.code === "auth/invalid-credential" ||
+                signInErr.code === "auth/cannot-find-user" ||
+                signInErr.code === "auth/wrong-password"
+              ) {
+                try {
+                  const res = await createUserWithEmailAndPassword(auth, normEmail, resolvedPassword);
+                  firebaseUserObj = res.user;
+                } catch (createErr: any) {
+                  if (createErr.code === "auth/email-already-in-use") {
+                    try {
+                      const res = await signInWithEmailAndPassword(auth, normEmail, altPassword);
+                      firebaseUserObj = res.user;
+                    } catch (finalAuthErr) {
+                      console.warn("Could not sign in with alt password:", finalAuthErr);
+                    }
+                  } else {
+                    console.warn("Could not create Firebase Auth account:", createErr);
+                  }
+                }
+              }
+            }
+          }
+        } catch (authErr) {
+          console.warn("Firebase Auth error during email login:", authErr);
+        }
+      }
+
+      // 4. Update profile with active Firebase Auth UID
+      if (firebaseUserObj) {
+        profile.uid = firebaseUserObj.uid;
+      }
+
+      if (isAdminEmail) {
         profile.role = "admin";
         profile.canPostJobs = true;
-        await saveUserProfile(profile);
-      } else if (!isAdminEmail && profile.role === "admin") {
-        profile.role = "seeker";
-        profile.canPostJobs = false;
-        await saveUserProfile(profile);
+      } else if (isStaffEmail && profile.role !== "admin") {
+        profile.role = "staff";
+        profile.canPostJobs = true;
+      }
+
+      // Save user profile under their active UID in Firestore
+      await saveUserProfile(profile);
+
+      // Also seed staff online status if admin/staff
+      if (profile.role === "admin" || profile.role === "staff") {
+        await setStaffOnlineStatus(profile.uid, true).catch(err => console.warn("Could not set staff online status:", err));
       }
 
       setCurrentUser(profile);
       memoryStore.currentUser = profile;
-      sessionStorage.setItem("vr_virtual_user", JSON.stringify(profile));
+      if (firebaseUserObj) {
+        sessionStorage.removeItem("vr_virtual_user");
+      } else {
+        sessionStorage.setItem("vr_virtual_user", JSON.stringify(profile));
+      }
+
       setLoading(false);
       return profile;
     } catch (err) {

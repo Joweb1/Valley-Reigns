@@ -69,31 +69,8 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowe
 
   // Check role authorization
   if (!allowedRoles.includes(currentUser.role)) {
-    if (isStandaloneOrFs) {
-      // In PWA/Fullscreen, if role is not authorized, redirect to their proper dashboard or /seeker
-      const dashboardPath = currentUser.role === "admin" ? "/admin" : currentUser.role === "staff" ? "/staff" : "/seeker";
-      if (location.pathname !== dashboardPath) {
-        return <Navigate to={dashboardPath} replace />;
-      }
-    }
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC] p-4">
-        <div className="max-w-md w-full bg-white rounded-3xl p-8 border border-slate-100 shadow-xl shadow-slate-100 text-center">
-          <div className="w-16 h-16 bg-red-50 text-red-600 rounded-2xl flex items-center justify-center mx-auto mb-6">
-            <ShieldAlert className="w-8 h-8" />
-          </div>
-          <h2 className="text-2xl font-sans font-bold text-slate-900 tracking-tight mb-2">
-            Access Restricted
-          </h2>
-          <p className="text-sm font-sans text-slate-500 mb-6 leading-relaxed">
-            Your current account role (<span className="font-semibold capitalize">{currentUser.role}</span>) does not possess permission rights to access <code className="px-1.5 py-0.5 bg-slate-100 rounded text-red-600 text-xs font-mono">{location.pathname}</code>.
-          </p>
-          <div className="flex flex-col gap-2">
-            <Navigate to="/" replace />
-          </div>
-        </div>
-      </div>
-    );
+    const dashboardPath = currentUser.role === "admin" ? "/admin" : currentUser.role === "staff" ? "/staff" : "/seeker";
+    return <Navigate to={dashboardPath} replace />;
   }
 
   return <>{children}</>;
