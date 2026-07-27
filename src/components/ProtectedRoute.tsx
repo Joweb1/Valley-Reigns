@@ -57,12 +57,9 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowe
   // Not authenticated
   if (!currentUser) {
     if (isStandaloneOrFs) {
-      // In PWA/Fullscreen, keep logged-out users on /seeker to display the forced AuthModal
-      if (location.pathname === "/seeker") {
-        return <>{children}</>;
-      } else {
-        return <Navigate to="/seeker" replace />;
-      }
+      setTimeout(() => {
+        window.dispatchEvent(new CustomEvent("open-auth-modal"));
+      }, 100);
     }
     return <Navigate to="/" state={{ from: location }} replace />;
   }

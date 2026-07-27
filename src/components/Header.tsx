@@ -401,6 +401,8 @@ export const Header: React.FC = () => {
                       </div>
                     )}
 
+
+
                     <div className="border-t border-slate-100 my-1.5 mx-1"></div>
 
                     <div className="px-1.5 py-1">
@@ -656,9 +658,9 @@ export const Header: React.FC = () => {
         </nav>
 
         {/* User Account / Sign In with Google */}
-        <div className="hidden md:flex items-center gap-4">
+        <div className="hidden md:flex items-center gap-3">
           {currentUser ? (
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 relative">
               <div className="text-right">
                 <span className="text-xs font-bold text-slate-800 block leading-tight">
                   {currentUser.displayName}
@@ -667,6 +669,15 @@ export const Header: React.FC = () => {
                   {currentUser.role.toUpperCase()}
                 </span>
               </div>
+              <motion.button
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.93 }}
+                onClick={() => setProfilePopupOpen(!profilePopupOpen)}
+                className="p-2 text-[#1E88E5] bg-transparent border-0 shadow-none transition-all cursor-pointer flex items-center justify-center focus:outline-none"
+                title="User Profile Menu"
+              >
+                <User className="w-6 h-6 text-[#1E88E5]" />
+              </motion.button>
               <button
                 onClick={() => logout()}
                 className="w-9 h-9 flex items-center justify-center text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all cursor-pointer border border-transparent hover:border-rose-100 hover:scale-105 active:scale-95"
@@ -792,6 +803,8 @@ export const Header: React.FC = () => {
                   My Dashboard
                 </Link>
               )}
+
+
 
               <div className="border-t border-slate-100 pt-3">
                 {currentUser ? (

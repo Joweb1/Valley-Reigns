@@ -8,9 +8,11 @@ export const PwaInstallPrompt: React.FC = () => {
   const [isInstalled, setIsInstalled] = useState(false);
 
   useEffect(() => {
-    // 1. Check if already installed / running in standalone mode
+    // 1. Check standalone / display-mode
     const isStandalone = 
       window.matchMedia("(display-mode: standalone)").matches || 
+      window.matchMedia("(display-mode: fullscreen)").matches ||
+      window.matchMedia("(display-mode: minimal-ui)").matches ||
       (navigator as any).standalone === true;
 
     if (isStandalone) {
@@ -18,84 +20,138 @@ export const PwaInstallPrompt: React.FC = () => {
       return;
     }
 
-    // 2. Check if user dismissed it in this session/recent days
-    const lastDismissed = localStorage.getItem("pwa_install_dismissed");
-    const isDismissed = lastDismissed && (Date.now() - parseInt(lastDismissed, 10) < 1000 * 60 * 60 * 24); // 24 hours cooldown
+    // Check if user clicked "Maybe Later" within the last 24 hours
+    const is1DayDismissed = (): boolean => {
+      try {
+        const lastDismissed = localStorage.getItem("pwa_install_dismissed");
+        if (!lastDismissed) return false;
+        const time = parseInt(lastDismissed, 10);
+        if (isNaN(time)) return false;
+        return Date.now() - time < 24 * 60 * 60 * 1000; // 1 day expiring
+      } catch {
+        return false;
+      }
+    };
 
-    // 3. Setup event listeners for beforeinstallprompt
+    // Check if Service Worker is active or registered
+    const isSwRegistered = async (): Promise<boolean> => {
+      if (!("serviceWorker" in navigator)) return false;
+      if (navigator.serviceWorker.controller) return true;
+      try {
+        const registration = await navigator.serviceWorker.getRegistration();
+        if (registration && (registration.active || registration.installing || registration.waiting)) {
+          return true;
+        }
+        // Fallback wait for SW ready
+        const readyReg = await Promise.race([
+          navigator.serviceWorker.ready,
+          new Promise<null>((resolve) => setTimeout(() => resolve(null), 2000))
+        ]);
+        return !!readyReg;
+      } catch {
+        return false;
+      }
+    };
+
+    // Attempt to show prompt ONLY if SW is registered and not dismissed via 1-day "Maybe Later"
+    const tryShowPrompt = async () => {
+      if (isStandalone || is1DayDismissed()) {
+        return;
+      }
+      const registered = await isSwRegistered();
+      if (registered) {
+        setIsVisible(true);
+      }
+    };
+
+    // Initial check with small delay to allow SW registration on load
+    const timer = setTimeout(() => {
+      tryShowPrompt();
+    }, 1000);
+
+    // Event listeners
+    const handleSwRegistered = () => {
+      tryShowPrompt();
+    };
+
     const handleInstallable = () => {
-      if (!isStandalone && !isDismissed) {
+      tryShowPrompt();
+    };
+
+    const handleTriggerInstall = async () => {
+      setShowiOSGuidance(false);
+      const registered = await isSwRegistered();
+      if (registered) {
         setIsVisible(true);
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+        if (isIOS || !(window as any).deferredPrompt) {
+          setShowiOSGuidance(true);
+        }
       }
     };
 
-    // If deferredPrompt is already populated
-    if ((window as any).deferredPrompt && !isStandalone && !isDismissed) {
-      setIsVisible(true);
-    }
-
-    window.addEventListener("pwa-installable", handleInstallable);
-
-    const handleTriggerInstall = () => {
-      setIsVisible(true);
-      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
-      if (isIOS) {
-        setShowiOSGuidance(true);
-      }
-    };
-    window.addEventListener("trigger-pwa-install", handleTriggerInstall);
-
-    // iOS detection (iOS doesn't support beforeinstallprompt but supports manual adding to home screen)
-    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
-    if (isIOS && !isStandalone && !isDismissed) {
-      // Show prompt but with iOS instructions (share -> add to home screen)
-      const delayTimeout = setTimeout(() => {
-        setIsVisible(true);
-      }, 3000); // Wait 3 seconds to not overwhelm landing
-      return () => {
-        clearTimeout(delayTimeout);
-        window.removeEventListener("pwa-installable", handleInstallable);
-        window.removeEventListener("trigger-pwa-install", handleTriggerInstall);
-      };
-    }
-
-    // Check if app is installed after triggering browser prompt
-    window.addEventListener("appinstalled", () => {
+    const handleAppInstalled = () => {
       setIsInstalled(true);
       setIsVisible(false);
-      localStorage.removeItem("pwa_install_dismissed");
-    });
+      try {
+        localStorage.removeItem("pwa_install_dismissed");
+      } catch {}
+    };
+
+    window.addEventListener("sw-registered", handleSwRegistered);
+    window.addEventListener("pwa-installable", handleInstallable);
+    window.addEventListener("trigger-pwa-install", handleTriggerInstall);
+    window.addEventListener("appinstalled", handleAppInstalled);
 
     return () => {
+      clearTimeout(timer);
+      window.removeEventListener("sw-registered", handleSwRegistered);
       window.removeEventListener("pwa-installable", handleInstallable);
       window.removeEventListener("trigger-pwa-install", handleTriggerInstall);
+      window.removeEventListener("appinstalled", handleAppInstalled);
     };
   }, []);
 
   const handleInstallClick = async () => {
     const promptEvent = (window as any).deferredPrompt;
-    if (!promptEvent) {
-      // If no native prompt event is available (like on iOS), toggle iOS manual guidance
-      setShowiOSGuidance(true);
+    if (promptEvent) {
+      try {
+        promptEvent.prompt();
+        const { outcome } = await promptEvent.userChoice;
+        console.log(`User response to install prompt: ${outcome}`);
+        (window as any).deferredPrompt = null;
+        if (outcome === "accepted") {
+          setIsInstalled(true);
+        }
+        setIsVisible(false);
+        return;
+      } catch (err) {
+        console.error("Native install prompt error:", err);
+      }
+    }
+
+    // If inside an iframe (like AI Studio preview frame where Chrome blocks beforeinstallprompt),
+    // open the app in a new top-level tab so Chrome can trigger native installation
+    if (window.self !== window.top) {
+      window.open(window.location.href, "_blank");
       return;
     }
 
-    // Show the browser install prompt
-    promptEvent.prompt();
+    // Show step guidance if browser native prompt is not yet ready
+    setShowiOSGuidance(true);
+  };
 
-    // Wait for the user to respond to the prompt
-    const { outcome } = await promptEvent.userChoice;
-    console.log(`User response to install prompt: ${outcome}`);
-
-    // Clear the deferred prompt variable (it can only be used once)
-    (window as any).deferredPrompt = null;
+  // Close Icon (X) -> Only dismisses for current view/refresh, NO 1-day localStorage penalty!
+  const handleCloseX = () => {
     setIsVisible(false);
   };
 
-  const handleDismiss = () => {
+  // "Maybe Later" button -> Sets 1 day expiration in localStorage
+  const handleMaybeLater = () => {
     setIsVisible(false);
-    // Cool down for 24 hours before reminding again
-    localStorage.setItem("pwa_install_dismissed", Date.now().toString());
+    try {
+      localStorage.setItem("pwa_install_dismissed", Date.now().toString());
+    } catch {}
   };
 
   if (isInstalled || !isVisible) {
@@ -113,10 +169,12 @@ export const PwaInstallPrompt: React.FC = () => {
           transition={{ type: "spring", stiffness: 150, damping: 20 }}
           className="pointer-events-auto bg-white text-slate-800 rounded-t-xl rounded-b-2xl border border-slate-200/90 shadow-[0_12px_40px_rgba(0,0,0,0.12)] w-full max-w-md p-4 relative overflow-hidden"
         >
+          {/* Close Icon (X): Just closes prompt without setting 1-day localStorage dismissal */}
           <button
-            onClick={handleDismiss}
+            onClick={handleCloseX}
             className="absolute top-3 right-3 text-slate-400 hover:text-slate-600 transition-colors p-1 hover:bg-slate-100 rounded-full cursor-pointer"
-            aria-label="Dismiss prompt"
+            aria-label="Close prompt"
+            title="Close"
           >
             <X className="w-4 h-4" />
           </button>
@@ -124,7 +182,6 @@ export const PwaInstallPrompt: React.FC = () => {
           {!showiOSGuidance ? (
             <div className="space-y-3">
               <div className="flex items-center gap-3">
-                {/* App Logo Emblem */}
                 <div className="w-10 h-10 rounded-xl bg-blue-50 text-[#1E88E5] flex items-center justify-center border border-blue-100 shrink-0">
                   <Smartphone className="w-5 h-5" />
                 </div>
@@ -139,8 +196,9 @@ export const PwaInstallPrompt: React.FC = () => {
 
               {/* Actions Footer */}
               <div className="flex items-center gap-2 pt-1">
+                {/* Maybe Later: Sets 1-day expiration */}
                 <button
-                  onClick={handleDismiss}
+                  onClick={handleMaybeLater}
                   className="flex-1 py-2 bg-slate-50 hover:bg-slate-100 active:bg-slate-200 text-slate-600 rounded-lg text-xs font-semibold transition-all cursor-pointer"
                 >
                   Maybe Later
@@ -155,32 +213,64 @@ export const PwaInstallPrompt: React.FC = () => {
               </div>
             </div>
           ) : (
-            // iOS share prompt guidance
+            // Manual installation guidance
             <div className="space-y-3">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-blue-50 text-[#1E88E5] flex items-center justify-center border border-blue-100 shrink-0">
                   <Monitor className="w-5 h-5" />
                 </div>
                 <div className="flex-1 text-left">
-                  <h3 className="text-sm font-bold text-slate-900">Add to Home Screen</h3>
+                  <h3 className="text-sm font-bold text-slate-900">Install App Guide</h3>
+                  <p className="text-[11px] text-slate-500">Quick manual install steps</p>
                 </div>
               </div>
 
-              {/* iOS Step Guide */}
-              <div className="bg-slate-50 border border-slate-100 rounded-xl p-3 space-y-2 text-left text-xs text-slate-600 leading-normal">
-                <div className="flex items-start gap-2">
-                  <div className="w-4 h-4 rounded-full bg-blue-100 text-[#1E88E5] font-semibold flex items-center justify-center text-[10px] shrink-0 mt-0.5">1</div>
-                  <p>
-                    Tap <strong className="text-slate-800">Share</strong> in Safari (<span className="bg-white border border-slate-200 px-1 py-0.5 rounded text-[11px]">⎋</span> at bottom).
-                  </p>
+              {/iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream ? (
+                <div className="bg-slate-50 border border-slate-100 rounded-xl p-3 space-y-2 text-left text-xs text-slate-600 leading-normal">
+                  <div className="flex items-start gap-2">
+                    <div className="w-4 h-4 rounded-full bg-blue-100 text-[#1E88E5] font-semibold flex items-center justify-center text-[10px] shrink-0 mt-0.5">1</div>
+                    <p>
+                      Tap <strong className="text-slate-800">Share</strong> in Safari (<span className="bg-white border border-slate-200 px-1 py-0.5 rounded text-[11px]">⎋</span> at bottom).
+                    </p>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <div className="w-4 h-4 rounded-full bg-blue-100 text-[#1E88E5] font-semibold flex items-center justify-center text-[10px] shrink-0 mt-0.5">2</div>
+                    <p>
+                      Tap <strong className="text-slate-800">Add to Home Screen</strong> (<span className="bg-white border border-slate-200 px-1 py-0.5 rounded text-[11px]">＋</span>).
+                    </p>
+                  </div>
                 </div>
-                <div className="flex items-start gap-2">
-                  <div className="w-4 h-4 rounded-full bg-blue-100 text-[#1E88E5] font-semibold flex items-center justify-center text-[10px] shrink-0 mt-0.5">2</div>
-                  <p>
-                    Tap <strong className="text-slate-800">Add to Home Screen</strong> (<span className="bg-white border border-slate-200 px-1 py-0.5 rounded text-[11px]">＋</span>).
-                  </p>
+              ) : window.self !== window.top ? (
+                <div className="bg-slate-50 border border-slate-100 rounded-xl p-3 space-y-2 text-left text-xs text-slate-600 leading-normal">
+                  <div className="flex items-start gap-2">
+                    <div className="w-4 h-4 rounded-full bg-blue-100 text-[#1E88E5] font-semibold flex items-center justify-center text-[10px] shrink-0 mt-0.5">1</div>
+                    <p>
+                      Click <strong className="text-slate-800">Open in new tab</strong> (<span className="bg-white border border-slate-200 px-1 py-0.5 rounded text-[11px]">↗</span>) to view outside the preview frame.
+                    </p>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <div className="w-4 h-4 rounded-full bg-blue-100 text-[#1E88E5] font-semibold flex items-center justify-center text-[10px] shrink-0 mt-0.5">2</div>
+                    <p>
+                      In Chrome, click <strong className="text-slate-800">Install</strong> (<span className="bg-white border border-slate-200 px-1 py-0.5 rounded text-[11px]">⤓</span>) in address bar or Menu (<span className="bg-white border border-slate-200 px-1 py-0.5 rounded text-[11px]">⋮</span>) &rarr; <strong className="text-slate-800">Install Valley Reigns</strong>.
+                    </p>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="bg-slate-50 border border-slate-100 rounded-xl p-3 space-y-2 text-left text-xs text-slate-600 leading-normal">
+                  <div className="flex items-start gap-2">
+                    <div className="w-4 h-4 rounded-full bg-blue-100 text-[#1E88E5] font-semibold flex items-center justify-center text-[10px] shrink-0 mt-0.5">1</div>
+                    <p>
+                      Look for the <strong className="text-slate-800">Install icon</strong> (<span className="bg-white border border-slate-200 px-1 py-0.5 rounded text-[11px]">⤓</span>) on the right side of Chrome&apos;s address bar.
+                    </p>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <div className="w-4 h-4 rounded-full bg-blue-100 text-[#1E88E5] font-semibold flex items-center justify-center text-[10px] shrink-0 mt-0.5">2</div>
+                    <p>
+                      Or open Chrome Menu (<span className="bg-white border border-slate-200 px-1 py-0.5 rounded text-[11px]">⋮</span>) and select <strong className="text-slate-800">Install Valley Reigns</strong>.
+                    </p>
+                  </div>
+                </div>
+              )}
 
               <div className="flex items-center gap-2 pt-1">
                 <button
@@ -190,7 +280,7 @@ export const PwaInstallPrompt: React.FC = () => {
                   Back
                 </button>
                 <button
-                  onClick={handleDismiss}
+                  onClick={handleMaybeLater}
                   className="w-full py-2 bg-[#1E88E5] hover:bg-[#1565C0] text-white rounded-lg text-xs font-semibold transition-all cursor-pointer"
                 >
                   Got It

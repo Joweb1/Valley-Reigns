@@ -11,9 +11,42 @@ interface AuthModalProps {
 }
 
 export const AuthModal: React.FC<AuthModalProps> = ({ forcedOpen = false, onCloseOverride }) => {
-  const [isOpen, setIsOpen] = useState(forcedOpen);
-  const { loginWithGoogle, signupUser, loginWithEmail, loginDemo, sendPasswordlessLink } = useAuth();
+  const { currentUser, loginWithGoogle, signupUser, loginWithEmail, loginDemo, sendPasswordlessLink } = useAuth();
   const navigate = useNavigate();
+
+  // Detect standalone or fullscreen mode
+  const [isStandaloneOrFs, setIsStandaloneOrFs] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return (
+      window.matchMedia("(display-mode: standalone)").matches ||
+      window.matchMedia("(display-mode: fullscreen)").matches ||
+      window.matchMedia("(display-mode: minimal-ui)").matches ||
+      (navigator as any).standalone === true
+    );
+  });
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const checkMode = () => {
+      const isSt =
+        window.matchMedia("(display-mode: standalone)").matches ||
+        window.matchMedia("(display-mode: fullscreen)").matches ||
+        window.matchMedia("(display-mode: minimal-ui)").matches ||
+        (navigator as any).standalone === true;
+      setIsStandaloneOrFs(isSt);
+    };
+    checkMode();
+    const mediaQuery = window.matchMedia("(display-mode: standalone)");
+    if (mediaQuery.addEventListener) {
+      mediaQuery.addEventListener("change", checkMode);
+      return () => mediaQuery.removeEventListener("change", checkMode);
+    }
+  }, []);
+
+  const canClose = !forcedOpen && !(isStandaloneOrFs && !currentUser);
+  const showCloseButton = !isStandaloneOrFs && !forcedOpen && canClose;
+
+  const [isOpen, setIsOpen] = useState(() => forcedOpen || (isStandaloneOrFs && !currentUser));
   
   // Tabs: "signin" | "signup"
   const [activeTab, setActiveTab] = useState<"signin" | "signup">("signin");
@@ -198,8 +231,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({ forcedOpen = false, onClos
   }, []);
 
   useEffect(() => {
-    setIsOpen(forcedOpen);
-    if (!forcedOpen) {
+    if (currentUser) {
+      setIsOpen(false);
       setShowMagicLinkView(false);
       setShowEmailForm(false);
       setShowHifiPreview(false);
@@ -207,11 +240,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({ forcedOpen = false, onClos
       setEmailError("");
       setSignupError("");
       setIsProcessing(false);
+      if (onCloseOverride) {
+        onCloseOverride();
+      }
+    } else if (forcedOpen || isStandaloneOrFs) {
+      setIsOpen(true);
     }
-  }, [forcedOpen]);
+  }, [currentUser, forcedOpen, isStandaloneOrFs, onCloseOverride]);
 
   const handleClose = () => {
-    if (forcedOpen) return;
+    if (!canClose) return;
     setIsOpen(false);
     setShowMagicLinkView(false);
     setShowEmailForm(false);
@@ -338,8 +376,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({ forcedOpen = false, onClos
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            onClick={forcedOpen ? undefined : handleClose}
-            className={`absolute inset-0 bg-slate-900/40 backdrop-blur-sm ${forcedOpen ? "cursor-default" : "cursor-pointer"}`}
+            onClick={canClose ? handleClose : undefined}
+            className={`absolute inset-0 bg-slate-900/40 backdrop-blur-sm ${canClose ? "cursor-pointer" : "cursor-default"}`}
           />
 
           {/* Modal Container */}
@@ -360,7 +398,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ forcedOpen = false, onClos
                   Valley Reigns
                 </span>
               </div>
-              {!forcedOpen && (
+              {showCloseButton && (
                 <button
                   onClick={handleClose}
                   className="w-8 h-8 rounded-full bg-white border border-slate-200/80 flex items-center justify-center text-slate-400 hover:text-slate-600 shadow-sm hover:shadow transition-all cursor-pointer"

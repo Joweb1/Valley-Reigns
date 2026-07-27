@@ -31,9 +31,9 @@
     <link rel="manifest" href="/manifest.json" />
     <link rel="icon" type="image/svg+xml" href="/icon.svg" />
     <link rel="apple-touch-icon" href="/icon.svg" />
-    <meta name="theme-color" content="#0F5132" />
+    <meta name="theme-color" content="#F8FAFC" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 
     <!-- Fonts preconnect for faster rendering -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -67,6 +67,14 @@
         }
       }
     </script>
+    <script>
+      (function() {
+        try {
+          document.documentElement.classList.remove('dark');
+          localStorage.removeItem('theme');
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
@@ -82,7 +90,10 @@
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
           navigator.serviceWorker.register('/sw.js')
-            .then(reg => console.log('ServiceWorker registered:', reg))
+            .then(reg => {
+              console.log('ServiceWorker registered:', reg);
+              window.dispatchEvent(new CustomEvent('sw-registered'));
+            })
             .catch(err => console.error('ServiceWorker registration failed:', err));
         });
       }

@@ -1,19 +1,18 @@
-const CACHE_NAME = 'valley-reigns-cache-v1';
+const CACHE_NAME = 'valley-reigns-cache-v2';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
   '/manifest.json',
   '/icon.svg',
-  '/offline.html',
-  '/src/main.tsx',
-  '/src/App.tsx',
-  '/src/index.css'
+  '/offline.html'
 ];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(ASSETS_TO_CACHE);
+      return Promise.allSettled(
+        ASSETS_TO_CACHE.map((url) => cache.add(url).catch((err) => console.warn('Failed to cache:', url, err)))
+      );
     }).then(() => self.skipWaiting())
   );
 });
@@ -135,4 +134,3 @@ self.addEventListener('push', (event) => {
     self.registration.showNotification(data.title, options)
   );
 });
-
