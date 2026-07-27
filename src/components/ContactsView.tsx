@@ -73,7 +73,7 @@ export const ContactsView: React.FC<ContactsViewProps> = ({ onBack, hideTopTitle
     const query = searchQuery.toLowerCase().trim();
     if (!query) return true;
     return (
-      c.customerPhone.toLowerCase().includes(query) ||
+      (c.customerPhone && c.customerPhone.toLowerCase().includes(query)) ||
       (c.name && c.name.toLowerCase().includes(query)) ||
       (c.lastJobTitle && c.lastJobTitle.toLowerCase().includes(query))
     );
@@ -132,13 +132,13 @@ export const ContactsView: React.FC<ContactsViewProps> = ({ onBack, hideTopTitle
       <div className="flex items-center gap-2 w-full">
         {/* Search Input occupying remaining width */}
         <div className="relative flex-1 min-w-0">
-          <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search phone, name or job..."
-            className="w-full pl-8 pr-3 py-1.5 bg-white border border-[#0B1B3D]/20 rounded-xl text-xs font-medium text-slate-800 focus:outline-none focus:border-[#0B1B3D] focus:ring-1 focus:ring-[#0B1B3D]/20 transition-all shadow-none"
+            placeholder="Search..."
+            className="w-full pl-10 pr-3 py-2 bg-slate-100/80 border border-slate-200 rounded-xl text-sm font-normal text-slate-800 focus:outline-none focus:border-[#1E88E5] focus:ring-1 focus:ring-[#1E88E5]/20 transition-all shadow-none placeholder-gray-400"
           />
         </div>
 

@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { UserProfile, Conversation } from "../types";
 import { SLACountdownTimer } from "./SLACountdownTimer";
+import { batchDeleteConversations, batchResetConversations, deleteConversation, updateConversationStatus } from "../lib/services";
 import { 
   BarChart3, 
   ArrowLeft, 
@@ -11,7 +12,11 @@ import {
   Clock, 
   HelpCircle,
   Inbox,
-  ArrowRight
+  ArrowRight,
+  Trash2,
+  RotateCcw,
+  CheckSquare,
+  Square
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
@@ -122,11 +127,85 @@ export const TicketRoutingBoard: React.FC<TicketRoutingBoardProps> = ({
   const [expandedPendingChatId, setExpandedPendingChatId] = useState<string | null>(null);
   const [activeDropdownChatId, setActiveDropdownChatId] = useState<string | null>(null);
 
+  // Batch actions state
+  const [selectedChatIds, setSelectedChatIds] = useState<Set<string>>(new Set());
+  const [actionSuccess, setActionSuccess] = useState<string | null>(null);
+
+  // Handle tab change and clear selections
+  const handleTabChange = (tab: "pending" | "ongoing" | "finished" | "abandoned") => {
+    setActiveTab(tab);
+    setSelectedChatIds(new Set());
+  };
+
   // Group counts
   const pendingChats = conversationsList.filter(c => c.status === "pending");
   const ongoingChats = conversationsList.filter(c => c.status === "ongoing");
   const finishedChats = conversationsList.filter(c => c.status === "finished");
   const abandonedChats = conversationsList.filter(c => c.status === "abandoned");
+
+  const toggleSelectChat = (chatId: string) => {
+    setSelectedChatIds(prev => {
+      const next = new Set(prev);
+      if (next.has(chatId)) next.delete(chatId);
+      else next.add(chatId);
+      return next;
+    });
+  };
+
+  const handleSelectAll = (chats: Conversation[]) => {
+    if (selectedChatIds.size === chats.length && chats.length > 0) {
+      setSelectedChatIds(new Set());
+    } else {
+      setSelectedChatIds(new Set(chats.map(c => c.chatId)));
+    }
+  };
+
+  const handleBatchDelete = async () => {
+    if (selectedChatIds.size === 0) return;
+    if (!window.confirm(`Are you sure you want to permanently delete ${selectedChatIds.size} chat(s)?`)) return;
+    try {
+      await batchDeleteConversations(Array.from(selectedChatIds));
+      setActionSuccess(`Successfully deleted ${selectedChatIds.size} chat(s).`);
+      setSelectedChatIds(new Set());
+      setTimeout(() => setActionSuccess(null), 3000);
+    } catch (err) {
+      console.error("Batch delete failed:", err);
+    }
+  };
+
+  const handleBatchReset = async () => {
+    if (selectedChatIds.size === 0) return;
+    if (!window.confirm(`Are you sure you want to restore / reset ${selectedChatIds.size} chat(s) back to pending queue?`)) return;
+    try {
+      await batchResetConversations(Array.from(selectedChatIds));
+      setActionSuccess(`Successfully restored ${selectedChatIds.size} chat(s) back to pending queue.`);
+      setSelectedChatIds(new Set());
+      setTimeout(() => setActionSuccess(null), 3000);
+    } catch (err) {
+      console.error("Batch reset failed:", err);
+    }
+  };
+
+  const handleSingleDelete = async (chatId: string) => {
+    if (!window.confirm("Are you sure you want to permanently delete this conversation?")) return;
+    try {
+      await deleteConversation(chatId);
+      setActionSuccess("Chat deleted permanently.");
+      setTimeout(() => setActionSuccess(null), 3000);
+    } catch (err) {
+      console.error("Single delete failed:", err);
+    }
+  };
+
+  const handleSingleRestore = async (chatId: string) => {
+    try {
+      await updateConversationStatus(chatId, "pending");
+      setActionSuccess("Chat restored back to Pending queue.");
+      setTimeout(() => setActionSuccess(null), 3000);
+    } catch (err) {
+      console.error("Single restore failed:", err);
+    }
+  };
 
   const getActiveChatsCount = (staffUid: string) => {
     return conversationsList.filter(
@@ -189,6 +268,14 @@ export const TicketRoutingBoard: React.FC<TicketRoutingBoardProps> = ({
 
       {/* Main Board Card Container */}
       <div className="bg-white border border-slate-200/60 rounded-[32px] p-6 sm:p-8 shadow-[0_8px_30px_rgba(30, 136, 229, 0.03)] space-y-6">
+        {/* Action success toast */}
+        {actionSuccess && (
+          <div className="p-3 bg-blue-50 border border-blue-200 text-blue-800 text-xs font-bold rounded-2xl flex items-center justify-between">
+            <span>✓ {actionSuccess}</span>
+            <button onClick={() => setActionSuccess(null)} className="text-blue-600 hover:text-blue-900 font-extrabold cursor-pointer">✕</button>
+          </div>
+        )}
+
         {/* TOP TAB CONTROLS (ALIGNED SIDE-BY-SIDE) */}
         <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 pb-4 select-none">
           {tabsInfo.map((tab) => {
@@ -197,7 +284,7 @@ export const TicketRoutingBoard: React.FC<TicketRoutingBoardProps> = ({
             return (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
+                onClick={() => handleTabChange(tab.id)}
                 className={`relative px-4 py-2.5 rounded-2xl text-xs font-bold tracking-tight transition-all cursor-pointer flex items-center gap-2 border ${
                   isActive
                     ? "bg-[#1E88E5] text-white border-[#1E88E5] shadow-md shadow-blue-950/10"
@@ -229,6 +316,47 @@ export const TicketRoutingBoard: React.FC<TicketRoutingBoardProps> = ({
             );
           })}
         </div>
+
+        {/* Batch Action Toolbar for Finished and Abandoned Tabs */}
+        {(activeTab === "finished" || activeTab === "abandoned") && activeList.length > 0 && (
+          <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 bg-slate-50 border border-slate-200 rounded-2xl shadow-xs">
+            <button
+              onClick={() => handleSelectAll(activeList)}
+              className="flex items-center gap-2 text-xs font-bold text-slate-700 hover:text-blue-700 transition-colors cursor-pointer border-0 bg-transparent"
+            >
+              {selectedChatIds.size === activeList.length && activeList.length > 0 ? (
+                <CheckSquare className="w-4.5 h-4.5 text-[#1E88E5]" />
+              ) : (
+                <Square className="w-4.5 h-4.5 text-slate-400" />
+              )}
+              <span>
+                {selectedChatIds.size === activeList.length && activeList.length > 0
+                  ? "Deselect All"
+                  : `Select All (${activeList.length})`}
+              </span>
+            </button>
+
+            {selectedChatIds.size > 0 && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-mono font-bold text-blue-800 bg-blue-100 px-2.5 py-1 rounded-lg">
+                  {selectedChatIds.size} Selected
+                </span>
+                <button
+                  onClick={handleBatchReset}
+                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-extrabold rounded-xl transition-all flex items-center gap-1.5 shadow-xs cursor-pointer border-0"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" /> Restore Selected
+                </button>
+                <button
+                  onClick={handleBatchDelete}
+                  className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-extrabold rounded-xl transition-all flex items-center gap-1.5 shadow-xs cursor-pointer border-0"
+                >
+                  <Trash2 className="w-3.5 h-3.5" /> Delete Selected
+                </button>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Board Queue Content with Switcher Animations */}
         {loading ? (
@@ -288,12 +416,37 @@ export const TicketRoutingBoard: React.FC<TicketRoutingBoardProps> = ({
                         {/* Header Details */}
                         <div className="space-y-2">
                           <div className="flex items-center justify-between gap-2">
-                            <span className="text-xs font-mono font-extrabold text-slate-900 bg-slate-50 px-2 py-1 rounded-lg">
-                              {c.customerPhone}
-                            </span>
-                            <span className="text-[9px] font-sans font-medium text-slate-400">
-                              {new Date(c.lastMessageAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                            </span>
+                            <div className="flex items-center gap-2">
+                              {(activeTab === "finished" || activeTab === "abandoned") && (
+                                <button
+                                  onClick={() => toggleSelectChat(c.chatId)}
+                                  className="text-slate-400 hover:text-blue-600 transition-colors cursor-pointer border-0 bg-transparent p-0"
+                                >
+                                  {selectedChatIds.has(c.chatId) ? (
+                                    <CheckSquare className="w-4.5 h-4.5 text-[#1E88E5]" />
+                                  ) : (
+                                    <Square className="w-4.5 h-4.5 text-slate-300" />
+                                  )}
+                                </button>
+                              )}
+                              <span className="text-xs font-mono font-extrabold text-slate-900 bg-slate-50 px-2 py-1 rounded-lg">
+                                {c.customerPhone}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-[9px] font-sans font-medium text-slate-400">
+                                {new Date(c.lastMessageAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                              {(activeTab === "finished" || activeTab === "abandoned") && (
+                                <button
+                                  onClick={() => handleSingleDelete(c.chatId)}
+                                  className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all cursor-pointer border-0 bg-transparent"
+                                  title="Delete chat permanently"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                            </div>
                           </div>
                           <div>
                             <h4 className="text-sm font-sans font-extrabold text-slate-800 leading-snug">
@@ -395,28 +548,31 @@ export const TicketRoutingBoard: React.FC<TicketRoutingBoardProps> = ({
                         )}
 
                         {activeTab === "finished" && (
-                          <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[10px] font-mono text-blue-700 font-bold">
-                            <span className="flex items-center gap-1">
+                          <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
+                            <span className="flex items-center gap-1 text-[10px] font-mono text-blue-700 font-bold bg-blue-50 px-2 py-1 rounded-xl border border-blue-200">
                               <CheckCircle2 className="w-3.5 h-3.5" />
-                              ARCHIVED
+                              ARCHIVED ({c.assignedToName || "System"})
                             </span>
-                            <span className="text-slate-500 font-sans font-semibold">By: {c.assignedToName || "System"}</span>
+                            <button
+                              onClick={() => handleSingleRestore(c.chatId)}
+                              className="text-blue-600 hover:text-blue-800 flex items-center gap-1 cursor-pointer border-0 bg-transparent text-[11px] font-extrabold hover:underline"
+                            >
+                              <RotateCcw className="w-3.5 h-3.5" /> Restore Queue
+                            </button>
                           </div>
                         )}
 
                         {activeTab === "abandoned" && (
-                          <div className="pt-2 border-t border-slate-100 space-y-2">
-                            <div className="flex justify-between items-center text-[10px] font-mono text-rose-600 font-bold">
-                              <span className="flex items-center gap-1">
-                                <AlertTriangle className="w-3.5 h-3.5" />
-                                SLA ABANDONED
-                              </span>
-                            </div>
+                          <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
+                            <span className="flex items-center gap-1 text-[10px] font-mono text-rose-700 font-bold bg-rose-50 px-2 py-1 rounded-xl border border-rose-200">
+                              <AlertTriangle className="w-3.5 h-3.5" />
+                              SLA ABANDONED
+                            </span>
                             <button
-                              onClick={() => onForceReassign(c.chatId)}
-                              className="w-full py-1.5 bg-slate-100 hover:bg-[#1E88E5] text-slate-700 hover:text-white text-[10px] font-mono font-bold rounded-xl flex items-center justify-center gap-1 transition-all cursor-pointer border-0"
+                              onClick={() => handleSingleRestore(c.chatId)}
+                              className="text-blue-600 hover:text-blue-800 flex items-center gap-1 cursor-pointer border-0 bg-transparent text-[11px] font-extrabold hover:underline"
                             >
-                              Reset Chat back to Pending
+                              <RotateCcw className="w-3.5 h-3.5" /> Restore Queue
                             </button>
                           </div>
                         )}

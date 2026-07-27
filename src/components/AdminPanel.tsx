@@ -13,7 +13,12 @@ import {
   getAllUserProfiles,
   batchDeleteConversations,
   batchResetConversations,
-  deleteConversation
+  deleteConversation,
+  reopenStaffReportSubmissions,
+  isReportSubmissionReopened,
+  subscribeToReportReopens,
+  isDeadlinePassedForDate,
+  getLocalTodayString
 } from "../lib/services";
 import { 
   BarChart3, 
@@ -47,13 +52,19 @@ import {
   CheckSquare,
   Square,
   BookUser,
-  AlertCircle
+  AlertCircle,
+  FileText,
+  X,
+  UserX,
+  Unlock,
+  Lock
 } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "motion/react";
 import { JobManagement } from "./JobManagement";
 import { AdminPostJobPage } from "./AdminPostJobPage";
 import { ContactsView } from "./ContactsView";
+import { CandidateListSummarySection } from "./CandidateListSummarySection";
 import { 
   ResponsiveContainer, 
   LineChart, 
@@ -251,6 +262,68 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ jobsList }) => {
     return `${year}-${month}-${day}`;
   });
   const [reportsSearchQuery, setReportsSearchQuery] = useState("");
+  const [showMissingStaffModal, setShowMissingStaffModal] = useState(false);
+  const [selectedReopenStaffUids, setSelectedReopenStaffUids] = useState<Set<string>>(new Set());
+  const [reopenFeedbackMsg, setReopenFeedbackMsg] = useState<string | null>(null);
+  const [reopenModalData, setReopenModalData] = useState<{
+    isOpen: boolean;
+    uids: string[];
+    targetDate: string;
+  } | null>(null);
+  const [, setReopenTrigger] = useState(0);
+
+  useEffect(() => {
+    const unsub = subscribeToReportReopens(() => setReopenTrigger(v => v + 1));
+    return () => unsub();
+  }, []);
+
+  const handleToggleSelectReopenStaff = (uid: string) => {
+    setSelectedReopenStaffUids(prev => {
+      const next = new Set(prev);
+      if (next.has(uid)) next.delete(uid);
+      else next.add(uid);
+      return next;
+    });
+  };
+
+  const handleOpenReopenModal = (uidsToReopen?: string[]) => {
+    const targetUids = uidsToReopen || Array.from(selectedReopenStaffUids);
+    if (targetUids.length === 0) return;
+    setReopenModalData({
+      isOpen: true,
+      uids: targetUids,
+      targetDate: selectedReportsDate
+    });
+  };
+
+  const handleConfirmReopenModal = async () => {
+    if (!reopenModalData) return;
+    const { uids, targetDate } = reopenModalData;
+    if (!isDeadlinePassedForDate(targetDate)) return;
+
+    await reopenStaffReportSubmissions(uids, targetDate, staffList);
+    setReopenFeedbackMsg(`Successfully reopened report submission for ${targetDate} for ${uids.length} staff member(s) for 6 hours!`);
+    setSelectedReopenStaffUids(new Set());
+    setReopenModalData(null);
+    setTimeout(() => setReopenFeedbackMsg(null), 4000);
+  };
+
+  const [systemReportTarget, setSystemReportTarget] = useState<{
+    uid: string;
+    staffName: string;
+    staffEmail?: string;
+    date: string;
+    report?: StaffDailyReport;
+  } | null>(null);
+
+  const missingStaffList = React.useMemo(() => {
+    const submittedUids = new Set(
+      dailyReports
+        .filter(r => r.date === selectedReportsDate)
+        .map(r => r.uid)
+    );
+    return staffList.filter(s => (s.role === "staff" || s.role === "admin") && !submittedUids.has(s.uid));
+  }, [staffList, dailyReports, selectedReportsDate]);
   
   // Loading & Feedback States
   const [loading, setLoading] = useState(true);
@@ -264,8 +337,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ jobsList }) => {
   const [routingTab, setRoutingTab] = useState<"pending" | "ongoing" | "finished" | "abandoned">("pending");
   const [chartFilter, setChartFilter] = useState<"daily" | "weekly" | "monthly" | "yearly">("daily");
 
-  // Abandoned chats batch action states
+  // Abandoned and Finished chats batch action states
   const [selectedAbandonedChatIds, setSelectedAbandonedChatIds] = useState<Set<string>>(new Set());
+  const [selectedFinishedChatIds, setSelectedFinishedChatIds] = useState<Set<string>>(new Set());
   const [confirmBatchModal, setConfirmBatchModal] = useState<{
     isOpen: boolean;
     action: "delete" | "reset";
@@ -292,18 +366,39 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ jobsList }) => {
     }
   };
 
+  const handleToggleSelectFinished = (chatId: string) => {
+    setSelectedFinishedChatIds(prev => {
+      const next = new Set(prev);
+      if (next.has(chatId)) {
+        next.delete(chatId);
+      } else {
+        next.add(chatId);
+      }
+      return next;
+    });
+  };
+
+  const handleSelectAllFinished = (finishedChatsList: Conversation[]) => {
+    if (selectedFinishedChatIds.size === finishedChatsList.length && finishedChatsList.length > 0) {
+      setSelectedFinishedChatIds(new Set());
+    } else {
+      setSelectedFinishedChatIds(new Set(finishedChatsList.map(c => c.chatId)));
+    }
+  };
+
   const handleExecuteBatchAction = async () => {
     if (!confirmBatchModal) return;
     const { action, chatIds } = confirmBatchModal;
     try {
       if (action === "delete") {
         await batchDeleteConversations(chatIds);
-        setActionSuccess(`Successfully deleted ${chatIds.length} abandoned ticket(s).`);
+        setActionSuccess(`Successfully deleted ${chatIds.length} ticket(s).`);
       } else if (action === "reset") {
         await batchResetConversations(chatIds);
-        setActionSuccess(`Successfully reset ${chatIds.length} ticket(s) back to pending queue.`);
+        setActionSuccess(`Successfully restored ${chatIds.length} ticket(s) back to pending queue.`);
       }
       setSelectedAbandonedChatIds(new Set());
+      setSelectedFinishedChatIds(new Set());
       setTimeout(() => setActionSuccess(null), 3000);
     } catch (err) {
       console.error("Batch action failed:", err);
@@ -1665,31 +1760,113 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ jobsList }) => {
                           <span>No Archived/Finished Chat Sessions Found</span>
                         </div>
                       ) : (
-                        finishedChats.map((c) => (
-                          <div key={c.chatId} className="p-6 bg-white rounded-none border-y border-[#1E88E5] space-y-4 relative transition-all duration-300 z-10 w-full">
-                            {/* Vector graphic pattern background design */}
-                            <div className="absolute inset-0 pointer-events-none opacity-[0.03] text-[#1E88E5]">
-                              <svg width="100%" height="100%" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <circle cx="85%" cy="15%" r="50" stroke="currentColor" strokeWidth="1.2" />
-                                <circle cx="90%" cy="20%" r="80" stroke="currentColor" strokeWidth="1" strokeDasharray="3 3" />
-                                <path d="M-10,80 C30,40 80,100 150,60" stroke="currentColor" strokeWidth="1.2" />
-                              </svg>
-                            </div>
-
-                            <div className="flex items-center justify-between gap-1 relative z-10">
-                              <span className="text-xs font-mono font-bold text-slate-800">
-                                {c.customerPhone}
+                        <div className="col-span-full space-y-4">
+                          {/* Batch Action Toolbar */}
+                          <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 bg-blue-50/60 border border-blue-200/80 rounded-2xl shadow-xs">
+                            <button
+                              onClick={() => handleSelectAllFinished(finishedChats)}
+                              className="flex items-center gap-2 text-xs font-bold text-slate-700 hover:text-blue-700 transition-colors cursor-pointer border-0 bg-transparent"
+                            >
+                              {selectedFinishedChatIds.size === finishedChats.length && finishedChats.length > 0 ? (
+                                <CheckSquare className="w-4.5 h-4.5 text-blue-600" />
+                              ) : (
+                                <Square className="w-4.5 h-4.5 text-slate-400" />
+                              )}
+                              <span>
+                                {selectedFinishedChatIds.size === finishedChats.length && finishedChats.length > 0
+                                  ? "Deselect All"
+                                  : `Select All (${finishedChats.length})`}
                               </span>
-                            </div>
-                            <p className="text-sm font-sans font-black text-black leading-snug relative z-10">
-                              {c.jobTitle}
-                            </p>
-                            <div className="pt-2.5 border-t border-slate-100 flex items-center justify-between gap-1 text-[10px] font-mono text-blue-200 font-bold bg-slate-900 px-2.5 py-1.5 rounded-xl border border-slate-800/40 shadow-sm relative z-10 w-full">
-                              <span>✓ ARCHIVED SESSION</span>
-                              <span className="text-blue-300 font-sans font-semibold text-[9px]">By: {c.assignedToName || "System"}</span>
-                            </div>
+                            </button>
+
+                            {selectedFinishedChatIds.size > 0 && (
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-mono font-bold text-blue-800 bg-blue-100 px-2.5 py-1 rounded-lg">
+                                  {selectedFinishedChatIds.size} Selected
+                                </span>
+                                <button
+                                  onClick={() => setConfirmBatchModal({ isOpen: true, action: "reset", chatIds: Array.from(selectedFinishedChatIds) })}
+                                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-extrabold rounded-xl transition-all flex items-center gap-1.5 shadow-xs cursor-pointer border-0"
+                                >
+                                  <RotateCcw className="w-3.5 h-3.5" /> Restore Selected
+                                </button>
+                                <button
+                                  onClick={() => setConfirmBatchModal({ isOpen: true, action: "delete", chatIds: Array.from(selectedFinishedChatIds) })}
+                                  className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-extrabold rounded-xl transition-all flex items-center gap-1.5 shadow-xs cursor-pointer border-0"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" /> Delete Selected
+                                </button>
+                              </div>
+                            )}
                           </div>
-                        ))
+
+                          {/* Cards Grid */}
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {finishedChats.map((c) => (
+                              <div
+                                key={c.chatId}
+                                className={`p-5 bg-white rounded-2xl border ${
+                                  selectedFinishedChatIds.has(c.chatId)
+                                    ? "border-blue-500 ring-2 ring-blue-100 shadow-sm"
+                                    : "border-slate-200"
+                                } space-y-4 relative transition-all duration-300 z-10 w-full shadow-xs hover:shadow-md flex flex-col justify-between`}
+                              >
+                                {/* Vector graphic pattern background design */}
+                                <div className="absolute inset-0 pointer-events-none opacity-[0.03] text-blue-600">
+                                  <svg width="100%" height="100%" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <circle cx="85%" cy="15%" r="50" stroke="currentColor" strokeWidth="1.2" />
+                                    <circle cx="90%" cy="20%" r="80" stroke="currentColor" strokeWidth="1" strokeDasharray="3 3" />
+                                    <path d="M-10,80 C30,40 80,100 150,60" stroke="currentColor" strokeWidth="1.2" />
+                                  </svg>
+                                </div>
+
+                                <div className="space-y-2 relative z-10">
+                                  <div className="flex items-center justify-between gap-2">
+                                    <div className="flex items-center gap-2">
+                                      <button
+                                        onClick={() => handleToggleSelectFinished(c.chatId)}
+                                        className="text-slate-400 hover:text-blue-600 transition-colors cursor-pointer border-0 bg-transparent p-0"
+                                      >
+                                        {selectedFinishedChatIds.has(c.chatId) ? (
+                                          <CheckSquare className="w-4.5 h-4.5 text-blue-600" />
+                                        ) : (
+                                          <Square className="w-4.5 h-4.5 text-slate-300" />
+                                        )}
+                                      </button>
+                                      <span className="text-xs font-mono font-bold text-slate-900">
+                                        {c.customerPhone}
+                                      </span>
+                                    </div>
+
+                                    <button
+                                      onClick={() => setConfirmBatchModal({ isOpen: true, action: "delete", chatIds: [c.chatId] })}
+                                      className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all cursor-pointer border-0 bg-transparent"
+                                      title="Delete finished chat permanently"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </button>
+                                  </div>
+
+                                  <p className="text-xs font-extrabold text-slate-800 leading-snug">
+                                    {c.jobTitle}
+                                  </p>
+                                </div>
+
+                                <div className="pt-3 border-t border-slate-100 flex flex-row items-center justify-between gap-2 relative z-10">
+                                  <span className="flex items-center gap-1 text-[10px] font-mono text-blue-700 font-bold bg-blue-50 px-2.5 py-1 rounded-xl border border-blue-200 shadow-xs">
+                                    ✓ ARCHIVED ({c.assignedToName || "System"})
+                                  </span>
+                                  <button
+                                    onClick={() => setConfirmBatchModal({ isOpen: true, action: "reset", chatIds: [c.chatId] })}
+                                    className="text-blue-600 hover:text-blue-800 flex items-center gap-1 cursor-pointer border-0 bg-transparent text-[11px] font-extrabold hover:underline"
+                                  >
+                                    <RotateCcw className="w-3.5 h-3.5" /> Restore Queue
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
                       )
                     )}
 
@@ -1957,15 +2134,33 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ jobsList }) => {
 
               {/* Activity Logs Feed Container */}
               <div className="bg-white border border-blue-800 rounded-3xl p-6 sm:p-8 space-y-6 shadow-[0_15px_35px_-5px_rgba(0,0,0,0.05)]">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-[#111827] border border-slate-800 rounded-xl flex items-center justify-center text-blue-200 shrink-0 shadow-sm">
-                    <ClipboardList className="w-5 h-5" />
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-[#111827] border border-slate-800 rounded-xl flex items-center justify-center text-blue-200 shrink-0 shadow-sm">
+                      <ClipboardList className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-sans font-extrabold text-slate-900 tracking-tight leading-none">
+                        Activity Logs Feed
+                      </h3>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="text-base font-sans font-extrabold text-slate-900 tracking-tight leading-none">
-                      Activity Logs Feed
-                    </h3>
-                  </div>
+
+                  {/* Icon Button: Staff Missing Reports */}
+                  <button
+                    type="button"
+                    onClick={() => setShowMissingStaffModal(true)}
+                    className="px-3 py-2 bg-amber-50 hover:bg-amber-100 border border-amber-300/80 text-amber-900 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer shadow-2xs hover:scale-[1.02] active:scale-95"
+                    title="View Missing Staff Daily Reports"
+                  >
+                    <div className="relative">
+                      <UserMinus className="w-4 h-4 text-amber-700" />
+                      {missingStaffList.length > 0 && (
+                        <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-amber-600 rounded-full animate-ping" />
+                      )}
+                    </div>
+                    <span>({missingStaffList.length})</span>
+                  </button>
                 </div>
 
                 <div className="space-y-4">
@@ -2011,6 +2206,26 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ jobsList }) => {
                                     PAST 9PM LIMIT
                                   </span>
                                 )}
+
+                                {/* Tag-like button: View System Report */}
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSystemReportTarget({
+                                      uid: report.uid,
+                                      staffName: report.staffName,
+                                      staffEmail: staffEmail || undefined,
+                                      date: report.date,
+                                      report: report
+                                    });
+                                  }}
+                                  className="text-[10px] font-mono bg-blue-600 hover:bg-blue-700 text-white px-2.5 py-0.5 rounded-lg font-bold shadow-xs flex items-center gap-1 transition-all cursor-pointer border-0 hover:scale-[1.03] active:scale-95"
+                                  title="View Full System Activity & Candidate Logs Report"
+                                >
+                                  <FileText className="w-3 h-3" />
+                                  <span>View System Report</span>
+                                </button>
                               </div>
                               <p className="text-xs text-slate-500 font-mono font-medium">
                                 Registered at {new Date(report.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -2261,6 +2476,417 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ jobsList }) => {
                 Click anywhere to close full screen verification
               </div>
             </div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Modal: Missing Daily Reports Staff List */}
+      <AnimatePresence>
+        {showMissingStaffModal && (
+          <div className="fixed inset-0 z-[9999] bg-slate-900/60 backdrop-blur-md flex flex-col items-center justify-center p-3 sm:p-6 overflow-hidden">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              className="bg-white border border-slate-200 rounded-3xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden relative"
+            >
+              {/* Top Sticky Header */}
+              <div className="p-5 sm:p-6 bg-[#111827] text-white flex items-center justify-between shrink-0">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-amber-500/20 border border-amber-500/30 rounded-2xl flex items-center justify-center text-amber-400 shrink-0">
+                    <UserMinus className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-base sm:text-lg font-sans font-black tracking-tight leading-tight">
+                      Unsubmitted Daily Staff Reports
+                    </h3>
+                    <p className="text-xs text-slate-300 font-mono mt-0.5">
+                      Selected Date: <span className="text-amber-400 font-bold">{selectedReportsDate}</span> • {missingStaffList.length} Staff Member(s) Pending
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setShowMissingStaffModal(false)}
+                  className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-colors cursor-pointer border-0"
+                  title="Close modal"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Content Body */}
+              <div className="p-5 sm:p-6 overflow-y-auto space-y-4 flex-1 text-left bg-slate-50/50">
+                {reopenFeedbackMsg && (
+                  <div className="bg-emerald-50 border border-emerald-200 text-emerald-900 p-3 rounded-2xl text-xs font-extrabold flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span>{reopenFeedbackMsg}</span>
+                  </div>
+                )}
+
+                {missingStaffList.length === 0 ? (
+                  <div className="bg-white border border-emerald-200 rounded-2xl p-8 text-center space-y-2">
+                    <CheckCircle2 className="w-10 h-10 text-emerald-600 mx-auto" />
+                    <h4 className="text-base font-bold text-slate-900">All Staff Submitted!</h4>
+                    <p className="text-xs text-slate-500">Every registered staff member has submitted their daily report for {selectedReportsDate}.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {/* Active date deadline check */}
+                    {!isDeadlinePassedForDate(selectedReportsDate) && (
+                      <div className="bg-amber-50/80 border border-amber-200 text-amber-900 p-3.5 rounded-2xl text-xs font-bold flex items-center gap-2.5 shadow-2xs">
+                        <Clock className="w-4 h-4 text-amber-600 shrink-0" />
+                        <span>
+                          Today's 9:00 PM deadline has not been reached yet. Staff can submit natively for this date. Reopening is available once 9:00 PM passes or when choosing a previous date.
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Batch Actions Header Bar */}
+                    <div className="p-3 bg-white border border-slate-200 rounded-2xl flex flex-wrap items-center justify-between gap-3 shadow-2xs">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (selectedReopenStaffUids.size === missingStaffList.length) {
+                            setSelectedReopenStaffUids(new Set());
+                          } else {
+                            setSelectedReopenStaffUids(new Set(missingStaffList.map(s => s.uid)));
+                          }
+                        }}
+                        className="flex items-center gap-2 text-xs font-extrabold text-slate-700 hover:text-slate-900 cursor-pointer"
+                      >
+                        {selectedReopenStaffUids.size === missingStaffList.length ? (
+                          <CheckSquare className="w-4 h-4 text-blue-600" />
+                        ) : (
+                          <Square className="w-4 h-4 text-slate-400" />
+                        )}
+                        <span>Select All ({missingStaffList.length})</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        disabled={!isDeadlinePassedForDate(selectedReportsDate)}
+                        onClick={() => {
+                          if (!isDeadlinePassedForDate(selectedReportsDate)) return;
+                          if (selectedReopenStaffUids.size > 0) {
+                            handleOpenReopenModal();
+                          } else {
+                            handleOpenReopenModal(missingStaffList.map(s => s.uid));
+                          }
+                        }}
+                        className={`px-4 py-2 rounded-xl font-black text-xs transition-all flex items-center gap-2 border-0 shadow-2xs ${
+                          isDeadlinePassedForDate(selectedReportsDate)
+                            ? "bg-amber-500 hover:bg-amber-600 text-slate-950 cursor-pointer hover:scale-[1.02] active:scale-95"
+                            : "bg-slate-200 text-slate-400 cursor-not-allowed opacity-60"
+                        }`}
+                        title={
+                          isDeadlinePassedForDate(selectedReportsDate)
+                            ? "Select Date to Reopen Submission"
+                            : "Reopening is inactive because the 9:00 PM deadline for today has not been reached yet."
+                        }
+                      >
+                        <Unlock className="w-4 h-4" />
+                        <span>Reopen</span>
+                      </button>
+                    </div>
+
+                    <div className="divide-y divide-slate-200/70">
+                      {missingStaffList.map((staff) => {
+                        const isReopened = isReportSubmissionReopened(staff.uid, selectedReportsDate).isReopened;
+                        const isSelected = selectedReopenStaffUids.has(staff.uid);
+                        const isDatePassed = isDeadlinePassedForDate(selectedReportsDate);
+
+                        return (
+                          <div 
+                            key={staff.uid}
+                            className={`py-3.5 flex items-center justify-between gap-3 ${isSelected ? "bg-amber-50/40 px-2 rounded-xl" : ""}`}
+                          >
+                            <div className="flex items-center gap-3 min-w-0">
+                              <button
+                                type="button"
+                                onClick={() => handleToggleSelectReopenStaff(staff.uid)}
+                                className="text-slate-400 hover:text-blue-600 transition-colors cursor-pointer shrink-0"
+                              >
+                                {isSelected ? (
+                                  <CheckSquare className="w-4 h-4 text-blue-600" />
+                                ) : (
+                                  <Square className="w-4 h-4 text-slate-300" />
+                                )}
+                              </button>
+
+                              <div className="w-9 h-9 rounded-full bg-[#111827] text-white flex items-center justify-center text-xs font-black uppercase shrink-0">
+                                {(staff.displayName || "S").charAt(0)}
+                              </div>
+
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <h4 className="text-sm font-extrabold text-slate-900 leading-snug">
+                                    {staff.displayName || "Staff Member"}
+                                  </h4>
+                                  {isReopened && (
+                                    <span className="bg-emerald-100 text-emerald-800 text-[9px] font-mono font-bold px-2 py-0.5 rounded-full flex items-center gap-1 shrink-0">
+                                      <Unlock className="w-2.5 h-2.5" /> Reopened (6h Extension)
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-xs text-slate-500 font-mono">
+                                  {staff.email}
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-2 shrink-0">
+                              <button
+                                type="button"
+                                disabled={!isDatePassed}
+                                onClick={() => {
+                                  if (!isDatePassed) return;
+                                  handleOpenReopenModal([staff.uid]);
+                                }}
+                                className={`w-9 h-9 rounded-full flex items-center justify-center transition-all shrink-0 border-0 shadow-2xs ${
+                                  !isDatePassed
+                                    ? "bg-slate-100 text-slate-300 cursor-not-allowed opacity-50"
+                                    : isReopened
+                                      ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-200 cursor-pointer hover:scale-105 active:scale-95"
+                                      : "bg-amber-500 text-slate-950 hover:bg-amber-600 cursor-pointer hover:scale-105 active:scale-95"
+                                }`}
+                                title={
+                                  !isDatePassed
+                                    ? "Reopening is inactive because today's 9:00 PM deadline has not been reached yet."
+                                    : isReopened
+                                      ? "Extend Reopen Window for 6 Hours"
+                                      : "Reopen Report Submission for 6 Hours"
+                                }
+                              >
+                                <Unlock className="w-4 h-4" />
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setShowMissingStaffModal(false);
+                                  setSystemReportTarget({
+                                    uid: staff.uid,
+                                    staffName: staff.displayName || "Staff Member",
+                                    staffEmail: staff.email,
+                                    date: selectedReportsDate
+                                  });
+                                }}
+                                className="w-9 h-9 rounded-full bg-[#111827] hover:bg-[#1f2937] text-white flex items-center justify-center transition-all shrink-0 cursor-pointer border-0 shadow-2xs hover:scale-105 active:scale-95"
+                                title="View Staff System Report"
+                              >
+                                <FileText className="w-4 h-4 text-blue-300" />
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Modal: Select Reopen Date Popup */}
+      <AnimatePresence>
+        {reopenModalData && reopenModalData.isOpen && (
+          <div className="fixed inset-0 z-[10005] bg-slate-950/70 backdrop-blur-md flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              className="bg-white border border-slate-200 rounded-3xl shadow-2xl w-full max-w-md overflow-hidden text-left"
+            >
+              {/* Header */}
+              <div className="p-5 bg-[#111827] text-white flex items-center justify-between border-b border-slate-800">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center border border-amber-500/30">
+                    <Unlock className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-black tracking-tight leading-tight">Reopen Report Submission</h3>
+                    <p className="text-xs text-slate-400 font-mono mt-0.5">Select date & grant 6-hour window</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setReopenModalData(null)}
+                  className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors cursor-pointer border-0"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Body */}
+              <div className="p-5 space-y-4 bg-slate-50/50">
+                {/* Target Staff List Summary */}
+                <div className="bg-white border border-slate-200 rounded-2xl p-3.5 space-y-2 shadow-2xs">
+                  <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider block">
+                    Target Staff ({reopenModalData.uids.length})
+                  </span>
+                  <div className="flex flex-wrap items-center gap-1.5 max-h-28 overflow-y-auto pr-1">
+                    {reopenModalData.uids.map((uid) => {
+                      const staffObj = staffList.find(s => s.uid === uid);
+                      const name = staffObj?.displayName || memoryStore.users[uid]?.displayName || "Staff Member";
+                      return (
+                        <span key={uid} className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 border border-slate-200 rounded-lg text-xs font-bold text-slate-800">
+                          <span className="w-4 h-4 rounded-full bg-[#111827] text-white text-[9px] font-black flex items-center justify-center uppercase">
+                            {name.charAt(0)}
+                          </span>
+                          <span>{name}</span>
+                        </span>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Date Input */}
+                <div className="space-y-2">
+                  <label className="text-xs font-black text-slate-900 block">
+                    Select Report Date to Reopen:
+                  </label>
+                  <input
+                    type="date"
+                    value={reopenModalData.targetDate}
+                    max={getLocalTodayString()}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val) {
+                        setReopenModalData(prev => prev ? { ...prev, targetDate: val } : null);
+                      }
+                    }}
+                    className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-sm font-mono font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500 shadow-2xs cursor-pointer"
+                  />
+
+                  {/* Dynamic Status badge for chosen date */}
+                  {(() => {
+                    const modalDatePassed = isDeadlinePassedForDate(reopenModalData.targetDate);
+                    if (modalDatePassed) {
+                      return (
+                        <div className="bg-emerald-50 border border-emerald-200 text-emerald-900 p-2.5 rounded-xl text-xs font-extrabold flex items-center gap-2">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                          <span>9:00 PM Deadline Passed — Eligible for Reopen</span>
+                        </div>
+                      );
+                    } else {
+                      return (
+                        <div className="bg-amber-50 border border-amber-200 text-amber-900 p-2.5 rounded-xl text-xs font-bold flex items-center gap-2">
+                          <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                          <span>Today's 9:00 PM deadline has not been reached yet. Reports are open natively.</span>
+                        </div>
+                      );
+                    }
+                  })()}
+                </div>
+
+                {/* Extension detail */}
+                <div className="bg-blue-50/80 border border-blue-200 p-3 rounded-2xl flex items-center gap-3">
+                  <Clock className="w-5 h-5 text-blue-600 shrink-0" />
+                  <div>
+                    <span className="text-xs font-extrabold text-blue-950 block">6-Hour Time Extension</span>
+                    <span className="text-[11px] text-blue-800 font-medium leading-relaxed">
+                      Staff will be granted 6 hours from now to submit or update their daily report for {reopenModalData.targetDate}.
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Actions Footer */}
+              <div className="p-4 bg-white border-t border-slate-200 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setReopenModalData(null)}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-extrabold text-xs rounded-xl transition-colors cursor-pointer border-0"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={!isDeadlinePassedForDate(reopenModalData.targetDate)}
+                  onClick={handleConfirmReopenModal}
+                  className={`px-5 py-2 rounded-xl font-black text-xs transition-all flex items-center gap-2 shadow-2xs border-0 ${
+                    isDeadlinePassedForDate(reopenModalData.targetDate)
+                      ? "bg-amber-500 hover:bg-amber-600 text-slate-950 cursor-pointer hover:scale-[1.02] active:scale-95"
+                      : "bg-slate-200 text-slate-400 cursor-not-allowed opacity-60"
+                  }`}
+                >
+                  <Unlock className="w-4 h-4" />
+                  <span>Confirm Reopen (6 Hours)</span>
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Modal: Full Screen Staff System Report */}
+      <AnimatePresence>
+        {systemReportTarget && (
+          <div className="fixed inset-0 z-[10000] bg-slate-950/70 backdrop-blur-md flex flex-col items-center justify-center p-2 sm:p-5 overflow-hidden">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.94, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.94, y: 20 }}
+              className="bg-white border border-slate-200 rounded-[28px] shadow-2xl w-full max-w-6xl max-h-[92vh] flex flex-col overflow-hidden relative text-left"
+            >
+              {/* Top Bar */}
+              <div className="p-5 sm:p-6 bg-[#111827] text-white flex items-center justify-between shrink-0">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-blue-600/20 border border-blue-500/30 rounded-2xl flex items-center justify-center text-blue-400 shrink-0">
+                    <FileText className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-base sm:text-lg font-sans font-black tracking-tight leading-tight">
+                        Staff Report Activity
+                      </h3>
+                      <span className="text-[10px] font-mono bg-blue-600 text-white px-2 py-0.5 rounded-md font-bold">
+                        {systemReportTarget.date}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-300 font-mono mt-0.5">
+                      Staff: <span className="text-blue-300 font-bold">{systemReportTarget.staffName}</span>
+                      {systemReportTarget.staffEmail && ` (${systemReportTarget.staffEmail})`}
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setSystemReportTarget(null)}
+                  className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-colors cursor-pointer border-0"
+                  title="Close System Report"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Modal Scroll Content: Only Candidate & List Activity Log Section */}
+              <div className="p-5 sm:p-7 overflow-y-auto space-y-8 flex-1 bg-slate-50/40">
+                <div className="space-y-4">
+                  <div className="border-b border-slate-200/80 pb-3 flex items-center justify-between">
+                    <div>
+                      <h4 className="text-base font-extrabold text-slate-900 font-sans">
+                        Candidate & List Activity Log
+                      </h4>
+                      <p className="text-xs text-slate-500 font-medium">
+                        Showing candidate updates made by {systemReportTarget.staffName}
+                      </p>
+                    </div>
+                  </div>
+
+                  <CandidateListSummarySection 
+                    initialDate={systemReportTarget.date}
+                    filterStaffUid={systemReportTarget.uid}
+                    filterStaffName={systemReportTarget.staffName}
+                  />
+                </div>
+              </div>
+            </motion.div>
           </div>
         )}
       </AnimatePresence>

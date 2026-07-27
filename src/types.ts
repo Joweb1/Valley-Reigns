@@ -11,6 +11,7 @@ export interface Job {
   impressions: number;
   createdAt: number;
   postedByUid?: string;
+  isUnavailable?: boolean;
 }
 
 export interface SystemNotification {
@@ -55,6 +56,19 @@ export interface ChatMessage {
   timestamp: number;
 }
 
+export interface CandidateListLog {
+  id: string;
+  listName: string; // e.g. "Registered Candidates" | "Pending Resume(CV)" | "Submitted Resume(CV)" | "Address Given" | "Verified" | "Pending Commission Retrieval"
+  action: "added" | "removed";
+  timestamp: number;
+  staffUid?: string;
+  staffName?: string;
+  customerPhone?: string;
+  customerName?: string;
+  chatId?: string;
+  jobTitle?: string;
+}
+
 export interface Conversation {
   chatId: string;
   customerPhone: string;
@@ -74,8 +88,11 @@ export interface Conversation {
   isInApp?: boolean;
   abandonedAt?: number;
   finishedAt?: number;
+  claimedAt?: number;
   seekerUid?: string;
   typing?: Record<string, { isTyping: boolean; name: string; updatedAt: number }>;
+  candidateLists?: Record<string, { addedAt: number; addedBy?: string }>;
+  candidateListLogs?: CandidateListLog[];
 }
 
 export interface StaffStatus {
@@ -127,7 +144,24 @@ export interface StaffDailyReport {
   // Computed target status checked at submission
   targetReachOutsMet: boolean;   // Target >= 20
   targetAddressesMet: boolean;   // Target >= 4
-  targetOnTimeMet: boolean;      // Submitted on or before 9:00 PM local
+  targetOnTimeMet: boolean;      // Morning resumption logged on or before 9:00 AM local
+  resumptionTimeStr?: string;    // E.g. "08:45 AM"
+}
+
+export interface StaffResumptionRecord {
+  id?: string;
+  uid: string;
+  staffName: string;
+  date: string; // YYYY-MM-DD
+  timestamp: number;
+}
+
+export interface StaffReportReopenOverride {
+  id?: string;
+  uid: string;
+  staffName?: string;
+  reopenedAt: number; // timestamp when admin reopened submission
+  targetDate?: string; // YYYY-MM-DD date
 }
 
 

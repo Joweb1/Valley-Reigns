@@ -7,7 +7,7 @@ import {
   ExternalLink, Play, Pause, UserCheck, Clock, Layers
 } from "lucide-react";
 import { doc, getDoc, setDoc } from "firebase/firestore";
-import { db } from "../lib/services";
+import { db, clearAllWhatsAppConversations } from "../lib/services";
 import { useAuth } from "../context/AuthContext";
 import { motion, AnimatePresence } from "motion/react";
 
@@ -196,11 +196,12 @@ export const WhatsAppConfigPage: React.FC = () => {
     }
   };
 
-  const handleConnectBaileysQR = async () => {
+  const handleConnectBaileys = async () => {
     setConnectingBaileys(true);
     setStatusMessage(null);
     setBaileysPairingCode(null);
     try {
+      await clearAllWhatsAppConversations();
       const res = await fetch("/api/baileys/connect", { method: "POST" });
       if (res.ok) {
         const data = await res.json();
@@ -224,6 +225,7 @@ export const WhatsAppConfigPage: React.FC = () => {
     setPairingCodeError(null);
     setPairingFormattedPhone(null);
     try {
+      await clearAllWhatsAppConversations();
       const res = await fetch("/api/baileys/request-pairing-code", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -248,13 +250,14 @@ export const WhatsAppConfigPage: React.FC = () => {
 
   const handleDisconnectBaileys = async () => {
     try {
+      await clearAllWhatsAppConversations();
       const res = await fetch("/api/baileys/disconnect", { method: "POST" });
       if (res.ok) {
         setBaileysStatus("disconnected");
         setBaileysQrCode(null);
         setBaileysPairingCode(null);
         setBaileysUserPhone(null);
-        setStatusMessage({ type: "success", text: "Baileys session logged out successfully." });
+        setStatusMessage({ type: "success", text: "Baileys session logged out and previous conversations cleared successfully." });
         setTimeout(() => setStatusMessage(null), 3500);
       }
     } catch (err) {
@@ -600,7 +603,7 @@ export const WhatsAppConfigPage: React.FC = () => {
                       ) : (
                         <button
                           type="button"
-                          onClick={handleConnectBaileysQR}
+                          onClick={handleConnectBaileys}
                           disabled={connectingBaileys}
                           className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-sm transition-all cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
                         >

@@ -283,6 +283,7 @@ const JobSeekerDashboard: React.FC = () => {
   // Filter listings dynamically based on criteria
   const filteredJobs = (() => {
     const list = jobs.filter((job) => {
+      if (job.isUnavailable) return false;
       let matchesCategory = false;
       if (selectedCategory === "All") {
         matchesCategory = true;
@@ -473,17 +474,17 @@ const JobSeekerDashboard: React.FC = () => {
   
         {/* Main Discover Workspace Section */}
         <div id="jobs-explore" className="space-y-6 text-left">
-          {/* Search Input bar - Hover & Focus scale / shadow enhancements */}
-          <div className="relative max-w-lg bg-white border border-slate-900 p-1.5 rounded-[24px] shadow-[0_16px_36px_-6px_rgba(30, 136, 229, 0.05),0_10px_20px_-10px_rgba(30, 136, 229, 0.03)] hover:border-[#1E88E5] hover:shadow-[0_16px_40px_rgba(30, 136, 229, 0.08)] focus-within:ring-4 focus-within:ring-[#1E88E5]/10 focus-within:border-[#1E88E5] focus-within:scale-[1.015] transition-all duration-300 flex items-center gap-2 md:mx-auto">
-            <Search className="w-4.5 h-4.5 text-[#1E88E5] ml-3 shrink-0" />
+          {/* Search Input bar */}
+          <div className="relative max-w-lg bg-slate-100/80 border border-slate-200 p-2.5 rounded-[24px] shadow-none hover:border-slate-300 focus-within:ring-2 focus-within:ring-[#1E88E5]/20 focus-within:border-[#1E88E5] transition-all duration-300 flex items-center gap-2.5 md:mx-auto">
+            <Search className="w-5 h-5 text-slate-400 ml-3 shrink-0" />
             <input
               type="text"
-              placeholder="Type any job title, skill, or company name..."
+              placeholder="Search..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full py-1 bg-transparent text-xs font-medium focus:outline-none text-slate-800 placeholder-slate-400"
+              className="w-full py-1.5 bg-transparent text-sm font-normal focus:outline-none text-slate-800 placeholder-gray-400"
             />
-            <span className="text-[10px] font-mono font-bold bg-slate-50 text-[#1E88E5] px-3 py-1.5 rounded-xl uppercase tracking-wider shrink-0 hidden sm:inline border border-slate-200/50">
+            <span className="text-[10px] font-mono font-bold bg-white text-[#1E88E5] px-3 py-1.5 rounded-xl uppercase tracking-wider shrink-0 hidden sm:inline border border-slate-200">
               {filteredJobs.length} Vacancies
             </span>
           </div>
@@ -624,27 +625,8 @@ const StaffDashboardView: React.FC = () => {
   const isInbox = staffTab === "inbox";
 
   return (
-    <div className={isInbox ? (hasActiveChat ? "w-full h-full flex flex-col bg-white min-h-0 md:max-w-7xl md:mx-auto md:px-4 sm:px-6 lg:px-8 md:pt-12 md:pb-12 md:h-auto" : "w-full min-h-screen bg-white pb-12 md:max-w-7xl md:mx-auto md:px-4 sm:px-6 lg:px-8 md:pt-12 md:pb-12") : "max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10 space-y-6"}>
+    <div className={isInbox ? (hasActiveChat ? "w-full h-full flex flex-col bg-white min-h-0 md:max-w-7xl md:mx-auto md:px-4 sm:px-6 lg:px-8 md:pt-12 md:pb-12 md:h-auto" : "w-full min-h-screen bg-white pt-2 sm:pt-4 pb-12 md:max-w-7xl md:mx-auto md:px-4 sm:px-6 lg:px-8 md:pt-12 md:pb-12") : "max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10 space-y-6"}>
       
-      {/* Modern homepage-style navigation and headers */}
-      {!hasActiveChat && staffTab !== "report" && staffTab !== "post-job" && (
-        <div className="flex flex-col items-center gap-4 pt-6 pb-6">
-          <div className="relative w-full max-w-md bg-white border border-slate-200/80 p-1.5 rounded-2xl flex items-center gap-2 shadow-sm mt-2 select-text">
-            <Search className="w-4 h-4 text-[#1E88E5] ml-2 shrink-0" />
-            <input
-              type="text"
-              placeholder={isInbox ? "Search live chats or available requests..." : "Search jobs..."}
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full py-1 bg-transparent text-xs font-medium focus:outline-none text-slate-800 placeholder-slate-400"
-            />
-            <span className="text-[10px] font-mono font-bold bg-slate-50 text-[#1E88E5] px-2.5 py-1 rounded-xl uppercase tracking-wider shrink-0 hidden sm:inline border border-slate-100">
-              {isInbox ? "Staff" : "Jobs"}
-            </span>
-          </div>
-        </div>
-      )}
-
       {/* Render selected workspace tabs */}
       <div className={isInbox && hasActiveChat ? "w-full h-full flex flex-col min-h-0" : "w-full"}>
         {staffTab === "inbox" && (

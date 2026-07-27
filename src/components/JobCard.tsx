@@ -466,7 +466,7 @@ export const JobCard: React.FC<JobCardProps> = ({ job, onImpressionsUpdate }) =>
               style={{ color: theme.primary }}
               onClick={handleToggle}
             >
-              {isOpen ? job.title : shortTitle}
+              {job.title}
             </h3>
           </div>
 

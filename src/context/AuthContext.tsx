@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { onAuthStateChanged, User, signOut } from "firebase/auth";
-import { auth, getUserProfile, saveUserProfile, memoryStore, getUserProfileByEmail, rtdb, setStaffOnlineStatus } from "../lib/services";
+import { auth, getUserProfile, saveUserProfile, memoryStore, getUserProfileByEmail, rtdb, setStaffOnlineStatus, recordStaffResumption } from "../lib/services";
 import { UserProfile } from "../types";
 import { ref, onValue, onDisconnect } from "firebase/database";
 
@@ -73,6 +73,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
           setCurrentUser(profile);
           memoryStore.currentUser = profile;
+          if (profile.role === "admin" || profile.role === "staff") {
+            recordStaffResumption(profile.uid, profile.displayName).catch(() => {});
+          }
         } else {
           // Create a default profile
           const userEmail = user.email || "";
@@ -332,6 +335,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (finalRole === "admin" || finalRole === "staff") {
         await setStaffOnlineStatus(user.uid, true).catch(e => console.warn("Could not set staff online status:", e));
+        await recordStaffResumption(user.uid, displayName).catch(e => console.warn("Could not record staff resumption:", e));
       }
 
       setCurrentUser(newProfile);
@@ -540,9 +544,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Save user profile under their active UID in Firestore
       await saveUserProfile(profile);
 
-      // Also seed staff online status if admin/staff
+      // Also seed staff online status and record morning resumption if admin/staff
       if (profile.role === "admin" || profile.role === "staff") {
         await setStaffOnlineStatus(profile.uid, true).catch(err => console.warn("Could not set staff online status:", err));
+        await recordStaffResumption(profile.uid, profile.displayName).catch(err => console.warn("Could not record staff resumption:", err));
       }
 
       setCurrentUser(profile);

@@ -3,6 +3,8 @@ import { Link, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { ThreadCardSkeleton } from "./ThreadCardSkeleton";
 import { Conversation, ChatMessage, Job } from "../types";
+import { uploadToImageKit } from "../lib/imagekit";
+import { ChatMessageContent } from "./ChatMessageContent";
 import { 
   subscribeToConversations, 
   sendChatMessage, 
@@ -60,6 +62,29 @@ export const SeekerMessagesView: React.FC = () => {
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const [isUploadingAttachment, setIsUploadingAttachment] = useState(false);
+  const attachmentInputRef = useRef<HTMLInputElement>(null);
+
+  const handleSeekerFileAttachment = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !activeChatId) return;
+
+    try {
+      setIsUploadingAttachment(true);
+      const res = await uploadToImageKit(file, "/seeker_cvs_and_files");
+      const fileNotice = res.fileType === "image"
+        ? `[Attached Photo]: ${res.url}`
+        : `[Attached CV/Document]: ${res.name}\n${res.url}`;
+
+      setMessageInput(prev => prev ? `${prev}\n${fileNotice}` : fileNotice);
+    } catch (err: any) {
+      console.error("[CV/File Upload Error]", err);
+      alert(err.message || "Failed to upload file to ImageKit");
+    } finally {
+      setIsUploadingAttachment(false);
+      if (attachmentInputRef.current) attachmentInputRef.current.value = "";
+    }
+  };
 
   useEffect(() => {
     if (activeChatId) {
@@ -343,7 +368,7 @@ export const SeekerMessagesView: React.FC = () => {
                     }`}
                   >
                     <div className="flex items-center justify-between gap-2 mb-1.5">
-                      <span className="text-xs font-mono font-bold text-slate-950 flex items-center gap-1 max-w-[70%] truncate">
+                      <span className="text-[14px] sm:text-[15px] font-normal text-slate-950 flex items-center gap-1 max-w-[70%] truncate font-['Roboto',sans-serif]">
                         <Building className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                         {conv.jobTitle}
                       </span>
@@ -360,11 +385,11 @@ export const SeekerMessagesView: React.FC = () => {
                     </div>
 
                     <div className="space-y-1">
-                      <p className="text-[10px] font-sans font-bold text-[#1E88E5]">
+                      <p className="text-xs font-normal text-[#1E88E5] font-['Roboto',sans-serif]">
                         Hiring Team • {conv.assignedToName || "Unassigned Agent"}
                       </p>
                       {latestMsg && (
-                        <p className="text-[11px] font-sans text-slate-400 line-clamp-1 italic">
+                        <p className="text-xs sm:text-sm text-slate-500 line-clamp-1 italic font-['Roboto',sans-serif]">
                           {latestMsg.sender === "customer" || latestMsg.sender === "guest" ? "You: " : "Recruiter: "}
                           "{latestMsg.text}"
                         </p>
@@ -576,9 +601,7 @@ export const SeekerMessagesView: React.FC = () => {
                             ? "bg-[#1E88E5] text-white border-blue-700 rounded-tr-none text-right"
                             : "bg-white text-slate-800 border-slate-100 rounded-tl-none text-left"
                         }`}>
-                          <p className="text-xs font-sans leading-relaxed whitespace-pre-line select-text">
-                            {msg.text}
-                          </p>
+                          <ChatMessageContent msg={msg} isSelf={isSeeker} />
 
                           {/* Beautiful Job Card Dropdown Embedded in First Message */}
                           {matchedJob && (
@@ -753,13 +776,20 @@ export const SeekerMessagesView: React.FC = () => {
 
                   return (
                     <form onSubmit={handleSendMessage} className="flex gap-2 items-center">
+                      <input 
+                        ref={attachmentInputRef}
+                        type="file"
+                        accept="image/*,application/pdf,.doc,.docx"
+                        onChange={handleSeekerFileAttachment}
+                        className="hidden"
+                      />
                       <input
                         ref={inputRef}
                         type="text"
                         required
                         value={messageInput}
                         onChange={(e) => handleInputChange(e.target.value)}
-                        placeholder={exp.isInApp ? "Type in-app message securely..." : "Type WhatsApp application message..."}
+                        placeholder={exp.isInApp ? "Type in-app message or attach CV/file..." : "Type WhatsApp application message..."}
                         className={`w-full px-4 py-3 rounded-xl border text-xs font-sans font-medium focus:outline-none focus:border-[#1E88E5] ${
                           exp.isUrgent 
                             ? "border-red-300 bg-red-50/10 focus:border-red-500 animate-[pulse_2s_infinite]" 
@@ -768,15 +798,20 @@ export const SeekerMessagesView: React.FC = () => {
                       />
                       <button
                         type="button"
-                        onClick={() => alert("Attachment functionality: Select images, PDFs, or audio documents.")}
-                        className="p-2.5 rounded-full bg-transparent hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors cursor-pointer border-none shadow-none shrink-0 flex items-center justify-center"
-                        title="Add attachment"
+                        onClick={() => attachmentInputRef.current?.click()}
+                        disabled={isUploadingAttachment || isSending}
+                        className="p-2.5 rounded-full bg-transparent hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors cursor-pointer border-none shadow-none shrink-0 flex items-center justify-center disabled:opacity-50"
+                        title="Attach CV, Image, or Document (ImageKit)"
                       >
-                        <Paperclip className="w-5 h-5" />
+                        {isUploadingAttachment ? (
+                          <Loader2 className="w-5 h-5 animate-spin text-[#1E88E5]" />
+                        ) : (
+                          <Paperclip className="w-5 h-5" />
+                        )}
                       </button>
                       <button
                         type="submit"
-                        disabled={isSending}
+                        disabled={isSending || isUploadingAttachment}
                         className="w-10 h-10 rounded-full bg-[#1E88E5] hover:bg-[#1565C0] text-white flex items-center justify-center transition-colors cursor-pointer shadow-none shrink-0 disabled:opacity-75 disabled:cursor-not-allowed"
                         title="Send message"
                       >

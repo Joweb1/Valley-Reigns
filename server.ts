@@ -1,6 +1,7 @@
 import express from "express";
 import path from "path";
 import fs from "fs";
+import crypto from "crypto";
 import { createServer as createViteServer } from "vite";
 import { initializeApp } from "firebase/app";
 import { getFirestore, doc, getDoc, updateDoc, setDoc, collection, getDocs, onSnapshot, deleteDoc } from "firebase/firestore";
@@ -92,8 +93,83 @@ async function checkAndCleanStaffStatuses() {
 }
 
 // Middleware
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ limit: "50mb", extended: true }));
+
+// ImageKit Authentication Endpoint for @imagekit/react client SDKs
+app.get("/api/imagekit-auth", (req, res) => {
+  try {
+    const token = (req.query.token as string) || crypto.randomUUID();
+    const expire = (req.query.expire as string) || String(Math.floor(Date.now() / 1000) + 2400);
+    const privateKey = process.env.IMAGEKIT_PRIVATE_KEY || "private_OqsZ5WWYsU0b2wNOGPTLNU7k2cw=";
+
+    const signature = crypto
+      .createHmac("sha1", privateKey)
+      .update(token + expire)
+      .digest("hex");
+
+    res.json({
+      token,
+      expire,
+      signature,
+      publicKey: process.env.IMAGEKIT_PUBLIC_KEY || "public_7cIQfpYvqi4X6yx3g4c+6BnOZOA=",
+      urlEndpoint: process.env.IMAGEKIT_URL_ENDPOINT || "https://ik.imagekit.io/deglio1ni"
+    });
+  } catch (err: any) {
+    console.error("[ImageKit Auth Endpoint Error]", err);
+    res.status(500).json({ error: err.message || "Failed to generate ImageKit auth signature" });
+  }
+});
+
+// ImageKit Direct File/Image Upload Endpoint
+app.post("/api/upload", async (req, res) => {
+  try {
+    const { file, fileName, folder } = req.body;
+    if (!file || !fileName) {
+      res.status(400).json({ error: "Missing required fields: 'file' (base64 string or URL) and 'fileName'." });
+      return;
+    }
+
+    const privateKey = process.env.IMAGEKIT_PRIVATE_KEY || "private_OqsZ5WWYsU0b2wNOGPTLNU7k2cw=";
+    const authHeader = "Basic " + Buffer.from(privateKey + ":").toString("base64");
+
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("fileName", fileName);
+    formData.append("useUniqueFileName", "true");
+    if (folder) {
+      formData.append("folder", folder);
+    }
+
+    const ikRes = await fetch("https://upload.imagekit.io/api/v1/files/upload", {
+      method: "POST",
+      headers: {
+        "Authorization": authHeader
+      },
+      body: formData
+    });
+
+    const ikData = await ikRes.json();
+    if (!ikRes.ok) {
+      console.error("[ImageKit Upload API Error]", ikData);
+      res.status(ikRes.status || 400).json({ error: ikData?.message || "Failed to upload file to ImageKit." });
+      return;
+    }
+
+    res.json({
+      success: true,
+      url: ikData.url,
+      fileId: ikData.fileId,
+      name: ikData.name,
+      fileType: ikData.fileType || "file",
+      thumbnailUrl: ikData.thumbnailUrl || ikData.url,
+      size: ikData.size
+    });
+  } catch (err: any) {
+    console.error("[ImageKit Proxy Upload Error]", err);
+    res.status(500).json({ error: err.message || "Internal server error during file upload." });
+  }
+});
 
 // API health endpoints for uptime pingers
 app.get("/api/health", (req, res) => {
@@ -205,6 +281,7 @@ let baileysQrCode: string | null = null;
 let baileysPairingCode: string | null = null;
 let baileysUserPhone: string | null = null;
 let baileysError: string | null = null;
+let isNewSessionPairing = false;
 
 interface ReceivedWhatsAppMessageLog {
   id: string;
@@ -217,6 +294,27 @@ interface ReceivedWhatsAppMessageLog {
   status: string;
 }
 const recentReceivedWhatsAppMessages: ReceivedWhatsAppMessageLog[] = [];
+
+async function clearPreviousWhatsAppConversations() {
+  try {
+    console.log("[Baileys] Clearing previous WhatsApp conversations from database...");
+    const convsColl = collection(db, "conversations");
+    const snap = await getDocs(convsColl);
+    let count = 0;
+    for (const docSnap of snap.docs) {
+      const data = docSnap.data();
+      const isInApp = Boolean(data?.isInApp) || docSnap.id.startsWith("inapp_");
+      if (!isInApp) {
+        await deleteDoc(docSnap.ref);
+        count++;
+      }
+    }
+    console.log(`[Baileys] Successfully cleared ${count} WhatsApp conversations from Firestore.`);
+    recentReceivedWhatsAppMessages.length = 0;
+  } catch (err) {
+    console.error("[Baileys] Error clearing previous WhatsApp conversations:", err);
+  }
+}
 
 async function getActiveWhatsAppMode(): Promise<"official" | "baileys"> {
   try {
@@ -353,12 +451,27 @@ async function syncIncomingBaileysMessage(fromJid: string, name: string, text: s
         resolvedName = currentData.name;
       }
       
+      const parseJobId = (msgText: string): string => {
+        if (!msgText) return "";
+        const refMatch = msgText.match(/Reference ID:\s*([A-Za-z0-9_-]+)/i);
+        if (refMatch && refMatch[1]) return refMatch[1].trim();
+        const genericMatch = msgText.match(/\b(JOB-[A-Za-z0-9_-]+|job-[A-Za-z0-9_-]+)\b/i);
+        if (genericMatch) return genericMatch[0];
+        return "";
+      };
+
+      const extractedJobId = parseJobId(text) || currentData.jobId || "";
+
       const updateData: any = {
         name: resolvedName,
         text: text,
         lastMessageAt: Date.now(),
         messages: [...messages, newMessage]
       };
+
+      if (extractedJobId) {
+        updateData.jobId = extractedJobId;
+      }
 
       // Re-open/set to pending if unassigned or previously finished/abandoned
       if (!currentData.assignedTo || currentData.status === "unassigned" || currentData.status === "abandoned" || currentData.status === "finished") {
@@ -369,12 +482,24 @@ async function syncIncomingBaileysMessage(fromJid: string, name: string, text: s
 
       await updateDoc(convRef, updateData);
     } else {
+      const parseJobId = (msgText: string): string => {
+        if (!msgText) return "";
+        const refMatch = msgText.match(/Reference ID:\s*([A-Za-z0-9_-]+)/i);
+        if (refMatch && refMatch[1]) return refMatch[1].trim();
+        const genericMatch = msgText.match(/\b(JOB-[A-Za-z0-9_-]+|job-[A-Za-z0-9_-]+)\b/i);
+        if (genericMatch) return genericMatch[0];
+        return "";
+      };
+      const extractedJobId = parseJobId(text);
+
       await setDoc(convRef, {
         chatId: chatId,
         customerPhone: formattedPhone,
         name: resolvedName,
         category: "WhatsApp Inquiry",
         text: text,
+        jobId: extractedJobId,
+        jobTitle: extractedJobId ? `Job Application (${extractedJobId})` : "WhatsApp Inquiry",
         status: "pending",
         assignedTo: "",
         assignedToName: "",
@@ -612,6 +737,12 @@ async function initBaileysSocket(forceReconnect = false) {
         baileysUserPhone = userJid.split("@")[0].split(":")[0] || "Connected";
         console.log(`[Baileys] Successfully connected to WhatsApp Web as +${baileysUserPhone}!`);
 
+        if (isNewSessionPairing) {
+          console.log("[Baileys] New WhatsApp connection established. Wiping previous conversations...");
+          await clearPreviousWhatsAppConversations();
+          isNewSessionPairing = false;
+        }
+
         // Send initial 'available' presence update so WhatsApp shows number Online
         try {
           await sock.sendPresenceUpdate("available");
@@ -674,12 +805,13 @@ async function initBaileysSocket(forceReconnect = false) {
           baileysQrCode = null;
           baileysUserPhone = null;
           baileysError = "Session logged out.";
-          console.log("[Baileys] Session logged out.");
+          console.log("[Baileys] Session logged out. Clearing previous conversations...");
           try {
             fs.rmSync(BAILEYS_AUTH_DIR, { recursive: true, force: true });
           } catch (e) {
             console.warn("[Baileys] Error removing auth directory on logout:", e);
           }
+          await clearPreviousWhatsAppConversations();
         } else if (isQrExpired) {
           baileysStatus = "disconnected";
           baileysQrCode = null;
@@ -803,6 +935,8 @@ async function disconnectBaileys() {
   } catch (e) {
     console.warn("[Baileys] Failed to update Firestore disconnect status:", e);
   }
+
+  await clearPreviousWhatsAppConversations();
 }
 
 async function sendWhatsAppMessage(toPhone: string, text: string) {
@@ -1035,6 +1169,9 @@ app.post("/api/baileys/request-pairing-code", async (req, res) => {
       return;
     }
 
+    isNewSessionPairing = true;
+    await clearPreviousWhatsAppConversations();
+
     console.log(`[Baileys Pairing Code] Requesting pairing code for phone number +${cleanedPhone}...`);
     
     // Pause to allow socket WS frame handshakes to settle
@@ -1165,9 +1302,21 @@ app.post("/api/whatsapp/toggle-mode", async (req, res) => {
   }
 });
 
+// Clear Conversations Endpoint
+app.post("/api/whatsapp/clear-conversations", async (req, res) => {
+  try {
+    await clearPreviousWhatsAppConversations();
+    res.json({ success: true, message: "Cleared all previous conversations." });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Baileys Connect / Initialize Endpoint
 app.post("/api/baileys/connect", async (req, res) => {
   try {
+    isNewSessionPairing = true;
+    await clearPreviousWhatsAppConversations();
     await initBaileysSocket(true);
     res.json({ success: true, status: baileysStatus, qrCode: baileysQrCode });
   } catch (err: any) {

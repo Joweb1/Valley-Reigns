@@ -25,17 +25,82 @@ import {
   set, 
   update, 
   push, 
-  runTransaction 
+  runTransaction,
+  get,
+  remove
 } from "firebase/database";
 import { auth, db, rtdb } from "./firebase";
 export { auth, db, rtdb };
-import { Job, UserProfile, Conversation, ChatMessage, DailyStat, SystemNotification, StaffDailyReport, CustomerContact } from "../types";
+import { Job, UserProfile, Conversation, ChatMessage, DailyStat, SystemNotification, StaffDailyReport, CustomerContact, CandidateListLog, StaffResumptionRecord, StaffReportReopenOverride } from "../types";
 import { SEEDED_JOBS_LIST } from "./defaultJobs";
 
 // ==========================================
 // SEED DATA FOR HIGH-FIDELITY PREVIEW
 // ==========================================
 const DEFAULT_JOBS: Job[] = SEEDED_JOBS_LIST;
+
+const DEFAULT_CANDIDATE_LIST_LOGS: CandidateListLog[] = [
+  {
+    id: "log-seed-101",
+    listName: "Registered Candidates",
+    action: "added",
+    timestamp: Date.now() - 1000 * 60 * 20, // 20 mins ago
+    staffUid: "staff-demo",
+    staffName: "Marcus Vance",
+    customerPhone: "+1 (555) 019-2834",
+    customerName: "David Miller",
+    chatId: "chat-101",
+    jobTitle: "Lead WhatsApp Solutions Architect"
+  },
+  {
+    id: "log-seed-102",
+    listName: "Submitted Resume(CV)",
+    action: "added",
+    timestamp: Date.now() - 1000 * 60 * 90, // 90 mins ago
+    staffUid: "staff-demo",
+    staffName: "Marcus Vance",
+    customerPhone: "+1 (555) 012-7643",
+    customerName: "Sarah Jenkins",
+    chatId: "chat-103",
+    jobTitle: "Staff Fintech Infrastructure Engineer"
+  },
+  {
+    id: "log-seed-103",
+    listName: "Address Given",
+    action: "added",
+    timestamp: Date.now() - 1000 * 60 * 180, // 3 hours ago
+    staffUid: "staff-demo",
+    staffName: "Marcus Vance",
+    customerPhone: "+1 (555) 014-9872",
+    customerName: "Robert Chen",
+    chatId: "chat-102",
+    jobTitle: "Senior AI Integration Specialist"
+  },
+  {
+    id: "log-seed-104",
+    listName: "Verified",
+    action: "added",
+    timestamp: Date.now() - 1000 * 60 * 60 * 25, // Yesterday
+    staffUid: "staff-1-seed",
+    staffName: "Marcus Vance",
+    customerPhone: "+1 (555) 018-3321",
+    customerName: "Angela Adams",
+    chatId: "chat-seed-yesterday",
+    jobTitle: "Senior DevOps Architect"
+  },
+  {
+    id: "log-seed-105",
+    listName: "Pending Commission Retrieval",
+    action: "added",
+    timestamp: Date.now() - 1000 * 60 * 60 * 72, // 3 days ago
+    staffUid: "staff-2-seed",
+    staffName: "Jessica Carter",
+    customerPhone: "+1 (555) 011-9988",
+    customerName: "Michael Chang",
+    chatId: "chat-seed-3days",
+    jobTitle: "Principal Product Designer"
+  }
+];
 
 const DEFAULT_CONVERSATIONS: Record<string, Conversation> = {
   "chat-101": {
@@ -158,6 +223,9 @@ class MemoryStorage {
   systemNotifications: SystemNotification[] = [];
   dailyReports: StaffDailyReport[] = [];
   contacts: Record<string, CustomerContact> = {};
+  candidateListLogs: CandidateListLog[] = [];
+  staffResumptions: Record<string, StaffResumptionRecord> = {};
+  reportReopens: Record<string, StaffReportReopenOverride> = {};
   listeners: Set<() => void> = new Set();
 
   constructor() {
@@ -168,6 +236,9 @@ class MemoryStorage {
     const savedNotifications = localStorage.getItem("vr_system_notifications");
     const savedReports = localStorage.getItem("vr_daily_reports");
     const savedContacts = localStorage.getItem("vr_contacts");
+    const savedListLogs = localStorage.getItem("vr_candidate_list_logs");
+    const savedResumptions = localStorage.getItem("vr_staff_resumptions");
+    const savedReopens = localStorage.getItem("vr_report_reopens");
     if (savedJobs) {
       try {
         const parsed = JSON.parse(savedJobs);
@@ -218,6 +289,21 @@ class MemoryStorage {
         console.warn("Could not load contacts from localStorage", e);
       }
     }
+    if (savedListLogs) {
+      try {
+        this.candidateListLogs = JSON.parse(savedListLogs);
+      } catch (e) {
+        this.candidateListLogs = [...DEFAULT_CANDIDATE_LIST_LOGS];
+      }
+    } else {
+      this.candidateListLogs = [...DEFAULT_CANDIDATE_LIST_LOGS];
+    }
+    if (savedResumptions) {
+      try { this.staffResumptions = JSON.parse(savedResumptions); } catch(e) {}
+    }
+    if (savedReopens) {
+      try { this.reportReopens = JSON.parse(savedReopens); } catch(e) {}
+    }
   }
 
   save() {
@@ -227,6 +313,9 @@ class MemoryStorage {
     localStorage.setItem("vr_system_notifications", JSON.stringify(this.systemNotifications));
     localStorage.setItem("vr_daily_reports", JSON.stringify(this.dailyReports));
     localStorage.setItem("vr_contacts", JSON.stringify(this.contacts));
+    localStorage.setItem("vr_candidate_list_logs", JSON.stringify(this.candidateListLogs));
+    localStorage.setItem("vr_staff_resumptions", JSON.stringify(this.staffResumptions || {}));
+    localStorage.setItem("vr_report_reopens", JSON.stringify(this.reportReopens || {}));
     this.listeners.forEach(l => l());
   }
 
@@ -798,11 +887,6 @@ export function subscribeToConversations(callback: (conversations: Record<string
         snapshot.docs.forEach((d) => {
           convs[d.id] = normalizeConversation(d.id, d.data());
         });
-      } else {
-        Object.entries(DEFAULT_CONVERSATIONS).forEach(([id, conv]) => {
-          setDoc(doc(db, "conversations", id), conv).catch(() => {});
-          convs[id] = normalizeConversation(id, conv);
-        });
       }
       latestFirestoreConvs = convs;
       emitMerged();
@@ -865,6 +949,7 @@ export async function claimConversation(chatId: string, userUid: string, userNam
     localConv.assignedTo = userUid;
     localConv.assignedToName = userName;
     localConv.status = "ongoing";
+    localConv.claimedAt = Date.now();
     localConv.lastMessageAt = Date.now();
     if (!localConv.messages) localConv.messages = [];
     if (Array.isArray(localConv.messages)) {
@@ -874,6 +959,16 @@ export async function claimConversation(chatId: string, userUid: string, userNam
       currentMessages = [...Object.values(localConv.messages), systemMsg];
       localConv.messages = currentMessages;
     }
+
+    // Check top message for job ID
+    const firstMsg = currentMessages.find(m => m.sender === "customer" || m.sender === "guest") || currentMessages[0];
+    if (firstMsg?.text) {
+      const jobIdMatch = firstMsg.text.match(/\b(JOB-[A-Za-z0-9_-]+|job-[A-Za-z0-9_-]+)\b/i);
+      if (jobIdMatch && !localConv.jobId) {
+        localConv.jobId = jobIdMatch[0];
+      }
+    }
+
     memoryStore.save();
   }
 
@@ -892,6 +987,16 @@ export async function claimConversation(chatId: string, userUid: string, userNam
       }
       seekerUid = seekerUid || data.seekerUid;
       const messagesArray = Array.isArray(data.messages) ? data.messages : [];
+
+      // Check top message for Job ID
+      let topJobId = data.jobId || "";
+      const firstCustomerMsg = messagesArray.find(m => m.sender === "customer" || m.sender === "guest") || messagesArray[0];
+      if (firstCustomerMsg?.text) {
+        const jobIdMatch = firstCustomerMsg.text.match(/\b(JOB-[A-Za-z0-9_-]+|job-[A-Za-z0-9_-]+)\b/i);
+        if (jobIdMatch) {
+          topJobId = jobIdMatch[0];
+        }
+      }
       
       // Auto-claim message for WhatsApp chats
       const isWhatsApp = chatId.startsWith("whatsapp-") || Boolean(data.customerPhone && (data.customerPhone.startsWith("+") || /^\d+$/.test(data.customerPhone)));
@@ -919,13 +1024,20 @@ export async function claimConversation(chatId: string, userUid: string, userNam
         currentMessages = [...messagesArray, systemMsg];
       }
       
-      await updateDoc(convRef, {
+      const updatePayload: any = {
         assignedTo: userUid,
         assignedToName: userName,
         status: "ongoing",
+        claimedAt: Date.now(),
         lastMessageAt: Date.now(),
         messages: currentMessages
-      });
+      };
+
+      if (topJobId && !data.jobId) {
+        updatePayload.jobId = topJobId;
+      }
+
+      await updateDoc(convRef, updatePayload);
       success = true;
     }
   } catch (error) {
@@ -951,6 +1063,7 @@ export async function claimConversation(chatId: string, userUid: string, userNam
         assignedTo: userUid,
         assignedToName: userName,
         status: "ongoing",
+        claimedAt: Date.now(),
         lastMessageAt: Date.now(),
         messages: currentMessages
       });
@@ -1761,6 +1874,50 @@ export async function batchResetConversations(chatIds: string[]): Promise<void> 
   await Promise.all(chatIds.map(id => updateConversationStatus(id, "pending")));
 }
 
+export async function clearAllWhatsAppConversations(): Promise<void> {
+  // Clear memoryStore only for WhatsApp chats
+  Object.keys(memoryStore.conversations).forEach((id) => {
+    const conv = memoryStore.conversations[id];
+    if (!conv?.isInApp && !id.startsWith("inapp_")) {
+      delete memoryStore.conversations[id];
+    }
+  });
+  memoryStore.save();
+
+  try {
+    const collRef = collection(db, "conversations");
+    const snap = await getDocs(collRef);
+    for (const d of snap.docs) {
+      const data = d.data();
+      const isInApp = Boolean(data?.isInApp) || d.id.startsWith("inapp_");
+      if (!isInApp) {
+        await deleteDoc(d.ref);
+      }
+    }
+  } catch (err) {
+    console.warn("Firestore clearAllWhatsAppConversations failed:", err);
+  }
+
+  if (rtdb) {
+    try {
+      const rtdbRef = ref(rtdb, "conversations");
+      const snap = await get(rtdbRef);
+      if (snap.exists()) {
+        const val = snap.val();
+        for (const key of Object.keys(val)) {
+          if (!val[key]?.isInApp && !key.startsWith("inapp_")) {
+            await remove(ref(rtdb, `conversations/${key}`));
+          }
+        }
+      }
+    } catch (err) {
+      console.warn("RTDB clearAllWhatsAppConversations failed:", err);
+    }
+  }
+}
+
+export const clearAllConversations = clearAllWhatsAppConversations;
+
 // ==========================================
 // CUSTOMER CONTACTS MANAGEMENT SERVICES
 // ==========================================
@@ -2260,8 +2417,57 @@ export async function markNotificationAsRead(id: string): Promise<void> {
 }
 
 // ==========================================
-// FIRESTORE JOB MUTATIONS (EDIT/DELETE)
+// FIRESTORE JOB MUTATIONS (EDIT/DELETE/AVAILABILITY)
 // ==========================================
+export async function toggleJobAvailability(jobId: string, isUnavailable: boolean, actorUid?: string): Promise<void> {
+  try {
+    const docRef = doc(db, "jobs", jobId);
+    await updateDoc(docRef, { isUnavailable });
+  } catch (error) {
+    console.warn("Firestore toggleJobAvailability failing, updating in fallback:", error);
+  }
+
+  const index = memoryStore.jobs.findIndex(j => j.id === jobId);
+  if (index !== -1) {
+    memoryStore.jobs[index] = { ...memoryStore.jobs[index], isUnavailable };
+    memoryStore.save();
+  }
+
+  const actorName = actorUid ? (memoryStore.users[actorUid]?.displayName || "Staff") : "Staff";
+  const jobTitle = memoryStore.jobs[index]?.title || "Unknown Job";
+  await addSystemNotification({
+    type: "job_updated",
+    title: isUnavailable ? "Job Marked Unavailable" : "Job Marked Available",
+    message: `${actorName} marked the job "${jobTitle}" as ${isUnavailable ? "unavailable" : "available"}.`,
+    metadata: { jobId, isUnavailable, actorUid }
+  }).catch(() => {});
+}
+
+export async function batchSetJobAvailability(jobIds: string[], isUnavailable: boolean, actorUid?: string): Promise<void> {
+  for (const id of jobIds) {
+    try {
+      const docRef = doc(db, "jobs", id);
+      await updateDoc(docRef, { isUnavailable });
+    } catch (error) {
+      console.warn(`Firestore batchSetJobAvailability failing for ${id}:`, error);
+    }
+
+    const index = memoryStore.jobs.findIndex(j => j.id === id);
+    if (index !== -1) {
+      memoryStore.jobs[index] = { ...memoryStore.jobs[index], isUnavailable };
+    }
+  }
+  memoryStore.save();
+
+  const actorName = actorUid ? (memoryStore.users[actorUid]?.displayName || "Staff") : "Staff";
+  await addSystemNotification({
+    type: "job_updated",
+    title: isUnavailable ? "Jobs Marked Unavailable" : "Jobs Marked Available",
+    message: `${actorName} marked ${jobIds.length} job listing(s) as ${isUnavailable ? "unavailable" : "available"}.`,
+    metadata: { jobIds, isUnavailable, actorUid }
+  }).catch(() => {});
+}
+
 export async function updateJob(jobId: string, updatedFields: Partial<Job>, actorUid?: string): Promise<void> {
   try {
     const docRef = doc(db, "jobs", jobId);
@@ -2547,6 +2753,341 @@ export function subscribeToDailyReports(callback: (reports: StaffDailyReport[]) 
     unsubscribeMemory();
   };
 }
+
+// ==========================================
+// CANDIDATE LISTS & REPORTING TRACKER
+// ==========================================
+export function getCandidateListLogs(): CandidateListLog[] {
+  if (!memoryStore.candidateListLogs || memoryStore.candidateListLogs.length === 0) {
+    const savedListLogs = localStorage.getItem("vr_candidate_list_logs");
+    if (savedListLogs) {
+      try {
+        memoryStore.candidateListLogs = JSON.parse(savedListLogs);
+      } catch (e) {}
+    }
+    if (!memoryStore.candidateListLogs || memoryStore.candidateListLogs.length === 0) {
+      memoryStore.candidateListLogs = [...DEFAULT_CANDIDATE_LIST_LOGS];
+      memoryStore.save();
+    }
+  }
+  return [...memoryStore.candidateListLogs].sort((a, b) => b.timestamp - a.timestamp);
+}
+
+export function subscribeToCandidateListLogs(callback: (logs: CandidateListLog[]) => void): () => void {
+  callback(getCandidateListLogs());
+  return memoryStore.subscribe(() => {
+    callback(getCandidateListLogs());
+  });
+}
+
+export async function toggleCandidateListTag(
+  chatId: string,
+  listName: string,
+  staffUid?: string,
+  staffName?: string
+): Promise<Record<string, { addedAt: number; addedBy?: string }>> {
+  const conv = memoryStore.conversations[chatId];
+  const currentLists = { ...(conv?.candidateLists || {}) };
+  const isCurrentlyIn = Boolean(currentLists[listName]);
+
+  const newLists = { ...currentLists };
+  let action: "added" | "removed";
+
+  if (isCurrentlyIn) {
+    delete newLists[listName];
+    action = "removed";
+  } else {
+    newLists[listName] = {
+      addedAt: Date.now(),
+      addedBy: staffName || staffUid || "Staff"
+    };
+    action = "added";
+  }
+
+  if (conv) {
+    conv.candidateLists = newLists;
+    memoryStore.conversations[chatId] = conv;
+  }
+
+  // Create activity log
+  const newLog: CandidateListLog = {
+    id: `log-${Date.now()}-${Math.floor(Math.random() * 10000)}`,
+    listName,
+    action,
+    timestamp: Date.now(),
+    staffUid,
+    staffName: staffName || "Staff Member",
+    customerPhone: conv?.customerPhone || "",
+    customerName: conv?.name || conv?.customerPhone || "Candidate",
+    chatId,
+    jobTitle: conv?.jobTitle || "Job Candidate"
+  };
+
+  memoryStore.candidateListLogs = [newLog, ...(memoryStore.candidateListLogs || [])];
+  memoryStore.save();
+
+  // Sync to RTDB
+  try {
+    await syncToRTDB(chatId, {
+      candidateLists: newLists
+    });
+  } catch (err) {
+    console.warn("RTDB sync for candidate list tag failed:", err);
+  }
+
+  // Sync to Firestore
+  try {
+    const convRef = doc(db, "conversations", chatId);
+    await updateDoc(convRef, {
+      candidateLists: newLists
+    });
+  } catch (err) {
+    console.warn("Firestore sync for candidate list tag failed:", err);
+  }
+
+  return newLists;
+}
+
+// ==========================================
+// STAFF RESUMPTION & PUNCTUALITY TRACKING (9:00 AM SLA)
+// ==========================================
+export function getLocalTodayString(): string {
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+export function isTimestampOnTime(timestamp: number): boolean {
+  const d = new Date(timestamp);
+  const hours = d.getHours();
+  const minutes = d.getMinutes();
+  const seconds = d.getSeconds();
+  // Standard resumption deadline is 9:00 AM local time
+  if (hours < 9) return true;
+  if (hours === 9 && minutes === 0 && seconds === 0) return true;
+  return false;
+}
+
+export function formatTimeStr(timestamp: number): string {
+  const d = new Date(timestamp);
+  const hours = d.getHours();
+  const minutes = d.getMinutes();
+  const ampm = hours >= 12 ? "PM" : "AM";
+  const hours12 = hours % 12 || 12;
+  const minStr = minutes < 10 ? `0${minutes}` : minutes;
+  return `${hours12}:${minStr} ${ampm}`;
+}
+
+export async function recordStaffResumption(
+  uid: string,
+  staffName: string,
+  customDate?: string,
+  customTimestamp?: number
+): Promise<StaffResumptionRecord> {
+  const date = customDate || getLocalTodayString();
+  const timestamp = customTimestamp || Date.now();
+  const id = `resumption_${uid}_${date}`;
+
+  if (!memoryStore.staffResumptions) {
+    memoryStore.staffResumptions = {};
+  }
+
+  // Return existing record if already logged for today
+  if (memoryStore.staffResumptions[id]) {
+    return memoryStore.staffResumptions[id];
+  }
+
+  const record: StaffResumptionRecord = {
+    id,
+    uid,
+    staffName: staffName || "Staff Member",
+    date,
+    timestamp
+  };
+
+  memoryStore.staffResumptions[id] = record;
+  memoryStore.save();
+
+  try {
+    const docRef = doc(db, "staff_resumptions", id);
+    await setDoc(docRef, record, { merge: true });
+  } catch (err) {
+    console.warn("Firestore recordStaffResumption failed:", err);
+  }
+
+  return record;
+}
+
+export async function getStaffResumption(uid: string, date: string): Promise<StaffResumptionRecord | null> {
+  const id = `resumption_${uid}_${date}`;
+  if (memoryStore.staffResumptions && memoryStore.staffResumptions[id]) {
+    return memoryStore.staffResumptions[id];
+  }
+
+  try {
+    const docRef = doc(db, "staff_resumptions", id);
+    const snap = await getDoc(docRef);
+    if (snap.exists()) {
+      const rec = snap.data() as StaffResumptionRecord;
+      if (!memoryStore.staffResumptions) memoryStore.staffResumptions = {};
+      memoryStore.staffResumptions[id] = rec;
+      memoryStore.save();
+      return rec;
+    }
+  } catch (err) {
+    console.warn("Firestore getStaffResumption failed:", err);
+  }
+
+  return null;
+}
+
+// ==========================================
+// ADMIN REPORT SUBMISSION REOPEN OVERRIDES (6-HOUR WINDOW)
+// ==========================================
+export function isDeadlinePassedForDate(dateStr: string): boolean {
+  const localTodayStr = getLocalTodayString();
+  if (dateStr < localTodayStr) {
+    return true; // Any past day -> 9:00 PM deadline has passed
+  }
+  if (dateStr === localTodayStr) {
+    const currentHour = new Date().getHours();
+    return currentHour >= 21; // Today -> 9:00 PM (21:00) local time
+  }
+  return false;
+}
+
+export async function reopenStaffReportSubmissions(
+  uids: string[],
+  targetDate?: string,
+  staffProfiles?: UserProfile[]
+): Promise<void> {
+  const now = Date.now();
+  if (!memoryStore.reportReopens) {
+    memoryStore.reportReopens = {};
+  }
+
+  const names: string[] = [];
+
+  for (const uid of uids) {
+    const staffName =
+      staffProfiles?.find(s => s.uid === uid)?.displayName ||
+      memoryStore.users[uid]?.displayName ||
+      "Staff Member";
+    names.push(staffName);
+
+    const key = targetDate ? `${uid}_${targetDate}` : uid;
+    const override: StaffReportReopenOverride = {
+      id: `reopen_${key}`,
+      uid,
+      staffName,
+      reopenedAt: now,
+      targetDate
+    };
+
+    memoryStore.reportReopens[key] = override;
+    memoryStore.reportReopens[uid] = override;
+
+    try {
+      const docRef = doc(db, "staff_report_reopens", key);
+      await setDoc(docRef, override);
+    } catch (err) {
+      console.warn(`Firestore reopen error for ${key}:`, err);
+    }
+  }
+
+  memoryStore.save();
+
+  await addSystemNotification({
+    type: "report_submitted",
+    title: "Daily Report Submission Reopened",
+    message: `Admin reopened daily report submission for ${names.join(", ")} ${targetDate ? `for ${targetDate}` : ""} (6-hour window active).`,
+    metadata: { uids, reopenedAt: now, targetDate }
+  }).catch(() => {});
+}
+
+export function isReportSubmissionReopened(uid: string, targetDate?: string): {
+  isReopened: boolean;
+  remainingMs: number;
+  expiresAt: number | null;
+  reopenedAt: number | null;
+} {
+  const SIX_HOURS = 6 * 60 * 60 * 1000;
+  let override: StaffReportReopenOverride | null = null;
+
+  if (memoryStore.reportReopens) {
+    if (targetDate && memoryStore.reportReopens[`${uid}_${targetDate}`]) {
+      override = memoryStore.reportReopens[`${uid}_${targetDate}`];
+    } else if (memoryStore.reportReopens[uid]) {
+      override = memoryStore.reportReopens[uid];
+    }
+  }
+
+  if (!override || !override.reopenedAt) {
+    return { isReopened: false, remainingMs: 0, expiresAt: null, reopenedAt: null };
+  }
+
+  if (targetDate && override.targetDate && override.targetDate !== targetDate) {
+    const specificOverride = memoryStore.reportReopens[`${uid}_${targetDate}`];
+    if (specificOverride && specificOverride.reopenedAt) {
+      override = specificOverride;
+    } else {
+      return { isReopened: false, remainingMs: 0, expiresAt: null, reopenedAt: null };
+    }
+  }
+
+  const elapsed = Date.now() - override.reopenedAt;
+  if (elapsed < SIX_HOURS) {
+    const remainingMs = SIX_HOURS - elapsed;
+    return {
+      isReopened: true,
+      remainingMs,
+      expiresAt: override.reopenedAt + SIX_HOURS,
+      reopenedAt: override.reopenedAt
+    };
+  }
+
+  return { isReopened: false, remainingMs: 0, expiresAt: null, reopenedAt: override.reopenedAt };
+}
+
+export function subscribeToReportReopens(callback: () => void): () => void {
+  const collRef = collection(db, "staff_report_reopens");
+  const unsubscribeFirestore = onSnapshot(
+    collRef,
+    (snapshot) => {
+      if (!memoryStore.reportReopens) {
+        memoryStore.reportReopens = {};
+      }
+      snapshot.docs.forEach(docSnap => {
+        const data = docSnap.data() as StaffReportReopenOverride;
+        if (data && data.uid) {
+          const key = docSnap.id;
+          memoryStore.reportReopens[key] = data;
+          if (data.targetDate) {
+            memoryStore.reportReopens[`${data.uid}_${data.targetDate}`] = data;
+          }
+          memoryStore.reportReopens[data.uid] = data;
+        }
+      });
+      memoryStore.save();
+      callback();
+    },
+    (err) => {
+      console.warn("Firestore staff_report_reopens snapshot error:", err);
+    }
+  );
+
+  const unsubscribeMemory = memoryStore.subscribe(callback);
+
+  return () => {
+    try {
+      unsubscribeFirestore();
+    } catch (_) {}
+    unsubscribeMemory();
+  };
+}
+
 
 
 

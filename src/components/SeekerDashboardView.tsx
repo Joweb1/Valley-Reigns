@@ -142,6 +142,7 @@ export const SeekerDashboardView: React.FC = () => {
   // Filter listings dynamically based on criteria
   const filteredJobs = (() => {
     const list = jobs.filter((job) => {
+      if (job.isUnavailable) return false;
       let matchesCategory = false;
       if (selectedCategory === "All") {
         matchesCategory = true;
@@ -159,10 +160,11 @@ export const SeekerDashboardView: React.FC = () => {
         matchesCategory = job.category === selectedCategory;
       }
 
+      const q = searchQuery.toLowerCase();
       const matchesSearch = 
-        job.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        job.company.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        job.description.toLowerCase().includes(searchQuery.toLowerCase());
+        (job.title || "").toLowerCase().includes(q) ||
+        (job.company || "").toLowerCase().includes(q) ||
+        (job.description || "").toLowerCase().includes(q);
       return matchesCategory && matchesSearch;
     });
 
@@ -201,17 +203,17 @@ export const SeekerDashboardView: React.FC = () => {
 
       {/* Main Discover Workspace Section */}
       <div id="jobs-explore" className="space-y-6 pt-0">
-        {/* Search Input bar - Hover & Focus scale / shadow enhancements */}
-        <div className="relative max-w-lg bg-white border border-[#1E88E5] p-1.5 rounded-[24px] shadow-[0_16px_36px_-6px_rgba(30, 136, 229, 0.03)] hover:border-[#1E88E5] hover:shadow-[0_16px_40px_rgba(30, 136, 229, 0.06)] focus-within:ring-4 focus-within:ring-[#1E88E5]/10 focus-within:scale-[1.015] transition-all duration-300 flex items-center gap-2 md:mx-auto">
-          <Search className="w-4.5 h-4.5 text-[#1E88E5] ml-3 shrink-0" />
+        {/* Search Input bar */}
+        <div className="relative max-w-lg bg-slate-100/80 border border-slate-200 p-2.5 rounded-[24px] shadow-none hover:border-slate-300 focus-within:ring-2 focus-within:ring-[#1E88E5]/20 focus-within:border-[#1E88E5] transition-all duration-300 flex items-center gap-2.5 md:mx-auto">
+          <Search className="w-5 h-5 text-slate-400 ml-3 shrink-0" />
           <input
             type="text"
-            placeholder="Type any job title, skill, or company name..."
+            placeholder="Search..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full py-1 bg-transparent text-xs font-medium focus:outline-none text-slate-800 placeholder-slate-400"
+            className="w-full py-1.5 bg-transparent text-sm font-normal focus:outline-none text-slate-800 placeholder-gray-400"
           />
-          <span className="text-[10px] font-mono font-bold bg-[#FAFDFB] border border-blue-200 text-[#1E88E5] px-3 py-1.5 rounded-xl uppercase tracking-wider shrink-0 hidden sm:inline">
+          <span className="text-[10px] font-mono font-bold bg-white border border-slate-200 text-[#1E88E5] px-3 py-1.5 rounded-xl uppercase tracking-wider shrink-0 hidden sm:inline">
             {filteredJobs.length} Matches
           </span>
         </div>
