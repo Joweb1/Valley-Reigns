@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { useWhatsAppConfig } from "../hooks/useWhatsAppConfig";
 import { Job } from "../types";
 import { incrementJobImpressions, simulateIncomingChat } from "../lib/services";
 import { getCategoryImage, getCategoryThemeColor } from "../lib/categories";
@@ -355,9 +356,11 @@ export const JobCard: React.FC<JobCardProps> = ({ job, onImpressionsUpdate }) =>
     }
   };
 
-  // Compile formatted WhatsApp deep link
+  const { getWhatsAppLink } = useWhatsAppConfig();
+
+  // Compile formatted WhatsApp deep link including connected phone number
   const messageText = `I am applying for the ${job.title} position. Reference ID: ${job.id}`;
-  const whatsappLink = `https://wa.me/?text=${encodeURIComponent(messageText)}`;
+  const whatsappLink = getWhatsAppLink(messageText);
 
   // Simulates direct application routing
   const triggerMockWebhook = async () => {

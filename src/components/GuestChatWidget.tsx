@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useAuth } from "../context/AuthContext";
+import { useWhatsAppConfig } from "../hooks/useWhatsAppConfig";
 import { 
   simulateIncomingChat, 
   sendChatMessage, 
@@ -27,6 +28,7 @@ interface GuestSession {
 
 export const GuestChatWidget: React.FC = () => {
   const { currentUser } = useAuth();
+  const { getWhatsAppLink, formattedPhone, isConnected } = useWhatsAppConfig();
   const [isOpen, setIsOpen] = useState(false);
   const [session, setSession] = useState<GuestSession | null>(null);
 
@@ -301,8 +303,19 @@ export const GuestChatWidget: React.FC = () => {
                   </form>
                 </div>
 
-                <div className="text-center pt-3 border-t border-slate-200/60 text-[10px] font-mono text-slate-400">
-                  ⚡ Direct Company Support Line
+                <div className="text-center pt-3 border-t border-slate-200/60 text-[10px] font-mono text-slate-400 space-y-2">
+                  <div className="flex items-center justify-center">
+                    <a
+                      href={getWhatsAppLink("Hello! I am reaching out to Valley Reigns recruitment support.")}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#00A884] hover:bg-[#008f70] text-white font-sans font-bold text-[10px] rounded-xl shadow-xs transition-all decoration-none"
+                    >
+                      <span>Chat via WhatsApp</span>
+                      {formattedPhone && <span className="opacity-90 font-mono">({formattedPhone})</span>}
+                    </a>
+                  </div>
+                  <div>⚡ Direct Company Support Line</div>
                 </div>
               </div>
             ) : (

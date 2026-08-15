@@ -5,7 +5,7 @@ import { ShieldAlert } from "lucide-react";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
-  allowedRoles: Array<"seeker" | "staff" | "admin">;
+  allowedRoles: Array<"seeker" | "staff" | "admin" | "employer">;
 }
 
 export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowedRoles }) => {
@@ -66,7 +66,13 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowe
 
   // Check role authorization
   if (!allowedRoles.includes(currentUser.role)) {
-    const dashboardPath = currentUser.role === "admin" ? "/admin" : currentUser.role === "staff" ? "/staff" : "/seeker";
+    const dashboardPath = currentUser.role === "admin" 
+      ? "/admin" 
+      : currentUser.role === "staff" 
+      ? "/staff" 
+      : currentUser.role === "employer"
+      ? "/employer"
+      : "/seeker";
     return <Navigate to={dashboardPath} replace />;
   }
 

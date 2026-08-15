@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { useWhatsAppConfig } from "../hooks/useWhatsAppConfig";
 import { getJobs, updateJob, deleteJob, getAllUserProfiles, subscribeToJobs, toggleJobAvailability, batchSetJobAvailability } from "../lib/services";
 import { Job, UserProfile } from "../types";
 import { 
@@ -51,12 +52,13 @@ export const JobManagementCard: React.FC<JobManagementCardProps> = ({
   onToggleSelect
 }) => {
   const { currentUser } = useAuth();
+  const { getWhatsAppLink } = useWhatsAppConfig();
   const [isOpen, setIsOpen] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  // Compile formatted WhatsApp deep link for copying
+  // Compile formatted WhatsApp deep link for copying with connected phone number
   const messageText = `I am applying for the ${job.title} position. Reference ID: ${job.id}`;
-  const whatsappLink = `https://wa.me/?text=${encodeURIComponent(messageText)}`;
+  const whatsappLink = getWhatsAppLink(messageText);
 
   const handleCopyLink = async (e: React.MouseEvent) => {
     e.preventDefault();

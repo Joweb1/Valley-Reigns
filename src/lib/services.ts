@@ -31,7 +31,7 @@ import {
 } from "firebase/database";
 import { auth, db, rtdb } from "./firebase";
 export { auth, db, rtdb };
-import { Job, UserProfile, Conversation, ChatMessage, DailyStat, SystemNotification, StaffDailyReport, CustomerContact, CandidateListLog, StaffResumptionRecord, StaffReportReopenOverride } from "../types";
+import { Job, UserProfile, Conversation, ChatMessage, DailyStat, SystemNotification, StaffDailyReport, CustomerContact, CandidateListLog, StaffResumptionRecord, StaffReportReopenOverride, EmployerRecruitmentRequest, EmployerApplicant } from "../types";
 import { SEEDED_JOBS_LIST } from "./defaultJobs";
 
 // ==========================================
@@ -212,12 +212,144 @@ class MemoryStorage {
       password: "Password123",
       authProvider: "email",
       messagingPreference: "in-app"
+    },
+    "employer-demo": {
+      uid: "employer-demo",
+      email: "employer@apexsystems.com",
+      displayName: "David Apex",
+      companyName: "Apex Systems Global",
+      companyIndustry: "Technology & Software",
+      companyWebsite: "https://apexsystems.com",
+      companyPhone: "+234 803 112 4490",
+      companyAddress: "Plot 12, Adeola Odeku St, Victoria Island, Lagos",
+      rcNumber: "RC-892341",
+      role: "employer",
+      canPostJobs: true,
+      canMessageSeekers: true,
+      isVerifiedEmployer: true,
+      maxJobPosts: 10,
+      password: "Password123",
+      authProvider: "email",
+      messagingPreference: "in-app",
+      createdAt: Date.now() - 86400000 * 30
+    },
+    "employer-novacore": {
+      uid: "employer-novacore",
+      email: "hiring@novacore.com",
+      displayName: "Chioma Okonjo",
+      companyName: "NovaCore Supply & Logistics",
+      companyIndustry: "Logistics & Freight",
+      companyWebsite: "https://novacorelogistics.com",
+      companyPhone: "+234 802 555 7711",
+      companyAddress: "14 Commercial Ave, Ikeja, Lagos",
+      rcNumber: "RC-773412",
+      role: "employer",
+      canPostJobs: false,
+      canMessageSeekers: false,
+      isVerifiedEmployer: false,
+      maxJobPosts: 3,
+      password: "Password123",
+      authProvider: "email",
+      messagingPreference: "in-app",
+      createdAt: Date.now() - 86400000 * 12
+    },
+    "employer-zenith": {
+      uid: "employer-zenith",
+      email: "careers@zenithretail.ng",
+      displayName: "Tunde Bakare",
+      companyName: "Zenith Retail Group",
+      companyIndustry: "Retail & Consumer Goods",
+      companyWebsite: "https://zenithretail.ng",
+      companyPhone: "+234 814 990 2233",
+      companyAddress: "Block 4, Admiralty Way, Lekki Phase 1, Lagos",
+      rcNumber: "RC-661298",
+      role: "employer",
+      canPostJobs: true,
+      canMessageSeekers: false,
+      isVerifiedEmployer: true,
+      maxJobPosts: 5,
+      password: "Password123",
+      authProvider: "email",
+      messagingPreference: "in-app",
+      createdAt: Date.now() - 86400000 * 20
     }
   };
   staffStatuses: Record<string, "online" | "offline"> = {
     "staff-demo": "online",
     "staff-1-seed": "online",
     "staff-2-seed": "online"
+  };
+  recruitmentRequests: Record<string, EmployerRecruitmentRequest> = {
+    "req-101": {
+      id: "req-101",
+      employerUid: "employer-demo",
+      companyName: "Apex Systems Global",
+      contactPerson: "David Apex",
+      email: "employer@apexsystems.com",
+      phone: "+234 803 112 4490",
+      jobTitle: "Senior Frontend React Developer",
+      jobCategory: "Information Technology",
+      salaryBudget: "₦850,000 - ₦1,200,000 / month",
+      numberOfWorkers: 2,
+      jobLocation: "Victoria Island, Lagos (Hybrid)",
+      requirements: "Minimum 4+ years of TypeScript, React, Tailwind CSS, and performance optimization experience.",
+      urgency: "immediate",
+      status: "sourcing",
+      createdAt: Date.now() - 86400000 * 3,
+      assignedStaffUid: "staff-1-seed",
+      assignedStaffName: "Marcus Vance",
+      notes: "Sourcing top candidates from verified tech pool. 4 shortlisted profiles being vetted."
+    },
+    "req-102": {
+      id: "req-102",
+      employerUid: "employer-demo",
+      companyName: "Apex Systems Global",
+      contactPerson: "David Apex",
+      email: "employer@apexsystems.com",
+      phone: "+234 803 112 4490",
+      jobTitle: "Customer Experience & WhatsApp Specialist",
+      jobCategory: "Customer Support",
+      salaryBudget: "₦350,000 - ₦500,000 / month",
+      numberOfWorkers: 3,
+      jobLocation: "Lagos / Remote",
+      requirements: "Experience handling high volume in-app and WhatsApp chats, fast typing, fluent English.",
+      urgency: "within_1_week",
+      status: "reviewing",
+      createdAt: Date.now() - 86400000 * 1,
+      assignedStaffUid: "staff-2-seed",
+      assignedStaffName: "Jessica Carter"
+    }
+  };
+  employerApplicants: Record<string, EmployerApplicant> = {
+    "app-101": {
+      id: "app-101",
+      jobId: "job-001",
+      jobTitle: "Lead WhatsApp Solutions Architect",
+      employerUid: "employer-demo",
+      seekerUid: "seeker-demo",
+      seekerName: "Alex Rivera",
+      seekerEmail: "genesisjosephoghene+seeker@gmail.com",
+      seekerPhoneMasked: "+234 ••• ••• 2834",
+      seekerCategory: "Engineering",
+      appliedAt: Date.now() - 86400000 * 2,
+      status: "shortlisted",
+      interviewDate: "Tomorrow at 2:00 PM (Google Meet)",
+      notes: "Exceptional architecture portfolio and live system demonstration."
+    },
+    "app-102": {
+      id: "app-102",
+      jobId: "job-002",
+      jobTitle: "Senior AI Integration Specialist",
+      employerUid: "employer-demo",
+      seekerUid: "seeker-seed-2",
+      seekerName: "Robert Chen",
+      seekerEmail: "robert.chen@devmail.io",
+      seekerPhoneMasked: "+234 ••• ••• 9872",
+      seekerCategory: "AI / ML",
+      appliedAt: Date.now() - 86400000 * 4,
+      status: "reviewing",
+      notes: "Strong LLM and pipeline automation track record."
+    }
   };
   currentUser: UserProfile | null = null;
   systemNotifications: SystemNotification[] = [];
@@ -304,6 +436,20 @@ class MemoryStorage {
     if (savedReopens) {
       try { this.reportReopens = JSON.parse(savedReopens); } catch(e) {}
     }
+    const savedRecruitments = localStorage.getItem("vr_recruitment_requests");
+    if (savedRecruitments) {
+      try {
+        const parsed = JSON.parse(savedRecruitments);
+        this.recruitmentRequests = { ...this.recruitmentRequests, ...parsed };
+      } catch(e) {}
+    }
+    const savedApplicants = localStorage.getItem("vr_employer_applicants");
+    if (savedApplicants) {
+      try {
+        const parsed = JSON.parse(savedApplicants);
+        this.employerApplicants = { ...this.employerApplicants, ...parsed };
+      } catch(e) {}
+    }
   }
 
   save() {
@@ -316,6 +462,8 @@ class MemoryStorage {
     localStorage.setItem("vr_candidate_list_logs", JSON.stringify(this.candidateListLogs));
     localStorage.setItem("vr_staff_resumptions", JSON.stringify(this.staffResumptions || {}));
     localStorage.setItem("vr_report_reopens", JSON.stringify(this.reportReopens || {}));
+    localStorage.setItem("vr_recruitment_requests", JSON.stringify(this.recruitmentRequests || {}));
+    localStorage.setItem("vr_employer_applicants", JSON.stringify(this.employerApplicants || {}));
     this.listeners.forEach(l => l());
   }
 
@@ -673,6 +821,227 @@ export async function toggleStaffJobPosting(uid: string, canPost: boolean): Prom
     memoryStore.users[uid].canPostJobs = canPost;
     memoryStore.save();
   }
+}
+
+// ==========================================
+// EMPLOYER MANAGEMENT & ECOSYSTEM SERVICES
+// ==========================================
+
+export async function getEmployerProfiles(): Promise<UserProfile[]> {
+  try {
+    const collRef = collection(db, "users");
+    const snapshot = await getDocs(collRef);
+    const users = snapshot.docs.map(doc => doc.data() as UserProfile);
+    const employers = users.filter(u => u.role === "employer");
+    if (employers.length > 0) return employers;
+  } catch (error) {
+    console.warn("Firestore getEmployerProfiles failing, using fallback:", error);
+  }
+  return Object.values(memoryStore.users).filter(u => u.role === "employer");
+}
+
+export async function toggleEmployerJobPosting(uid: string, canPost: boolean): Promise<void> {
+  try {
+    const docRef = doc(db, "users", uid);
+    await updateDoc(docRef, { canPostJobs: canPost });
+  } catch (error) {
+    console.warn("Firestore toggleEmployerJobPosting failing, applying locally:", error);
+  }
+  if (memoryStore.users[uid]) {
+    memoryStore.users[uid].canPostJobs = canPost;
+    memoryStore.save();
+  }
+}
+
+export async function toggleEmployerSeekerMessaging(uid: string, canMessage: boolean): Promise<void> {
+  try {
+    const docRef = doc(db, "users", uid);
+    await updateDoc(docRef, { canMessageSeekers: canMessage });
+  } catch (error) {
+    console.warn("Firestore toggleEmployerSeekerMessaging failing, applying locally:", error);
+  }
+  if (memoryStore.users[uid]) {
+    memoryStore.users[uid].canMessageSeekers = canMessage;
+    memoryStore.save();
+  }
+}
+
+export async function toggleEmployerVerification(uid: string, isVerified: boolean): Promise<void> {
+  try {
+    const docRef = doc(db, "users", uid);
+    await updateDoc(docRef, { isVerifiedEmployer: isVerified });
+  } catch (error) {
+    console.warn("Firestore toggleEmployerVerification failing, applying locally:", error);
+  }
+  if (memoryStore.users[uid]) {
+    memoryStore.users[uid].isVerifiedEmployer = isVerified;
+    memoryStore.save();
+  }
+}
+
+export async function updateEmployerMaxJobPosts(uid: string, maxPosts: number): Promise<void> {
+  try {
+    const docRef = doc(db, "users", uid);
+    await updateDoc(docRef, { maxJobPosts: maxPosts });
+  } catch (error) {
+    console.warn("Firestore updateEmployerMaxJobPosts failing, applying locally:", error);
+  }
+  if (memoryStore.users[uid]) {
+    memoryStore.users[uid].maxJobPosts = maxPosts;
+    memoryStore.save();
+  }
+}
+
+export async function deleteEmployerProfile(uid: string): Promise<void> {
+  try {
+    const docRef = doc(db, "users", uid);
+    await deleteDoc(docRef);
+  } catch (error) {
+    console.warn("Firestore deleteEmployerProfile failing, applying locally:", error);
+  }
+  if (memoryStore.users[uid]) {
+    delete memoryStore.users[uid];
+    memoryStore.save();
+  }
+}
+
+export async function submitEmployerRecruitmentRequest(
+  data: Omit<EmployerRecruitmentRequest, "id" | "createdAt" | "status">
+): Promise<EmployerRecruitmentRequest> {
+  const newRequest: EmployerRecruitmentRequest = {
+    ...data,
+    id: `req-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+    createdAt: Date.now(),
+    status: "pending"
+  };
+
+  try {
+    const docRef = doc(db, "recruitment_requests", newRequest.id);
+    await setDoc(docRef, newRequest);
+  } catch (error) {
+    console.warn("Firestore submitEmployerRecruitmentRequest failing, storing locally:", error);
+  }
+
+  memoryStore.recruitmentRequests[newRequest.id] = newRequest;
+  memoryStore.save();
+  return newRequest;
+}
+
+export async function getEmployerRecruitmentRequests(employerUid?: string): Promise<EmployerRecruitmentRequest[]> {
+  try {
+    const collRef = collection(db, "recruitment_requests");
+    const snapshot = await getDocs(collRef);
+    let requests = snapshot.docs.map(doc => doc.data() as EmployerRecruitmentRequest);
+    if (employerUid) {
+      requests = requests.filter(r => r.employerUid === employerUid);
+    }
+    if (requests.length > 0) {
+      return requests.sort((a, b) => b.createdAt - a.createdAt);
+    }
+  } catch (error) {
+    console.warn("Firestore getEmployerRecruitmentRequests failing, using fallback:", error);
+  }
+  let localList = Object.values(memoryStore.recruitmentRequests);
+  if (employerUid) {
+    localList = localList.filter(r => r.employerUid === employerUid);
+  }
+  return localList.sort((a, b) => b.createdAt - a.createdAt);
+}
+
+export async function updateRecruitmentRequestStatus(
+  id: string,
+  status: EmployerRecruitmentRequest["status"],
+  staffUid?: string,
+  staffName?: string,
+  notes?: string
+): Promise<void> {
+  const updates: any = { status };
+  if (staffUid) updates.assignedStaffUid = staffUid;
+  if (staffName) updates.assignedStaffName = staffName;
+  if (notes !== undefined) updates.notes = notes;
+
+  try {
+    const docRef = doc(db, "recruitment_requests", id);
+    await updateDoc(docRef, updates);
+  } catch (error) {
+    console.warn("Firestore updateRecruitmentRequestStatus failing, updating locally:", error);
+  }
+
+  if (memoryStore.recruitmentRequests[id]) {
+    memoryStore.recruitmentRequests[id] = {
+      ...memoryStore.recruitmentRequests[id],
+      ...updates
+    };
+    memoryStore.save();
+  }
+}
+
+export async function getEmployerApplicants(employerUid?: string): Promise<EmployerApplicant[]> {
+  try {
+    const collRef = collection(db, "employer_applicants");
+    const snapshot = await getDocs(collRef);
+    let apps = snapshot.docs.map(doc => doc.data() as EmployerApplicant);
+    if (employerUid) {
+      apps = apps.filter(a => a.employerUid === employerUid);
+    }
+    if (apps.length > 0) {
+      return apps.sort((a, b) => b.appliedAt - a.appliedAt);
+    }
+  } catch (error) {
+    console.warn("Firestore getEmployerApplicants failing, using fallback:", error);
+  }
+  let localList = Object.values(memoryStore.employerApplicants);
+  if (employerUid) {
+    localList = localList.filter(a => a.employerUid === employerUid);
+  }
+  return localList.sort((a, b) => b.appliedAt - a.appliedAt);
+}
+
+export async function updateEmployerApplicantStatus(
+  id: string,
+  status: EmployerApplicant["status"],
+  interviewDate?: string,
+  notes?: string
+): Promise<void> {
+  const updates: any = { status };
+  if (interviewDate !== undefined) updates.interviewDate = interviewDate;
+  if (notes !== undefined) updates.notes = notes;
+
+  try {
+    const docRef = doc(db, "employer_applicants", id);
+    await updateDoc(docRef, updates);
+  } catch (error) {
+    console.warn("Firestore updateEmployerApplicantStatus failing, updating locally:", error);
+  }
+
+  if (memoryStore.employerApplicants[id]) {
+    memoryStore.employerApplicants[id] = {
+      ...memoryStore.employerApplicants[id],
+      ...updates
+    };
+    memoryStore.save();
+  }
+}
+
+export async function createEmployerApplicant(
+  data: Omit<EmployerApplicant, "id" | "appliedAt">
+): Promise<EmployerApplicant> {
+  const newApp: EmployerApplicant = {
+    ...data,
+    id: `app-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+    appliedAt: Date.now()
+  };
+
+  try {
+    const docRef = doc(db, "employer_applicants", newApp.id);
+    await setDoc(docRef, newApp);
+  } catch (error) {
+    console.warn("Firestore createEmployerApplicant failing, saving locally:", error);
+  }
+
+  memoryStore.employerApplicants[newApp.id] = newApp;
+  memoryStore.save();
+  return newApp;
 }
 
 // ==========================================
@@ -1878,7 +2247,17 @@ export async function clearAllWhatsAppConversations(): Promise<void> {
   // Clear memoryStore only for WhatsApp chats
   Object.keys(memoryStore.conversations).forEach((id) => {
     const conv = memoryStore.conversations[id];
-    if (!conv?.isInApp && !id.startsWith("inapp_")) {
+    const isInApp = 
+      Boolean(conv?.isInApp) ||
+      Boolean(conv?.seekerUid) ||
+      id.startsWith("inapp_") ||
+      id.startsWith("inapp-") ||
+      id.startsWith("guest_") ||
+      id.startsWith("guest-") ||
+      id.startsWith("chat-") ||
+      !id.startsWith("whatsapp-") ||
+      (conv?.customerPhone && !conv.customerPhone.startsWith("+") && !/^\d+$/.test(conv.customerPhone));
+    if (!isInApp) {
       delete memoryStore.conversations[id];
     }
   });
@@ -1889,7 +2268,18 @@ export async function clearAllWhatsAppConversations(): Promise<void> {
     const snap = await getDocs(collRef);
     for (const d of snap.docs) {
       const data = d.data();
-      const isInApp = Boolean(data?.isInApp) || d.id.startsWith("inapp_");
+      const id = d.id;
+      const isInApp = 
+        Boolean(data?.isInApp) ||
+        Boolean(data?.seekerUid) ||
+        Boolean(data?.isGuestInApp) ||
+        id.startsWith("inapp_") ||
+        id.startsWith("inapp-") ||
+        id.startsWith("guest_") ||
+        id.startsWith("guest-") ||
+        id.startsWith("chat-") ||
+        !id.startsWith("whatsapp-") ||
+        (data?.customerPhone && !data.customerPhone.startsWith("+") && !/^\d+$/.test(data.customerPhone));
       if (!isInApp) {
         await deleteDoc(d.ref);
       }
@@ -1905,7 +2295,18 @@ export async function clearAllWhatsAppConversations(): Promise<void> {
       if (snap.exists()) {
         const val = snap.val();
         for (const key of Object.keys(val)) {
-          if (!val[key]?.isInApp && !key.startsWith("inapp_")) {
+          const item = val[key];
+          const isInApp = 
+            Boolean(item?.isInApp) ||
+            Boolean(item?.seekerUid) ||
+            key.startsWith("inapp_") ||
+            key.startsWith("inapp-") ||
+            key.startsWith("guest_") ||
+            key.startsWith("guest-") ||
+            key.startsWith("chat-") ||
+            !key.startsWith("whatsapp-") ||
+            (item?.customerPhone && !item.customerPhone.startsWith("+") && !/^\d+$/.test(item.customerPhone));
+          if (!isInApp) {
             await remove(ref(rtdb, `conversations/${key}`));
           }
         }

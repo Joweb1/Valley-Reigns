@@ -8,8 +8,14 @@ interface AuthContextType {
   currentUser: UserProfile | null;
   firebaseUser: User | null;
   loading: boolean;
-  loginDemo: (role: "seeker" | "staff" | "admin") => Promise<void>;
-  signupUser: (email: string, displayName: string, role: "seeker" | "staff" | "admin", password?: string) => Promise<void>;
+  loginDemo: (role: "seeker" | "staff" | "admin" | "employer") => Promise<void>;
+  signupUser: (
+    email: string, 
+    displayName: string, 
+    role: "seeker" | "staff" | "admin" | "employer", 
+    password?: string,
+    extraData?: Partial<UserProfile>
+  ) => Promise<void>;
   loginWithEmail: (email: string, password?: string) => Promise<UserProfile>;
   loginWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
@@ -273,7 +279,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [loading, currentUser]);
 
   // One-click high-fidelity Persona Login for frictionless testing
-  const loginDemo = async (role: "seeker" | "staff" | "admin") => {
+  const loginDemo = async (role: "seeker" | "staff" | "admin" | "employer") => {
     setLoading(true);
     let email = "";
 
@@ -281,6 +287,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       email = "admin@valleyreigns.com";
     } else if (role === "staff") {
       email = "staff1@valleyreigns.com";
+    } else if (role === "employer") {
+      email = "employer@apexsystems.com";
     } else {
       email = "genesisjosephoghene+seeker@gmail.com";
     }
@@ -299,7 +307,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const signupUser = async (email: string, displayName: string, role: "seeker" | "staff" | "admin", password?: string) => {
+  const signupUser = async (
+    email: string, 
+    displayName: string, 
+    role: "seeker" | "staff" | "admin" | "employer", 
+    password?: string,
+    extraData?: Partial<UserProfile>
+  ) => {
     setLoading(true);
     const normEmail = email.trim().toLowerCase();
     const resolvedPassword = password || "Password123";
@@ -327,9 +341,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         email: normEmail,
         displayName,
         role: finalRole,
-        canPostJobs: finalRole === "admin" || finalRole === "staff",
+        canPostJobs: finalRole === "admin" || finalRole === "staff" ? true : (extraData?.canPostJobs || false),
+        canMessageSeekers: extraData?.canMessageSeekers || false,
+        isVerifiedEmployer: extraData?.isVerifiedEmployer || false,
+        companyName: extraData?.companyName || (finalRole === "employer" ? displayName : undefined),
+        companyIndustry: extraData?.companyIndustry || (finalRole === "employer" ? "Corporate Recruitment" : undefined),
+        companyWebsite: extraData?.companyWebsite,
+        companyPhone: extraData?.companyPhone,
+        companyAddress: extraData?.companyAddress,
+        rcNumber: extraData?.rcNumber,
+        maxJobPosts: extraData?.maxJobPosts || (finalRole === "employer" ? 5 : undefined),
+        createdAt: Date.now(),
         password: resolvedPassword,
-        authProvider: "email"
+        authProvider: "email",
+        messagingPreference: "in-app"
       };
       await saveUserProfile(newProfile);
 

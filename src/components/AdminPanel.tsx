@@ -202,6 +202,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ jobsList }) => {
       setActiveView("post-job");
     } else if (viewParam === "contacts") {
       navigate("/admin/contacts", { replace: true });
+    } else if (viewParam === "employers") {
+      navigate("/admin/employers", { replace: true });
     }
   }, [location.search, navigate]);
 

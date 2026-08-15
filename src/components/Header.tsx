@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useNotification } from "../context/NotificationContext";
-import { Briefcase, MessageSquare, ShieldCheck, LogOut, Menu, X, UserPlus, User, Bell, Info, Plus, Search, Download, Settings, Cpu, ClipboardList, Users } from "lucide-react";
+import { Briefcase, MessageSquare, ShieldCheck, LogOut, Menu, X, UserPlus, User, Bell, Info, Plus, Search, Download, Settings, Cpu, ClipboardList, Users, Building2 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { setStaffOnlineStatus, getAllUserProfiles } from "../lib/services";
 
@@ -104,7 +104,7 @@ export const Header: React.FC = () => {
       .catch(() => {});
   }, []);
 
-  const isDashboardPage = location.pathname === "/seeker" || location.pathname === "/seeker/messages" || location.pathname === "/seeker/notifications" || location.pathname === "/staff" || location.pathname === "/admin" || location.pathname === "/staff/manage-jobs" || location.pathname === "/admin/manage-jobs" || location.pathname === "/staff/notifications" || location.pathname === "/admin/notifications";
+  const isDashboardPage = location.pathname === "/seeker" || location.pathname === "/seeker/messages" || location.pathname === "/seeker/notifications" || location.pathname === "/staff" || location.pathname === "/admin" || location.pathname === "/staff/manage-jobs" || location.pathname === "/admin/manage-jobs" || location.pathname === "/staff/notifications" || location.pathname === "/admin/notifications" || location.pathname === "/employer";
 
   const handleFindJobsClick = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -126,7 +126,7 @@ export const Header: React.FC = () => {
           
           {/* Left: Companies logo and Administration tag */}
           <div className="flex items-center gap-3">
-            <Link to={currentUser?.role === "seeker" ? "/seeker" : "/staff"} className="flex items-center group">
+            <Link to={currentUser?.role === "employer" ? "/employer" : currentUser?.role === "seeker" ? "/seeker" : "/staff"} className="flex items-center group">
               <div className="w-12 h-12 flex items-center justify-center group-hover:scale-105 transition-all duration-300">
                 <img 
                   src="/icon.svg" 
@@ -144,6 +144,11 @@ export const Header: React.FC = () => {
             {currentUser?.role === "staff" && (
               <span className="text-sm font-sans font-black tracking-tight text-slate-800 border-l border-slate-200 pl-3">
                 Staff
+              </span>
+            )}
+            {currentUser?.role === "employer" && (
+              <span className="text-sm font-sans font-black tracking-tight text-indigo-700 border-l border-slate-200 pl-3 flex items-center gap-1.5">
+                Employer Portal
               </span>
             )}
             {(!currentUser || currentUser?.role === "seeker") && (
@@ -615,6 +620,20 @@ export const Header: React.FC = () => {
             </Link>
           )}
 
+          {currentUser?.role === "employer" && (
+            <Link
+              to="/employer"
+              className={`px-4 py-2 rounded-xl text-xs font-bold tracking-tight transition-all flex items-center gap-1.5 ${
+                location.pathname === "/employer"
+                  ? "bg-indigo-50 text-indigo-700 border border-indigo-200"
+                  : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+              }`}
+            >
+              <Building2 className="w-3.5 h-3.5" />
+              Employer Dashboard
+            </Link>
+          )}
+
           {currentUser?.role === "staff" && (
             <Link
               to="/staff"
@@ -801,6 +820,16 @@ export const Header: React.FC = () => {
                   className="block px-4 py-2.5 rounded-xl text-sm font-bold text-[#1E88E5] bg-blue-50 hover:bg-blue-100"
                 >
                   My Dashboard
+                </Link>
+              )}
+
+              {currentUser?.role === "employer" && (
+                <Link
+                  to="/employer"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="block px-4 py-2.5 rounded-xl text-sm font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100"
+                >
+                  Employer Dashboard
                 </Link>
               )}
 

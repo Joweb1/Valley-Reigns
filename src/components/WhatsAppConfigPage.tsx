@@ -70,6 +70,7 @@ export const WhatsAppConfigPage: React.FC = () => {
 
   // Form states for Official Meta API
   const [phoneNumberId, setPhoneNumberId] = useState("");
+  const [officialPhoneNumber, setOfficialPhoneNumber] = useState("");
   const [businessAccountId, setBusinessAccountId] = useState("");
   const [accessToken, setAccessToken] = useState("");
   const [verifyToken, setVerifyToken] = useState("");
@@ -130,6 +131,7 @@ export const WhatsAppConfigPage: React.FC = () => {
         if (docSnap.exists()) {
           const data = docSnap.data();
           setPhoneNumberId(data.phoneNumberId || "");
+          setOfficialPhoneNumber(data.officialPhoneNumber || "");
           setBusinessAccountId(data.businessAccountId || "");
           setAccessToken(data.accessToken || "");
           setVerifyToken(data.verifyToken || "");
@@ -353,6 +355,7 @@ export const WhatsAppConfigPage: React.FC = () => {
       const configRef = doc(db, "settings", "whatsapp");
       await setDoc(configRef, {
         phoneNumberId: phoneNumberId.trim(),
+        officialPhoneNumber: officialPhoneNumber.trim(),
         businessAccountId: businessAccountId.trim(),
         accessToken: accessToken.trim(),
         verifyToken: verifyToken.trim(),
@@ -1027,6 +1030,23 @@ export const WhatsAppConfigPage: React.FC = () => {
                       placeholder="e.g. 109825438910"
                       className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 focus:border-blue-500 focus:bg-white text-xs font-medium rounded-xl outline-none transition-all placeholder:text-slate-400"
                     />
+                  </div>
+
+                  {/* Official WhatsApp Phone Number */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                      <Smartphone className="w-3.5 h-3.5 text-[#00A884]" /> Official WhatsApp Phone Number
+                    </label>
+                    <input
+                      type="text"
+                      value={officialPhoneNumber}
+                      onChange={(e) => setOfficialPhoneNumber(e.target.value)}
+                      placeholder="e.g. +2348031234567 or 2348031234567"
+                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 focus:border-blue-500 focus:bg-white text-xs font-medium rounded-xl outline-none transition-all placeholder:text-slate-400"
+                    />
+                    <p className="text-[10px] text-slate-400">
+                      The phone number registered with Meta Official WhatsApp API for candidates to message.
+                    </p>
                   </div>
 
                   {/* Business Account ID */}

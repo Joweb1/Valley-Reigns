@@ -16,7 +16,7 @@ export interface Job {
 
 export interface SystemNotification {
   id: string;
-  type: "offline_routing" | "closed_conversation" | "reported_conversation" | "finished_conversation" | "new_job_posted" | "job_updated" | "job_deleted" | "report_submitted" | "awaiting_claim" | "abandoned_conversation" | "transferred_conversation" | "conversation_started" | "conversation_closed" | "conversation_finished" | "conversation_transferred" | "conversation_claimed";
+  type: "offline_routing" | "closed_conversation" | "reported_conversation" | "finished_conversation" | "new_job_posted" | "job_updated" | "job_deleted" | "report_submitted" | "awaiting_claim" | "abandoned_conversation" | "transferred_conversation" | "conversation_started" | "conversation_closed" | "conversation_finished" | "conversation_transferred" | "conversation_claimed" | "permission_request";
   title: string;
   message: string;
   timestamp: number;
@@ -41,12 +41,60 @@ export interface UserProfile {
   uid: string;
   email: string;
   displayName: string;
-  role: "seeker" | "staff" | "admin";
+  role: "seeker" | "staff" | "admin" | "employer";
   canPostJobs: boolean;
+  canMessageSeekers?: boolean;
+  isVerifiedEmployer?: boolean;
+  companyName?: string;
+  companyIndustry?: string;
+  companyWebsite?: string;
+  companyPhone?: string;
+  companyAddress?: string;
+  rcNumber?: string;
+  maxJobPosts?: number;
+  createdAt?: number;
   password?: string;
   authProvider?: "email" | "google";
   messagingPreference?: "whatsapp" | "in-app";
   photoURL?: string;
+}
+
+export interface EmployerRecruitmentRequest {
+  id: string;
+  employerUid: string;
+  companyName: string;
+  contactPerson: string;
+  email: string;
+  phone: string;
+  jobTitle: string;
+  jobCategory: string;
+  salaryBudget: string;
+  numberOfWorkers: number;
+  jobLocation: string;
+  requirements: string;
+  urgency: "immediate" | "within_1_week" | "within_1_month" | "flexible";
+  status: "pending" | "reviewing" | "sourcing" | "completed" | "cancelled";
+  createdAt: number;
+  assignedStaffUid?: string;
+  assignedStaffName?: string;
+  notes?: string;
+}
+
+export interface EmployerApplicant {
+  id: string;
+  jobId: string;
+  jobTitle: string;
+  employerUid: string;
+  seekerUid: string;
+  seekerName: string;
+  seekerEmail?: string;
+  seekerPhoneMasked?: string;
+  seekerCategory?: string;
+  appliedAt: number;
+  status: "reviewing" | "shortlisted" | "interview_scheduled" | "hired" | "rejected";
+  interviewDate?: string;
+  notes?: string;
+  chatId?: string;
 }
 
 export interface ChatMessage {

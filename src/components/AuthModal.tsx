@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "motion/react";
 import { useAuth } from "../context/AuthContext";
 import { memoryStore } from "../lib/services";
-import { X, LogIn, Phone, ArrowLeft, Shield, UserPlus, CheckCircle, Mail, Key, Eye, EyeOff } from "lucide-react";
+import { X, LogIn, Phone, ArrowLeft, Shield, UserPlus, CheckCircle, Mail, Key, Eye, EyeOff, Building2, Briefcase } from "lucide-react";
 
 interface AuthModalProps {
   forcedOpen?: boolean;
@@ -51,6 +51,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({ forcedOpen = false, onClos
   // Tabs: "signin" | "signup"
   const [activeTab, setActiveTab] = useState<"signin" | "signup">("signin");
   
+  // Employer mode
+  const [isEmployerMode, setIsEmployerMode] = useState(false);
+  const [companyName, setCompanyName] = useState("");
+  const [companyIndustry, setCompanyIndustry] = useState("");
+  const [companyPhone, setCompanyPhone] = useState("");
+
   // Email/Password inputs
   const [emailInput, setEmailInput] = useState("");
   const [passwordInput, setPasswordInput] = useState("");
@@ -59,7 +65,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ forcedOpen = false, onClos
   // Signup inputs
   const [signupName, setSignupName] = useState("");
   const [signupEmail, setSignupEmail] = useState("");
-  const [signupRole, setSignupRole] = useState<"seeker" | "staff">("seeker");
+  const [signupRole, setSignupRole] = useState<"seeker" | "staff" | "employer">("seeker");
   const [signupError, setSignupError] = useState("");
 
   // Form states
@@ -152,9 +158,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({ forcedOpen = false, onClos
       clearTimeout(signupHoldTimerRef.current);
       signupHoldTimerRef.current = null;
     }
-    // Safeguard: Once signupRole has been set to staff, never automatically reset it to seeker on release
-    if (!signupHoldTriggeredRef.current && signupRole !== "staff") {
-      setSignupRole("seeker");
+    // Safeguard: Once signupRole has been set to staff or employer, keep it
+    if (!signupHoldTriggeredRef.current && signupRole !== "staff" && signupRole !== "employer") {
+      setSignupRole(isEmployerMode ? "employer" : "seeker");
       setActiveTab("signup");
     }
   };
@@ -206,6 +212,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({ forcedOpen = false, onClos
       navigate("/admin");
     } else if (role === "staff") {
       navigate("/staff");
+    } else if (role === "employer") {
+      navigate("/employer");
     } else {
       navigate("/seeker");
     }
@@ -217,6 +225,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({ forcedOpen = false, onClos
       setIsOpen(true);
       setShowMagicLinkView(false);
       setShowEmailForm(false);
+      if (e?.detail?.role === "employer") {
+        setIsEmployerMode(true);
+        setSignupRole("employer");
+      } else {
+        setIsEmployerMode(false);
+        setSignupRole("seeker");
+      }
+
       if (e?.detail?.tab === "signup") {
         setActiveTab("signup");
       } else {
@@ -316,7 +332,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({ forcedOpen = false, onClos
           } else {
             setEmailLinkError(linkErr.message || "Unable to send magic link via Firebase.");
           }
-          // Automatically show fallback simulation bypass mode if transmission is pending configuration
           setShowHifiPreview(true);
         } finally {
           setIsProcessing(false);
@@ -332,6 +347,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({ forcedOpen = false, onClos
     e.preventDefault();
     if (!signupName.trim()) {
       setSignupError("Please enter your name.");
+      return;
+    }
+    if (isEmployerMode && !companyName.trim()) {
+      setSignupError("Please enter your company name.");
       return;
     }
     if (!signupEmail.trim() || !signupEmail.includes("@")) {
@@ -354,10 +373,26 @@ export const AuthModal: React.FC<AuthModalProps> = ({ forcedOpen = false, onClos
     setSignupError("");
     setIsProcessing(true);
 
-    signupUser(signupEmail, signupName, signupRole, signupPassword)
+    const targetRole = isEmployerMode ? "employer" : signupRole;
+
+    signupUser(
+      signupEmail, 
+      signupName, 
+      targetRole, 
+      signupPassword, 
+      isEmployerMode ? {
+        companyName: companyName.trim(),
+        companyIndustry: companyIndustry.trim() || "Corporate Recruitment",
+        companyPhone: companyPhone.trim() || undefined,
+        canPostJobs: true, // Auto grant trial post permission on signup for seamless evaluation
+        canMessageSeekers: false,
+        isVerifiedEmployer: false,
+        maxJobPosts: 5
+      } : undefined
+    )
       .then(() => {
         setIsProcessing(false);
-        handleRedirect(signupRole);
+        handleRedirect(targetRole);
         handleClose();
       })
       .catch((err) => {
@@ -377,7 +412,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ forcedOpen = false, onClos
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={canClose ? handleClose : undefined}
-            className={`absolute inset-0 bg-slate-900/40 backdrop-blur-sm ${canClose ? "cursor-pointer" : "cursor-default"}`}
+            className={`absolute inset-0 bg-slate-900/50 backdrop-blur-sm ${canClose ? "cursor-pointer" : "cursor-default"}`}
           />
 
           {/* Modal Container */}
@@ -386,32 +421,60 @@ export const AuthModal: React.FC<AuthModalProps> = ({ forcedOpen = false, onClos
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 15 }}
             transition={{ type: "spring", duration: 0.5 }}
-            className="relative w-full max-w-md bg-white rounded-[24px] shadow-2xl border border-slate-100 overflow-hidden z-10 flex flex-col"
+            className="relative w-full max-w-md bg-white rounded-[24px] shadow-2xl border border-slate-100 overflow-hidden z-10 flex flex-col max-h-[90vh]"
           >
-            {/* Elegant Header section */}
-            <div className="px-6 pt-6 pb-4 flex items-center justify-between border-b border-slate-100 bg-slate-50/50">
+            {/* Header section with Role Indicator */}
+            <div className="px-6 pt-5 pb-4 flex items-center justify-between border-b border-slate-100 bg-slate-50/70">
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-[#1E88E5]/10 flex items-center justify-center text-[#1E88E5]">
-                  <Shield className="w-4 h-4" />
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${isEmployerMode ? "bg-indigo-600/10 text-indigo-600" : "bg-[#1E88E5]/10 text-[#1E88E5]"}`}>
+                  {isEmployerMode ? <Building2 className="w-4 h-4" /> : <Shield className="w-4 h-4" />}
                 </div>
-                <span className="font-serif italic font-bold text-sm text-[#1e3a8a]">
-                  Valley Reigns
-                </span>
+                <div>
+                  <span className="font-serif italic font-bold text-sm text-[#1e3a8a] block leading-tight">
+                    Valley Reigns
+                  </span>
+                  {isEmployerMode && (
+                    <span className="text-[10px] font-mono font-bold text-indigo-700 uppercase tracking-wider block">
+                      Employer & Hiring Gateway
+                    </span>
+                  )}
+                </div>
               </div>
-              {showCloseButton && (
+
+              <div className="flex items-center gap-2">
+                {/* Mode Switcher Pill */}
                 <button
-                  onClick={handleClose}
-                  className="w-8 h-8 rounded-full bg-white border border-slate-200/80 flex items-center justify-center text-slate-400 hover:text-slate-600 shadow-sm hover:shadow transition-all cursor-pointer"
+                  type="button"
+                  onClick={() => {
+                    const nextMode = !isEmployerMode;
+                    setIsEmployerMode(nextMode);
+                    setSignupRole(nextMode ? "employer" : "seeker");
+                    setEmailError("");
+                    setSignupError("");
+                  }}
+                  className={`text-[10px] font-bold px-2.5 py-1 rounded-full border transition-all cursor-pointer ${
+                    isEmployerMode 
+                      ? "bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100" 
+                      : "bg-slate-100 border-slate-200 text-slate-600 hover:bg-slate-200"
+                  }`}
+                  title="Switch between Job Seeker and Employer Portal"
                 >
-                  <X className="w-4 h-4" />
+                  {isEmployerMode ? "Switch to Job Seeker" : "Employ Workers?"}
                 </button>
-              )}
+
+                {showCloseButton && (
+                  <button
+                    onClick={handleClose}
+                    className="w-8 h-8 rounded-full bg-white border border-slate-200/80 flex items-center justify-center text-slate-400 hover:text-slate-600 shadow-sm hover:shadow transition-all cursor-pointer"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
             </div>
 
-
-
             {/* Tab content wrapper */}
-            <div className="p-6 flex-grow">
+            <div className="p-6 flex-grow overflow-y-auto">
               <AnimatePresence mode="wait">
                 {showMagicLinkView ? (
                   <motion.div
@@ -497,15 +560,18 @@ export const AuthModal: React.FC<AuthModalProps> = ({ forcedOpen = false, onClos
                   >
                     <div className="space-y-1">
                       <h3 className="text-xl font-display font-extrabold tracking-tight text-[#1e3a8a]">
-                        Welcome Back!
+                        {isEmployerMode ? "Employer Sign In" : "Welcome Back!"}
                       </h3>
                       <p className="text-xs text-slate-500">
-                        Sign in with email or select a secure gateway option to access your dashboard
+                        {isEmployerMode 
+                          ? "Access your corporate recruitment dashboard to hire talent, manage job postings, and chat with candidates."
+                          : "Sign in with email or select a secure gateway option to access your dashboard"
+                        }
                       </p>
                     </div>
 
                     {!showEmailForm ? (
-                      /* First view: Only "Sign in with Email" and "Continue with Google" buttons */
+                      /* First view: "Sign in with Email" and "Continue with Google" buttons */
                       <div className="space-y-3 pt-2">
                         <motion.button
                           whileHover={{ scale: 1.02 }}
@@ -515,10 +581,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({ forcedOpen = false, onClos
                             setEmailError("");
                             setShowEmailForm(true);
                           }}
-                          className="w-full py-3 px-4 bg-[#1E88E5] hover:bg-[#1565C0] text-white rounded-xl font-bold text-xs shadow-md shadow-[#1E88E5]/10 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                          className={`w-full py-3 px-4 text-white rounded-xl font-bold text-xs shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                            isEmployerMode 
+                              ? "bg-indigo-600 hover:bg-indigo-700 shadow-indigo-600/10" 
+                              : "bg-[#1E88E5] hover:bg-[#1565C0] shadow-[#1E88E5]/10"
+                          }`}
                         >
                           <Mail className="w-4 h-4" />
-                          <span>Sign in with Email</span>
+                          <span>{isEmployerMode ? "Employer Sign in with Email" : "Sign in with Email"}</span>
                         </motion.button>
 
                         <motion.button
@@ -549,12 +619,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({ forcedOpen = false, onClos
                               d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
                             />
                           </svg>
-                          <span>Continue with Google</span>
+                          <span>{isEmployerMode ? "Continue as Corporate Google Account" : "Continue with Google"}</span>
                         </motion.button>
 
                         <div className="flex gap-1.5 justify-center pt-3 border-t border-slate-100 mt-2">
                           <span className="text-[10px] text-slate-500 font-medium">
-                            New here?
+                            {isEmployerMode ? "Need an Employer account?" : "New here?"}
                           </span>
                           <button
                             type="button"
@@ -562,25 +632,29 @@ export const AuthModal: React.FC<AuthModalProps> = ({ forcedOpen = false, onClos
                             onPointerUp={handleSignupLinkPointerUp}
                             onPointerLeave={handleSignupLinkPointerCancel}
                             onPointerCancel={handleSignupLinkPointerCancel}
-                            className="text-[10px] text-[#1E88E5] font-bold hover:underline cursor-pointer select-none"
+                            onClick={() => {
+                              setSignupRole(isEmployerMode ? "employer" : "seeker");
+                              setActiveTab("signup");
+                            }}
+                            className={`text-[10px] font-bold hover:underline cursor-pointer select-none ${isEmployerMode ? "text-indigo-600" : "text-[#1E88E5]"}`}
                           >
-                            {signupRole === "staff" ? "Create Staff Account" : "Create New Account"}
+                            {isEmployerMode ? "Register as Employer (Sign Up)" : signupRole === "staff" ? "Create Staff Account" : "Create New Account"}
                           </button>
                         </div>
 
-                        {/* Troubleshooting toggle to reveal quick-login test portals */}
+                        {/* Direct One-Click Testing Portals Toggle */}
                         <div className="flex justify-center pt-2">
                           <button
                             type="button"
                             onClick={() => setShowDemoPortals(!showDemoPortals)}
                             className="text-[9px] font-mono font-bold text-slate-400 hover:text-[#1E88E5] transition-colors cursor-pointer"
                           >
-                            {showDemoPortals ? "Hide Demo Quick-Login Portals" : "Trouble with Google Auth/Email Link? Click to reveal Quick-Login"}
+                            {showDemoPortals ? "Hide One-Click Demo Portals" : "⚡ Click here for Instant 1-Click Demo Logins (Employer / Admin / Seeker)"}
                           </button>
                         </div>
                       </div>
                     ) : (
-                      /* Second view: Email & Password Input fields for fill and sign in */
+                      /* Second view: Email & Password Input fields */
                       <div className="space-y-4 pt-1">
                         <button
                           type="button"
@@ -600,7 +674,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ forcedOpen = false, onClos
                           
                           <div className="space-y-1">
                             <label className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider block">
-                              Email Address
+                              {isEmployerMode ? "Work Email Address" : "Email Address"}
                             </label>
                             <div className="relative">
                               <span className="absolute inset-y-0 left-3 flex items-center text-slate-400">
@@ -609,7 +683,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ forcedOpen = false, onClos
                               <input
                                 type="email"
                                 required
-                                placeholder="e.g. admin@valleyreigns.com"
+                                placeholder={isEmployerMode ? "e.g. employer@apexsystems.com" : "e.g. admin@valleyreigns.com"}
                                 value={emailInput}
                                 onChange={(e) => setEmailInput(e.target.value)}
                                 className="w-full pl-9 pr-4 py-2.5 bg-slate-50 border border-slate-200/80 rounded-xl text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none hover:border-[#1E88E5]/60 focus:border-[#1E88E5] focus:bg-white focus:ring-4 focus:ring-[#1E88E5]/10 transition-all focus:scale-[1.01] shadow-sm"
@@ -650,32 +724,36 @@ export const AuthModal: React.FC<AuthModalProps> = ({ forcedOpen = false, onClos
                             whileHover={{ scale: 1.02 }}
                             whileTap={{ scale: 0.98 }}
                             type="submit"
-                            className="w-full py-2.5 px-4 bg-[#1E88E5] hover:bg-[#1565C0] text-white rounded-xl font-bold text-xs shadow-md shadow-[#1E88E5]/10 transition-all flex items-center justify-center gap-2 cursor-pointer mt-1"
+                            className={`w-full py-2.5 px-4 text-white rounded-xl font-bold text-xs shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer mt-1 ${
+                              isEmployerMode 
+                                ? "bg-indigo-600 hover:bg-indigo-700 shadow-indigo-600/10" 
+                                : "bg-[#1E88E5] hover:bg-[#1565C0] shadow-[#1E88E5]/10"
+                            }`}
                           >
                             <LogIn className="w-3.5 h-3.5" />
-                            <span>Sign In with Email</span>
+                            <span>{isEmployerMode ? "Employer Sign In" : "Sign In with Email"}</span>
                           </motion.button>
                         </form>
 
                         <div className="flex gap-1.5 justify-center pt-3 border-t border-slate-100 mt-2">
                           <span className="text-[10px] text-slate-500 font-medium">
-                            New here?
+                            {isEmployerMode ? "Need an Employer account?" : "New here?"}
                           </span>
                           <button
                             type="button"
-                            onPointerDown={handleSignupLinkPointerDown}
-                            onPointerUp={handleSignupLinkPointerUp}
-                            onPointerLeave={handleSignupLinkPointerCancel}
-                            onPointerCancel={handleSignupLinkPointerCancel}
-                            className="text-[10px] text-[#1E88E5] font-bold hover:underline cursor-pointer select-none"
+                            onClick={() => {
+                              setSignupRole(isEmployerMode ? "employer" : "seeker");
+                              setActiveTab("signup");
+                            }}
+                            className={`text-[10px] font-bold hover:underline cursor-pointer select-none ${isEmployerMode ? "text-indigo-600" : "text-[#1E88E5]"}`}
                           >
-                            {signupRole === "staff" ? "Create Staff Account" : "Create New Account"}
+                            {isEmployerMode ? "Register as Employer (Sign Up)" : signupRole === "staff" ? "Create Staff Account" : "Create New Account"}
                           </button>
                         </div>
                       </div>
                     )}
 
-                    {/* Quick-Login Testing Portals - hidden by default, visible only after 5s hold */}
+                    {/* Quick-Login Testing Portals */}
                     {showDemoPortals && (
                       <motion.div
                         initial={{ opacity: 0, y: 10 }}
@@ -683,14 +761,36 @@ export const AuthModal: React.FC<AuthModalProps> = ({ forcedOpen = false, onClos
                         className="bg-[#FAFDFB] border border-blue-100 rounded-2xl p-3.5 space-y-3 mt-2 max-h-[320px] overflow-y-auto"
                       >
                         <span className="text-[9px] font-mono font-bold text-blue-700 uppercase tracking-wider block text-center border-b border-blue-50/60 pb-1.5">
-                          ⚡ Quick-Login Testing Portals
+                          ⚡ Instant One-Click Demo Portals
                         </span>
 
                         <div className="space-y-1">
                           <span className="text-[8px] font-mono font-semibold text-slate-400 uppercase tracking-wider block">
-                            Core Demo Portals
+                            Roles Portals
                           </span>
                           <div className="grid grid-cols-2 gap-1.5">
+                            {/* Employer Demo Button */}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setIsProcessing(true);
+                                loginDemo("employer").then(() => {
+                                  handleRedirect("employer");
+                                  handleClose();
+                                }).catch(() => setIsProcessing(false));
+                              }}
+                              className="p-2 bg-indigo-50/80 hover:bg-indigo-100 rounded-xl text-left border border-indigo-200 cursor-pointer transition-colors col-span-2 flex items-center justify-between"
+                            >
+                              <div>
+                                <span className="block text-[10px] font-bold text-indigo-900 flex items-center gap-1.5">
+                                  <Building2 className="w-3.5 h-3.5 text-indigo-600" />
+                                  Demo Employer Portal (Apex Systems)
+                                </span>
+                                <span className="block text-[8px] text-indigo-600 font-mono">employer@apexsystems.com</span>
+                              </div>
+                              <span className="text-[9px] font-bold bg-indigo-600 text-white px-2 py-0.5 rounded-md">Log In</span>
+                            </button>
+
                             <button
                               type="button"
                               onClick={() => {
@@ -704,6 +804,21 @@ export const AuthModal: React.FC<AuthModalProps> = ({ forcedOpen = false, onClos
                             >
                               <span className="block text-[9px] font-bold text-[#1E88E5]">Admin Portal</span>
                               <span className="block text-[8px] text-slate-500 font-mono">admin@valleyreigns.com</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setIsProcessing(true);
+                                loginWithEmail("genesisjosephoghene+seeker@gmail.com").then((p) => {
+                                  handleRedirect(p.role);
+                                  handleClose();
+                                }).catch(() => setIsProcessing(false));
+                              }}
+                              className="p-2 bg-slate-50 hover:bg-slate-100 rounded-xl text-left border border-slate-200 cursor-pointer transition-colors"
+                            >
+                              <span className="block text-[9px] font-bold text-slate-700">Job Seeker Demo</span>
+                              <span className="block text-[8px] text-slate-500 font-mono">seeker-demo</span>
                             </button>
 
                             <button
@@ -735,58 +850,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({ forcedOpen = false, onClos
                               <span className="block text-[9px] font-bold text-slate-700">Recruiter 2 (Staff)</span>
                               <span className="block text-[8px] text-slate-500 font-mono">staff2@valleyreigns.com</span>
                             </button>
-
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setIsProcessing(true);
-                                loginWithEmail("genesisjosephoghene+seeker@gmail.com").then((p) => {
-                                  handleRedirect(p.role);
-                                  handleClose();
-                                }).catch(() => setIsProcessing(false));
-                              }}
-                              className="p-2 bg-slate-50 hover:bg-slate-100 rounded-xl text-left border border-slate-200 cursor-pointer transition-colors"
-                            >
-                              <span className="block text-[9px] font-bold text-slate-700">Job Seeker Demo</span>
-                              <span className="block text-[8px] text-slate-500 font-mono">seeker-demo</span>
-                            </button>
                           </div>
                         </div>
-
-                        {/* Seeded Staff Section */}
-                        {Object.values(memoryStore.users).filter(u => u.role === "staff" && u.email.includes("staff_seeded_")).length > 0 && (
-                          <div className="space-y-1 pt-1.5 border-t border-slate-100">
-                            <span className="text-[8px] font-mono font-semibold text-teal-600 uppercase tracking-wider block">
-                              Seeded Recruiter Staff (10 Users)
-                            </span>
-                            <div className="grid grid-cols-2 gap-1.5 max-h-[140px] overflow-y-auto pr-0.5">
-                              {Object.values(memoryStore.users)
-                                .filter(u => u.role === "staff" && u.email.includes("staff_seeded_"))
-                                .sort((a, b) => {
-                                  const numA = parseInt(a.email.match(/\d+/)?.[0] || "0");
-                                  const numB = parseInt(b.email.match(/\d+/)?.[0] || "0");
-                                  return numA - numB;
-                                })
-                                .map((u) => (
-                                  <button
-                                    key={u.uid}
-                                    type="button"
-                                    onClick={() => {
-                                      setIsProcessing(true);
-                                      loginWithEmail(u.email).then((p) => {
-                                        handleRedirect(p.role);
-                                        handleClose();
-                                      }).catch(() => setIsProcessing(false));
-                                    }}
-                                    className="p-1.5 bg-teal-50/40 hover:bg-teal-50 border border-teal-600/10 hover:border-teal-600/25 rounded-xl text-left cursor-pointer transition-colors"
-                                  >
-                                    <span className="block text-[9px] font-bold text-teal-800 truncate">{u.displayName}</span>
-                                    <span className="block text-[8px] text-slate-400 font-mono truncate">{u.email}</span>
-                                  </button>
-                                ))}
-                            </div>
-                          </div>
-                        )}
                       </motion.div>
                     )}
                   </motion.div>
@@ -802,13 +867,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({ forcedOpen = false, onClos
                   >
                     <button
                       onClick={() => {
-                        setSignupRole("seeker"); // reset role back to default seeker when returning
+                        setSignupRole(isEmployerMode ? "employer" : "seeker");
                         setActiveTab("signin");
                       }}
                       className="inline-flex items-center gap-1 text-xs font-bold text-slate-500 hover:text-slate-800 transition-colors cursor-pointer"
                     >
                       <ArrowLeft className="w-3.5 h-3.5" />
-                      Back to Sign In
+                      <span>Back to Sign In</span>
                     </button>
 
                     <div className="space-y-1">
@@ -820,10 +885,17 @@ export const AuthModal: React.FC<AuthModalProps> = ({ forcedOpen = false, onClos
                         className="text-lg font-display font-bold text-[#1e3a8a] select-none cursor-pointer hover:opacity-90"
                         title="Click and hold for 5s to create recruiter staff account"
                       >
-                        {signupRole === "staff" ? "Create Staff Account" : "Create an Account"}
+                        {isEmployerMode 
+                          ? "Employer Sign Up" 
+                          : signupRole === "staff" 
+                          ? "Create Staff Account" 
+                          : "Create an Account"
+                        }
                       </h3>
                       <p className="text-xs text-slate-500">
-                        {signupRole === "staff" 
+                        {isEmployerMode 
+                          ? "Create your company account to publish vacancies and hire vetted talent"
+                          : signupRole === "staff" 
                           ? "Join Valley Reigns as an authorized recruiter or staff member"
                           : "Join Valley Reigns to instantly chat with expert recruiters"
                         }
@@ -831,37 +903,82 @@ export const AuthModal: React.FC<AuthModalProps> = ({ forcedOpen = false, onClos
                     </div>
 
                     <form onSubmit={handleSignupSubmit} className="space-y-3 pt-1">
+                      {isEmployerMode && (
+                        <>
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-mono font-bold text-slate-400 uppercase block">
+                              Company / Organization Name *
+                            </label>
+                            <input
+                              type="text"
+                              placeholder="e.g. Apex Systems Global"
+                              value={companyName}
+                              onChange={(e) => setCompanyName(e.target.value)}
+                              required
+                              className="w-full px-4 py-2 border border-slate-200/80 rounded-xl text-sm font-sans font-medium focus:outline-none hover:border-indigo-500 focus:border-indigo-600 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 transition-all shadow-sm"
+                            />
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className="space-y-1">
+                              <label className="text-[10px] font-mono font-bold text-slate-400 uppercase block">
+                                Industry
+                              </label>
+                              <input
+                                type="text"
+                                placeholder="e.g. Technology / Logistics"
+                                value={companyIndustry}
+                                onChange={(e) => setCompanyIndustry(e.target.value)}
+                                className="w-full px-3 py-2 border border-slate-200/80 rounded-xl text-xs font-sans focus:outline-none hover:border-indigo-500 focus:border-indigo-600 focus:bg-white transition-all shadow-sm"
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-[10px] font-mono font-bold text-slate-400 uppercase block">
+                                Official Phone
+                              </label>
+                              <input
+                                type="tel"
+                                placeholder="e.g. +234 803 000 1122"
+                                value={companyPhone}
+                                onChange={(e) => setCompanyPhone(e.target.value)}
+                                className="w-full px-3 py-2 border border-slate-200/80 rounded-xl text-xs font-sans focus:outline-none hover:border-indigo-500 focus:border-indigo-600 focus:bg-white transition-all shadow-sm"
+                              />
+                            </div>
+                          </div>
+                        </>
+                      )}
+
                       <div className="space-y-1">
                         <label className="text-[10px] font-mono font-bold text-slate-400 uppercase block">
-                          Full Name
+                          {isEmployerMode ? "Hiring Lead / Contact Person *" : "Full Name *"}
                         </label>
                         <input
                           type="text"
-                          placeholder="e.g. Marcus Vance"
+                          placeholder={isEmployerMode ? "e.g. David Apex (HR Lead)" : "e.g. Marcus Vance"}
                           value={signupName}
                           onChange={(e) => setSignupName(e.target.value)}
                           required
-                          className="w-full px-4 py-2 border border-slate-200/80 rounded-xl text-sm font-sans font-medium focus:outline-none hover:border-[#1E88E5]/60 focus:border-[#1E88E5] focus:bg-white focus:ring-4 focus:ring-[#1E88E5]/10 transition-all focus:scale-[1.01]"
+                          className="w-full px-4 py-2 border border-slate-200/80 rounded-xl text-sm font-sans font-medium focus:outline-none hover:border-[#1E88E5]/60 focus:border-[#1E88E5] focus:bg-white focus:ring-4 focus:ring-[#1E88E5]/10 transition-all focus:scale-[1.01] shadow-sm"
                         />
                       </div>
 
                       <div className="space-y-1">
                         <label className="text-[10px] font-mono font-bold text-slate-400 uppercase block">
-                          Email Address
+                          {isEmployerMode ? "Official Corporate Email *" : "Email Address *"}
                         </label>
                         <input
                           type="email"
-                          placeholder="e.g. marcus@example.com"
+                          placeholder={isEmployerMode ? "e.g. hiring@apexsystems.com" : "e.g. marcus@example.com"}
                           value={signupEmail}
                           onChange={(e) => setSignupEmail(e.target.value)}
                           required
-                          className="w-full px-4 py-2 border border-slate-200/80 rounded-xl text-sm font-sans font-medium focus:outline-none hover:border-[#1E88E5]/60 focus:border-[#1E88E5] focus:bg-white focus:ring-4 focus:ring-[#1E88E5]/10 transition-all focus:scale-[1.01]"
+                          className="w-full px-4 py-2 border border-slate-200/80 rounded-xl text-sm font-sans font-medium focus:outline-none hover:border-[#1E88E5]/60 focus:border-[#1E88E5] focus:bg-white focus:ring-4 focus:ring-[#1E88E5]/10 transition-all focus:scale-[1.01] shadow-sm"
                         />
                       </div>
 
                       <div className="space-y-1">
                         <label className="text-[10px] font-mono font-bold text-slate-400 uppercase block">
-                          Password
+                          Password *
                         </label>
                         <div className="relative">
                           <span className="absolute inset-y-0 left-3 flex items-center text-slate-400">
@@ -887,7 +1004,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ forcedOpen = false, onClos
 
                       <div className="space-y-1">
                         <label className="text-[10px] font-mono font-bold text-slate-400 uppercase block">
-                          Confirm Password
+                          Confirm Password *
                         </label>
                         <div className="relative">
                           <span className="absolute inset-y-0 left-3 flex items-center text-slate-400">
@@ -919,10 +1036,21 @@ export const AuthModal: React.FC<AuthModalProps> = ({ forcedOpen = false, onClos
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
                         type="submit"
-                        className="w-full py-3 bg-[#1E88E5] hover:bg-[#1565C0] text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm cursor-pointer transition-colors mt-2"
+                        className={`w-full py-3 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm cursor-pointer transition-colors mt-2 ${
+                          isEmployerMode 
+                            ? "bg-indigo-600 hover:bg-indigo-700" 
+                            : "bg-[#1E88E5] hover:bg-[#1565C0]"
+                        }`}
                       >
                         <UserPlus className="w-3.5 h-3.5" />
-                        <span>{signupRole === "staff" ? "Create Staff Account" : "Register & Log In"}</span>
+                        <span>
+                          {isEmployerMode 
+                            ? "Register Corporate Account & Sign In" 
+                            : signupRole === "staff" 
+                            ? "Create Staff Account" 
+                            : "Register & Log In"
+                          }
+                        </span>
                       </motion.button>
                     </form>
                   </motion.div>
@@ -940,9 +1068,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ forcedOpen = false, onClos
                   className="absolute inset-0 bg-white/75 backdrop-blur-md z-50 flex flex-col items-center justify-center p-6 text-center rounded-[24px]"
                 >
                   <div className="relative flex items-center justify-center mb-4">
-                    {/* Outer pulsing ring */}
                     <div className="absolute w-16 h-16 rounded-full border-2 border-blue-500/20 animate-ping" />
-                    {/* Spinning active ring */}
                     <div className="w-12 h-12 rounded-full border-4 border-blue-100 border-t-[#1E88E5] animate-spin" />
                   </div>
                   
@@ -969,8 +1095,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({ forcedOpen = false, onClos
         </div>
       )}
     </AnimatePresence>
-
-
     </>
   );
 };

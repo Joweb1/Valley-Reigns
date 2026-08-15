@@ -7,12 +7,13 @@ import { initializeApp } from "firebase/app";
 import { getFirestore, doc, getDoc, updateDoc, setDoc, collection, getDocs, onSnapshot, deleteDoc } from "firebase/firestore";
 import { getDatabase, ref, set } from "firebase/database";
 import webpush from "web-push";
-import makeWASocket, { useMultiFileAuthState, DisconnectReason, Browsers } from "@whiskeysockets/baileys";
+import makeWASocket, { useMultiFileAuthState, DisconnectReason, Browsers, fetchLatestBaileysVersion } from "@whiskeysockets/baileys";
 import QRCode from "qrcode";
 
 const makeWASocketFn = (makeWASocket as any)?.default || makeWASocket;
 const useMultiFileAuthStateFn = (useMultiFileAuthState as any)?.default || useMultiFileAuthState;
 const BrowsersFn = (Browsers as any)?.default || Browsers;
+const fetchLatestBaileysVersionFn = (fetchLatestBaileysVersion as any)?.default || fetchLatestBaileysVersion;
 
 const app = express();
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
@@ -282,6 +283,101 @@ let baileysPairingCode: string | null = null;
 let baileysUserPhone: string | null = null;
 let baileysError: string | null = null;
 let isNewSessionPairing = false;
+let consecutiveLogoutErrors = 0;
+let autoHealInterval: NodeJS.Timeout | null = null;
+
+async function saveBaileysAuthToFirestore() {
+  try {
+    if (!fs.existsSync(BAILEYS_AUTH_DIR)) return;
+    const credsFile = path.join(BAILEYS_AUTH_DIR, "creds.json");
+    if (!fs.existsSync(credsFile)) return;
+
+    const files = fs.readdirSync(BAILEYS_AUTH_DIR);
+    const backup: Record<string, string> = {};
+
+    for (const file of files) {
+      if (file.endsWith(".json")) {
+        const filePath = path.join(BAILEYS_AUTH_DIR, file);
+        backup[file] = fs.readFileSync(filePath, "utf-8");
+      }
+    }
+
+    if (Object.keys(backup).length > 0) {
+      await setDoc(doc(db, "settings", "baileys_session_backup"), {
+        files: backup,
+        updatedAt: Date.now()
+      });
+      console.log(`[Baileys Auth Sync] Successfully backed up ${Object.keys(backup).length} auth files to Firestore.`);
+    }
+  } catch (err) {
+    console.warn("[Baileys Auth Sync Warning] Error backing up auth files to Firestore:", err);
+  }
+}
+
+async function restoreBaileysAuthFromFirestore(): Promise<boolean> {
+  try {
+    const credsFile = path.join(BAILEYS_AUTH_DIR, "creds.json");
+    if (fs.existsSync(credsFile)) {
+      return true;
+    }
+
+    const backupDoc = await getDoc(doc(db, "settings", "baileys_session_backup"));
+    if (backupDoc.exists()) {
+      const data = backupDoc.data();
+      const files: Record<string, string> = data?.files || {};
+      if (files["creds.json"]) {
+        if (!fs.existsSync(BAILEYS_AUTH_DIR)) {
+          fs.mkdirSync(BAILEYS_AUTH_DIR, { recursive: true });
+        }
+        for (const [fileName, fileContent] of Object.entries(files)) {
+          fs.writeFileSync(path.join(BAILEYS_AUTH_DIR, fileName), fileContent, "utf-8");
+        }
+        console.log(`[Baileys Auth Restore] Successfully restored ${Object.keys(files).length} session auth files from Firestore!`);
+        return true;
+      }
+    }
+  } catch (err) {
+    console.warn("[Baileys Auth Restore Warning] Failed to restore auth files from Firestore:", err);
+  }
+  return false;
+}
+
+async function clearBaileysAuthFromFirestore() {
+  try {
+    await deleteDoc(doc(db, "settings", "baileys_session_backup"));
+    console.log("[Baileys Auth Clear] Cleared session backup from Firestore.");
+  } catch (e) {
+    console.warn("[Baileys Auth Clear Warning]:", e);
+  }
+}
+
+function startBaileysAutoHealLoop() {
+  if (autoHealInterval) clearInterval(autoHealInterval);
+  autoHealInterval = setInterval(async () => {
+    try {
+      if (baileysStatus === "connected") return;
+      if (baileysStatus === "qr_ready" && baileysQrCode) return;
+
+      const restored = await restoreBaileysAuthFromFirestore();
+      const credsExist = fs.existsSync(path.join(BAILEYS_AUTH_DIR, "creds.json"));
+
+      if (restored || credsExist) {
+        let isRegistered = false;
+        try {
+          const rawCreds = JSON.parse(fs.readFileSync(path.join(BAILEYS_AUTH_DIR, "creds.json"), "utf-8"));
+          isRegistered = Boolean(rawCreds.registered || rawCreds.me);
+        } catch (e) {}
+
+        if (isRegistered && !baileysSocket && baileysStatus !== "connecting") {
+          console.log("[Baileys Auto-Heal] Registered session found offline. Re-establishing WhatsApp connection...");
+          await initBaileysSocket(true);
+        }
+      }
+    } catch (err) {
+      console.warn("[Baileys Auto-Heal Notice]:", err);
+    }
+  }, 20000);
+}
 
 interface ReceivedWhatsAppMessageLog {
   id: string;
@@ -297,22 +393,11 @@ const recentReceivedWhatsAppMessages: ReceivedWhatsAppMessageLog[] = [];
 
 async function clearPreviousWhatsAppConversations() {
   try {
-    console.log("[Baileys] Clearing previous WhatsApp conversations from database...");
-    const convsColl = collection(db, "conversations");
-    const snap = await getDocs(convsColl);
-    let count = 0;
-    for (const docSnap of snap.docs) {
-      const data = docSnap.data();
-      const isInApp = Boolean(data?.isInApp) || docSnap.id.startsWith("inapp_");
-      if (!isInApp) {
-        await deleteDoc(docSnap.ref);
-        count++;
-      }
-    }
-    console.log(`[Baileys] Successfully cleared ${count} WhatsApp conversations from Firestore.`);
+    console.log("[Baileys] Preserving in-app and existing customer chats on WhatsApp number connection.");
+    // Never delete in-app chats or customer conversations when a new WhatsApp number is connected
     recentReceivedWhatsAppMessages.length = 0;
   } catch (err) {
-    console.error("[Baileys] Error clearing previous WhatsApp conversations:", err);
+    console.error("[Baileys] Error preserving conversations on WhatsApp connection:", err);
   }
 }
 
@@ -675,27 +760,43 @@ async function initBaileysSocket(forceReconnect = false) {
     baileysSocket = null;
     try {
       if (oldSock.ev && typeof oldSock.ev.removeAllListeners === "function") {
-        oldSock.ev.removeAllListeners("connection.update");
-        oldSock.ev.removeAllListeners("creds.update");
-        oldSock.ev.removeAllListeners("messages.upsert");
+        oldSock.ev.removeAllListeners();
       }
       oldSock.end(undefined);
     } catch (e) {}
+    // Brief pause to allow underlying socket to clean up
+    await new Promise((r) => setTimeout(r, 500));
   }
 
   try {
+    await restoreBaileysAuthFromFirestore();
+
     if (!fs.existsSync(BAILEYS_AUTH_DIR)) {
       fs.mkdirSync(BAILEYS_AUTH_DIR, { recursive: true });
     }
 
     const { state, saveCreds } = await useMultiFileAuthStateFn(BAILEYS_AUTH_DIR);
 
-    // Note: WhatsApp Pairing Code requires standard WhatsApp Web browser signature (e.g. Ubuntu / Chrome)
+    // Fetch latest WhatsApp Web version to prevent session handshake rejection
+    let version: [number, number, number] = [2, 3000, 1035194821];
+    try {
+      if (fetchLatestBaileysVersionFn) {
+        const vRes = await fetchLatestBaileysVersionFn();
+        if (vRes?.version) {
+          version = vRes.version;
+          console.log(`[Baileys] Using WhatsApp Web protocol version: ${version.join(".")}`);
+        }
+      }
+    } catch (vErr) {
+      console.warn("[Baileys] Version check warning (using fallback):", vErr);
+    }
+
     const browserTuple = BrowsersFn && typeof BrowsersFn.ubuntu === "function" 
       ? BrowsersFn.ubuntu("Chrome") 
       : ["Ubuntu", "Chrome", "20.0.04"];
 
     const sock = makeWASocketFn({
+      version,
       auth: state,
       logger: silentLogger as any,
       printQRInTerminal: false,
@@ -705,7 +806,8 @@ async function initBaileysSocket(forceReconnect = false) {
       connectTimeoutMs: 60000,
       defaultQueryTimeoutMs: 60000,
       keepAliveIntervalMs: 25000,
-      retryRequestDelayMs: 250,
+      retryRequestDelayMs: 500,
+      maxMsgRetryCount: 5,
       getMessage: async (key: any) => {
         return { conversation: "" };
       }
@@ -713,7 +815,12 @@ async function initBaileysSocket(forceReconnect = false) {
 
     baileysSocket = sock;
 
-    sock.ev.on("creds.update", saveCreds);
+    sock.ev.on("creds.update", async () => {
+      try {
+        await saveCreds();
+        saveBaileysAuthToFirestore().catch(console.error);
+      } catch (e) {}
+    });
 
     sock.ev.on("connection.update", async (update: any) => {
       const { connection, lastDisconnect, qr } = update;
@@ -733,9 +840,13 @@ async function initBaileysSocket(forceReconnect = false) {
         baileysQrCode = null;
         baileysPairingCode = null;
         baileysError = null;
+        consecutiveLogoutErrors = 0;
         const userJid = sock.user?.id || "";
         baileysUserPhone = userJid.split("@")[0].split(":")[0] || "Connected";
         console.log(`[Baileys] Successfully connected to WhatsApp Web as +${baileysUserPhone}!`);
+
+        // Backup authenticated session to Firestore
+        saveBaileysAuthToFirestore().catch(console.error);
 
         if (isNewSessionPairing) {
           console.log("[Baileys] New WhatsApp connection established. Wiping previous conversations...");
@@ -760,9 +871,7 @@ async function initBaileysSocket(forceReconnect = false) {
           if (baileysSocket === sock && baileysStatus === "connected") {
             try {
               await sock.sendPresenceUpdate("available");
-            } catch (e) {
-              // Ignore transient socket presence errors
-            }
+            } catch (e) {}
           } else {
             if (baileysPresenceInterval) {
               clearInterval(baileysPresenceInterval);
@@ -788,42 +897,46 @@ async function initBaileysSocket(forceReconnect = false) {
           baileysPresenceInterval = null;
         }
 
-        const statusCode = lastDisconnect?.error?.output?.statusCode;
+        const statusCode = lastDisconnect?.error?.output?.statusCode || lastDisconnect?.error?.statusCode;
         const errMessage = lastDisconnect?.error?.message || String(lastDisconnect?.error || "");
         const credsExist = fs.existsSync(path.join(BAILEYS_AUTH_DIR, "creds.json"));
-        const isLoggedOut = statusCode === DisconnectReason?.loggedOut;
-        const isRestartRequired = statusCode === DisconnectReason?.restartRequired;
-        const isQrExpired = !credsExist && (errMessage.includes("QR refs attempts ended") || errMessage.includes("timed out"));
+
+        let isRegistered = false;
+        if (credsExist) {
+          try {
+            const rawCreds = JSON.parse(fs.readFileSync(path.join(BAILEYS_AUTH_DIR, "creds.json"), "utf-8"));
+            isRegistered = Boolean(rawCreds.registered || rawCreds.me);
+          } catch (e) {}
+        }
+
+        const isExplicitLoggedOut = statusCode === DisconnectReason?.loggedOut;
 
         // Only clear baileysSocket if THIS closed socket is still the active one
         if (baileysSocket === sock) {
           baileysSocket = null;
         }
 
-        if (isLoggedOut) {
+        if (isExplicitLoggedOut && !isRegistered) {
           baileysStatus = "disconnected";
           baileysQrCode = null;
           baileysUserPhone = null;
-          baileysError = "Session logged out.";
-          console.log("[Baileys] Session logged out. Clearing previous conversations...");
+          baileysError = "Session disconnected.";
+          console.log("[Baileys] Unregistered session closed. Clearing auth files.");
           try {
             fs.rmSync(BAILEYS_AUTH_DIR, { recursive: true, force: true });
-          } catch (e) {
-            console.warn("[Baileys] Error removing auth directory on logout:", e);
-          }
-          await clearPreviousWhatsAppConversations();
-        } else if (isQrExpired) {
-          baileysStatus = "disconnected";
-          baileysQrCode = null;
-          baileysUserPhone = null;
-          baileysError = "QR Code expired. Click 'Generate QR Code' in WhatsApp Settings to try again.";
-          console.log("[Baileys] QR code expired without pairing. Waiting for user action.");
+          } catch (e) {}
+          await clearBaileysAuthFromFirestore();
         } else {
+          // If session was registered OR is reconnecting, DO NOT wipe session auth files!
           baileysStatus = "connecting";
           baileysQrCode = null;
-          const delay = isRestartRequired ? 500 : 1500;
-          console.log(`[Baileys] Handshake socket closed (code ${statusCode}). Reconnecting authenticated session in ${delay}ms...`);
-          
+
+          consecutiveLogoutErrors++;
+          console.log(`[Baileys Connection Disconnect] Socket closed (statusCode ${statusCode}, msg: ${errMessage}). Registered: ${isRegistered}. Retrying connection attempt #${consecutiveLogoutErrors}...`);
+
+          // Exponential backoff reconnect delay
+          const delay = Math.min(1500 * Math.pow(1.4, Math.min(consecutiveLogoutErrors, 6)), 25000);
+
           if (baileysReconnectTimer) {
             clearTimeout(baileysReconnectTimer);
             baileysReconnectTimer = null;
@@ -926,6 +1039,8 @@ async function disconnectBaileys() {
   } catch (e) {
     console.warn("[Baileys] Error wiping auth folder on disconnect:", e);
   }
+
+  await clearBaileysAuthFromFirestore();
 
   try {
     await setDoc(doc(db, "settings", "whatsapp"), {
@@ -1102,6 +1217,7 @@ app.get("/api/whatsapp/provider-status", async (req, res) => {
       officialConfigured,
       officialConfig: {
         phoneAccountId: config.phoneAccountId || "",
+        officialPhoneNumber: config.officialPhoneNumber || "",
         businessAccountId: config.businessAccountId || "",
         verifyToken: config.verifyToken || "valleyreigns_verify_token"
       },
@@ -1782,14 +1898,21 @@ async function startServer() {
   startConversationsListener();
   startSystemNotificationsListener();
   
-  // Auto-restore active WhatsApp Baileys session if credentials exist
-  const credsFile = path.join(BAILEYS_AUTH_DIR, "creds.json");
-  if (fs.existsSync(credsFile)) {
-    console.log("[Baileys Boot] Found existing WhatsApp session credentials. Auto-connecting...");
-    initBaileysSocket(false).catch((err) => {
-      console.warn("[Baileys Boot] Auto-connect failed:", err);
-    });
+  // Auto-restore active WhatsApp Baileys session if credentials exist on disk or Firestore
+  try {
+    const hasRestored = await restoreBaileysAuthFromFirestore();
+    const credsFile = path.join(BAILEYS_AUTH_DIR, "creds.json");
+    if (hasRestored || fs.existsSync(credsFile)) {
+      console.log("[Baileys Boot] Found active WhatsApp session credentials. Auto-connecting...");
+      initBaileysSocket(false).catch((err) => {
+        console.warn("[Baileys Boot] Auto-connect failed:", err);
+      });
+    }
+  } catch (err) {
+    console.warn("[Baileys Boot] Warning checking initial auth state:", err);
   }
+
+  startBaileysAutoHealLoop();
 
   await setupVite();
 }
