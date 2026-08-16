@@ -56,6 +56,8 @@ export interface UserProfile {
   password?: string;
   authProvider?: "email" | "google";
   messagingPreference?: "whatsapp" | "in-app";
+  phoneNumber?: string;
+  jobTitle?: string;
   photoURL?: string;
 }
 

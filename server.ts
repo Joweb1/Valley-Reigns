@@ -455,6 +455,27 @@ async function useFirestoreAuthState(sessionId: string = "default_session") {
   };
 }
 
+async function seedWhatsAppSessionInitialData(): Promise<void> {
+  try {
+    const sessionInfoRef = doc(db, "whatsapp_sessions", "default_session_info");
+    const snap = await getDoc(sessionInfoRef);
+    if (!snap.exists()) {
+      await setDoc(sessionInfoRef, {
+        sessionId: "default_session",
+        key: "info",
+        description: "Valley Reigns WhatsApp Web Baileys Auth Session Storage",
+        storageType: "Multi-Device Firestore JSON Buffer",
+        status: "initialized",
+        createdAt: Date.now(),
+        updatedAt: Date.now()
+      });
+      console.log("[Firestore Auth] Seeded initial 'whatsapp_sessions' document (default_session_info) into Firestore.");
+    }
+  } catch (err) {
+    console.warn("[Firestore Auth] Initial session seed notice:", err);
+  }
+}
+
 async function hasStoredAuthCreds(sessionId: string = "default_session"): Promise<boolean> {
   try {
     const credsSnap = await getDoc(doc(db, "whatsapp_sessions", `${sessionId}_creds`));
@@ -2003,6 +2024,7 @@ app.post("/api/push/test", async (req, res) => {
 // Boot the integrated push systems & standard server
 async function startServer() {
   await initVapidKeys();
+  await seedWhatsAppSessionInitialData();
   startConversationsListener();
   startSystemNotificationsListener();
   

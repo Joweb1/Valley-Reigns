@@ -25,6 +25,7 @@ import { PwaInstallPrompt } from "./components/PwaInstallPrompt";
 import { WhatsAppConfigPage } from "./components/WhatsAppConfigPage";
 import { ContactsPage } from "./components/ContactsPage";
 import { EmployerManagementPage } from "./components/EmployerManagementPage";
+import { StaffPromotionPage } from "./components/StaffPromotionPage";
 import { NetworkStatusMonitor } from "./components/NetworkStatusMonitor";
 import { StaffReportForm } from "./components/StaffReportForm";
 import { AnniversaryGraffitiIntro } from "./components/AnniversaryGraffitiIntro";
@@ -1118,6 +1119,8 @@ function AppContent() {
     "/admin/contacts",
     "/admin/diagnostics",
     "/admin/employers",
+    "/admin/staff-promotion",
+    "/admin/users",
   ];
   const shouldHideHeader = (hideFloating && !isDesktop) || noHeaderPaths.includes(location.pathname);
 
@@ -1249,6 +1252,22 @@ function AppContent() {
               element={
                 <ProtectedRoute allowedRoles={["admin"]}>
                   <EmployerManagementPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/staff-promotion"
+              element={
+                <ProtectedRoute allowedRoles={["admin"]}>
+                  <StaffPromotionPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/users"
+              element={
+                <ProtectedRoute allowedRoles={["admin"]}>
+                  <StaffPromotionPage />
                 </ProtectedRoute>
               }
             />
@@ -1768,6 +1787,20 @@ function AppContent() {
                   >
                     <span className="text-sm font-bold text-slate-700 group-hover:text-blue-600 transition-colors">Employer Management</span>
                     <Building2 className="w-4 h-4 text-blue-500 group-hover:scale-110 transition-transform" />
+                  </button>
+
+                  <div className="border-t border-slate-100 my-1" />
+
+                  {/* User Management Row */}
+                  <button
+                    onClick={() => {
+                      setIsAdminSettingsOpen(false);
+                      navigate("/admin/staff-promotion");
+                    }}
+                    className="w-full flex items-center justify-between py-3.5 px-2.5 hover:bg-blue-50/55 rounded-xl transition-all duration-200 group border-0 bg-transparent cursor-pointer"
+                  >
+                    <span className="text-sm font-bold text-slate-700 group-hover:text-blue-600 transition-colors">User Management</span>
+                    <UserCheck className="w-4 h-4 text-blue-500 group-hover:scale-110 transition-transform" />
                   </button>
 
                   <div className="border-t border-slate-100 my-1" />

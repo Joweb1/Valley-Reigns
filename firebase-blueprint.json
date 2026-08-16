@@ -27,10 +27,46 @@
         "uid": { "type": "string", "description": "Unique Firebase Authentication UID." },
         "email": { "type": "string", "description": "User email address." },
         "displayName": { "type": "string", "description": "Public display name of the user." },
-        "role": { "type": "string", "enum": ["seeker", "staff", "admin"], "description": "User clearance role defining routing and access permissions." },
+        "role": { "type": "string", "enum": ["seeker", "staff", "admin", "employer"], "description": "User clearance role defining routing and access permissions." },
         "canPostJobs": { "type": "boolean", "description": "Flag indicating if the user is authorized to post new listings." }
       },
       "required": ["uid", "email", "displayName", "role", "canPostJobs"]
+    },
+    "Conversation": {
+      "title": "Conversation",
+      "description": "In-app and WhatsApp messaging conversation backing store.",
+      "type": "object",
+      "properties": {
+        "chatId": { "type": "string", "description": "Unique conversation ID." },
+        "customerPhone": { "type": "string", "description": "Customer telephone number or identifier." },
+        "status": { "type": "string", "enum": ["pending", "ongoing", "finished", "abandoned"], "description": "Current lifecycle status." },
+        "assignedTo": { "type": "string", "description": "Assigned staff member UID." },
+        "assignedToName": { "type": "string", "description": "Assigned staff member display name." },
+        "sharedWith": { "type": "array", "description": "List of candidate staff UIDs routed to claim this conversation." },
+        "text": { "type": "string", "description": "Latest conversation text summary." },
+        "jobId": { "type": "string", "description": "Linked job vacancy ID." },
+        "jobTitle": { "type": "string", "description": "Linked job vacancy title." },
+        "createdAt": { "type": "number", "description": "Creation epoch timestamp." },
+        "lastMessageAt": { "type": "number", "description": "Timestamp of most recent message." },
+        "messages": { "type": "array", "description": "Ordered array of chat message entries." },
+        "typing": { "type": "object", "description": "Real-time typing status map." },
+        "isReported": { "type": "boolean", "description": "Whether conversation has been flagged." },
+        "isInApp": { "type": "boolean", "description": "True if initiated via in-app portal." },
+        "seekerUid": { "type": "string", "description": "Authenticated seeker UID if available." }
+      },
+      "required": ["chatId", "status", "createdAt", "lastMessageAt"]
+    },
+    "StaffStatus": {
+      "title": "StaffStatus",
+      "description": "Real-time presence and availability status for recruiter staff.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Staff user UID." },
+        "status": { "type": "string", "enum": ["online", "offline"], "description": "Online presence state." },
+        "lastActive": { "type": "number", "description": "Epoch timestamp of last activity heartbeat." },
+        "email": { "type": "string", "description": "Staff email address." }
+      },
+      "required": ["uid", "status", "lastActive"]
     },
     "WhatsAppConfig": {
       "title": "WhatsAppConfig",
@@ -87,6 +123,66 @@
         "targetOnTimeMet": { "type": "boolean", "description": "If submitted before 9:00 PM local." }
       },
       "required": ["id", "uid", "staffName", "date", "timestamp", "newReachOuts", "resumptions", "cvsCollected", "candidatesRegistered", "addressesGiven", "challenges", "plansTomorrow", "chatsClearedConfirmed", "targetReachOutsMet", "targetAddressesMet", "targetOnTimeMet"]
+    },
+    "CustomerContact": {
+      "title": "CustomerContact",
+      "description": "Customer contact record extracted from conversations.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique contact ID." },
+        "customerPhone": { "type": "string", "description": "Customer phone number." },
+        "name": { "type": "string", "description": "Contact display name." },
+        "lastJobTitle": { "type": "string", "description": "Last inquired job title." },
+        "firstSeenAt": { "type": "number", "description": "First interaction epoch timestamp." },
+        "lastSeenAt": { "type": "number", "description": "Last interaction epoch timestamp." },
+        "chatCount": { "type": "number", "description": "Total count of chats." }
+      },
+      "required": ["id", "customerPhone", "firstSeenAt", "lastSeenAt", "chatCount"]
+    },
+    "DailyStat": {
+      "title": "DailyStat",
+      "description": "Daily aggregated platform analytics.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Date formatted ID." },
+        "date": { "type": "string", "description": "YYYY-MM-DD date." },
+        "impressions": { "type": "number", "description": "Total impressions." },
+        "sent": { "type": "number", "description": "Total inquiries initiated." },
+        "claimed": { "type": "number", "description": "Total chats claimed." },
+        "finished": { "type": "number", "description": "Total chats resolved." },
+        "abandoned": { "type": "number", "description": "Total chats abandoned." },
+        "timestamp": { "type": "number", "description": "Timestamp." }
+      },
+      "required": ["id", "date", "impressions", "sent", "claimed", "finished", "abandoned", "timestamp"]
+    },
+    "SystemNotification": {
+      "title": "SystemNotification",
+      "description": "In-app and staff notification record.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique notification ID." },
+        "type": { "type": "string", "description": "Notification category identifier." },
+        "title": { "type": "string", "description": "Notification header." },
+        "message": { "type": "string", "description": "Notification content body." },
+        "timestamp": { "type": "number", "description": "Epoch creation timestamp." },
+        "isRead": { "type": "boolean", "description": "Read acknowledgement flag." },
+        "seekerUid": { "type": "string", "description": "Target seeker UID if targeted." },
+        "staffUid": { "type": "string", "description": "Target staff UID if targeted." }
+      },
+      "required": ["id", "type", "title", "message", "timestamp", "isRead"]
+    },
+    "ConnectionDiagnostic": {
+      "title": "ConnectionDiagnostic",
+      "description": "Diagnostic and connectivity heartbeat records.",
+      "type": "object",
+      "properties": {
+        "status": { "type": "string", "description": "Diagnostic status." },
+        "configured": { "type": "boolean", "description": "Configuration verification state." },
+        "last_checked": { "type": "string", "description": "ISO timestamp string." },
+        "uid": { "type": "string", "description": "UID of executor." },
+        "email": { "type": "string", "description": "Email of executor." }
+      },
+      "required": ["status", "configured"]
     }
   },
   "firestore": {
@@ -97,6 +193,14 @@
     "/users/{userId}": {
       "schema": "UserProfile",
       "description": "Collection tracking user profiles, identities, and permissions."
+    },
+    "/conversations/{chatId}": {
+      "schema": "Conversation",
+      "description": "Global durable storage for all messaging conversations, messages, and typing states."
+    },
+    "/staff_statuses/{uid}": {
+      "schema": "StaffStatus",
+      "description": "Real-time presence and online/offline status for recruiters."
     },
     "/settings/{settingId}": {
       "schema": "WhatsAppConfig",
@@ -109,6 +213,26 @@
     "/daily_reports/{reportId}": {
       "schema": "StaffDailyReport",
       "description": "Recruiter and staff daily activity reports tracked by administrators."
+    },
+    "/contacts/{contactId}": {
+      "schema": "CustomerContact",
+      "description": "Customer contacts extracted from inquiries."
+    },
+    "/daily_stats/{statId}": {
+      "schema": "DailyStat",
+      "description": "Daily metrics and performance statistics."
+    },
+    "/system_notifications/{notificationId}": {
+      "schema": "SystemNotification",
+      "description": "In-app and push notification log."
+    },
+    "/connection_diagnostics/{docId}": {
+      "schema": "ConnectionDiagnostic",
+      "description": "Diagnostic connectivity records."
+    },
+    "/connection_tests/{testId}": {
+      "schema": "ConnectionDiagnostic",
+      "description": "Temporary ping verification test records."
     }
   }
 }

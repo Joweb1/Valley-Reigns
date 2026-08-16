@@ -31,6 +31,10 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
+    match /connection_diagnostics/{docId} {
+      allow read, write: if true;
+    }
+
     match /connection_tests/{testId} {
       allow read, write: if true;
     }
@@ -68,6 +72,14 @@ service cloud.firestore {
     }
 
     match /whatsapp_sessions/{sessionId} {
+      allow read, write: if true;
+    }
+
+    match /recruitment_requests/{requestId} {
+      allow read, write: if true;
+    }
+
+    match /employer_applicants/{applicantId} {
       allow read, write: if true;
     }
   }

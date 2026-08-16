@@ -58,7 +58,8 @@ import {
   X,
   UserX,
   Unlock,
-  Lock
+  Lock,
+  UserCheck
 } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "motion/react";
@@ -1151,6 +1152,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ jobsList }) => {
                 </div>
 
                 <div className="flex items-center gap-2 shrink-0">
+                  <Link
+                    to="/admin/staff-promotion"
+                    className="px-3.5 py-1.5 bg-[#0B1B3D] hover:bg-[#152e66] text-white text-xs font-extrabold rounded-xl transition-all flex items-center gap-1.5 shadow-xs cursor-pointer no-underline"
+                    title="Open User Management & Role Matrix"
+                  >
+                    <UserCheck className="w-3.5 h-3.5 text-blue-400" />
+                    <span className="hidden sm:inline">User Management</span>
+                  </Link>
+
                   {/* View mode toggle */}
                   <div className="flex items-center bg-[#1E88E5] border border-blue-600/40 rounded-xl p-0.5">
                     <button

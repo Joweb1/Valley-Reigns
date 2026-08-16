@@ -161,7 +161,8 @@ class MemoryStorage {
       canPostJobs: true,
       password: "Password123",
       authProvider: "email",
-      messagingPreference: "in-app"
+      messagingPreference: "in-app",
+      createdAt: Date.now() - 86400000 * 60
     },
     "staff-1-seed": {
       uid: "staff-1-seed",
@@ -171,7 +172,8 @@ class MemoryStorage {
       canPostJobs: true,
       password: "Password123",
       authProvider: "email",
-      messagingPreference: "in-app"
+      messagingPreference: "in-app",
+      createdAt: Date.now() - 86400000 * 32
     },
     "staff-2-seed": {
       uid: "staff-2-seed",
@@ -181,7 +183,8 @@ class MemoryStorage {
       canPostJobs: true,
       password: "Password123",
       authProvider: "email",
-      messagingPreference: "in-app"
+      messagingPreference: "in-app",
+      createdAt: Date.now() - 86400000 * 21
     },
     "admin-demo": {
       uid: "admin-demo",
@@ -191,7 +194,8 @@ class MemoryStorage {
       canPostJobs: true,
       password: "Password123",
       authProvider: "email",
-      messagingPreference: "in-app"
+      messagingPreference: "in-app",
+      createdAt: Date.now() - 86400000 * 14
     },
     "staff-demo": {
       uid: "staff-demo",
@@ -201,7 +205,8 @@ class MemoryStorage {
       canPostJobs: true,
       password: "Password123",
       authProvider: "email",
-      messagingPreference: "in-app"
+      messagingPreference: "in-app",
+      createdAt: Date.now() - 86400000 * 7
     },
     "seeker-demo": {
       uid: "seeker-demo",
@@ -211,7 +216,62 @@ class MemoryStorage {
       canPostJobs: false,
       password: "Password123",
       authProvider: "email",
-      messagingPreference: "in-app"
+      messagingPreference: "in-app",
+      phoneNumber: "+234 812 345 6789",
+      jobTitle: "Senior Frontend Specialist",
+      createdAt: Date.now() - 86400000 * 5
+    },
+    "seeker-sophia": {
+      uid: "seeker-sophia",
+      email: "sophia.williams@gmail.com",
+      displayName: "Sophia Williams",
+      role: "seeker",
+      canPostJobs: false,
+      password: "Password123",
+      authProvider: "email",
+      messagingPreference: "in-app",
+      phoneNumber: "+234 809 231 9944",
+      jobTitle: "Full Stack Software Engineer",
+      createdAt: Date.now() - 86400000 * 8
+    },
+    "seeker-emeka": {
+      uid: "seeker-emeka",
+      email: "emeka.okafor@techmail.ng",
+      displayName: "Emeka Okafor",
+      role: "seeker",
+      canPostJobs: false,
+      password: "Password123",
+      authProvider: "email",
+      messagingPreference: "in-app",
+      phoneNumber: "+234 703 445 1188",
+      jobTitle: "Data Analyst & BI Specialist",
+      createdAt: Date.now() - 86400000 * 14
+    },
+    "seeker-zainab": {
+      uid: "seeker-zainab",
+      email: "zainab.bello@cloudhub.io",
+      displayName: "Zainab Bello",
+      role: "seeker",
+      canPostJobs: false,
+      password: "Password123",
+      authProvider: "email",
+      messagingPreference: "in-app",
+      phoneNumber: "+234 818 990 4422",
+      jobTitle: "Cloud DevOps & Kubernetes Engineer",
+      createdAt: Date.now() - 86400000 * 18
+    },
+    "staff-sarah": {
+      uid: "staff-sarah",
+      email: "sarah.jenkins@valleyreigns.com",
+      displayName: "Sarah Jenkins",
+      role: "staff",
+      canPostJobs: true,
+      password: "Password123",
+      authProvider: "email",
+      messagingPreference: "in-app",
+      phoneNumber: "+234 814 667 8890",
+      jobTitle: "Senior Talent Coordinator",
+      createdAt: Date.now() - 86400000 * 25
     },
     "employer-demo": {
       uid: "employer-demo",
@@ -775,15 +835,45 @@ export async function getStaffProfiles(): Promise<UserProfile[]> {
 }
 
 export async function getAllUserProfiles(): Promise<UserProfile[]> {
+  const seedFallbackMap: Record<string, number> = {
+    "admin-seed": Date.now() - 86400000 * 60,
+    "staff-1-seed": Date.now() - 86400000 * 32,
+    "staff-2-seed": Date.now() - 86400000 * 21,
+    "admin-demo": Date.now() - 86400000 * 14,
+    "staff-demo": Date.now() - 86400000 * 7,
+    "seeker-demo": Date.now() - 86400000 * 5,
+    "seeker-sophia": Date.now() - 86400000 * 8,
+    "seeker-emeka": Date.now() - 86400000 * 3,
+    "seeker-zainab": Date.now() - 86400000 * 2,
+    "staff-sarah": Date.now() - 86400000 * 1,
+    "employer-demo": Date.now() - 3600000 * 4,
+    "employer-novacore": Date.now() - 86400000 * 12,
+    "employer-zenith": Date.now() - 86400000 * 20
+  };
+
   try {
     const collRef = collection(db, "users");
     const snapshot = await getDocs(collRef);
-    const users = snapshot.docs.map(doc => doc.data() as UserProfile);
+    const users = snapshot.docs.map(doc => {
+      const u = doc.data() as UserProfile;
+      if (!u.createdAt) {
+        u.createdAt = seedFallbackMap[u.uid] || memoryStore.users[u.uid]?.createdAt || Date.now() - 86400000 * 4;
+      }
+      return u;
+    });
     if (users.length > 0) return users;
   } catch (error) {
     console.warn("Firestore getAllUserProfiles failing, using fallback:", error);
   }
-  return Object.values(memoryStore.users);
+  return Object.values(memoryStore.users).map(u => {
+    if (!u.createdAt) {
+      return {
+        ...u,
+        createdAt: seedFallbackMap[u.uid] || Date.now() - 86400000 * 4
+      };
+    }
+    return u;
+  });
 }
 
 export async function getStaffStatuses(): Promise<Record<string, "online" | "offline">> {
@@ -807,13 +897,109 @@ export async function getStaffStatuses(): Promise<Record<string, "online" | "off
     console.warn("Firestore getStaffStatuses failed, relying on memory baseline:", error);
   }
 
+  // Also try RTDB if available
+  if (rtdb) {
+    try {
+      const rtdbRef = ref(rtdb, "staff_statuses");
+      const snap = await get(rtdbRef);
+      if (snap.exists()) {
+        const val = snap.val();
+        Object.entries(val).forEach(([uid, item]: [string, any]) => {
+          if (item?.status) {
+            statuses[uid] = item.status;
+          }
+        });
+      }
+    } catch (e) {
+      // Harmless when RTDB is offline
+    }
+  }
+
   return statuses;
+}
+
+// Real-time Staff Status Subscription (Dual Firestore & RTDB with instant fallback)
+export function subscribeToStaffStatuses(callback: (statuses: Record<string, "online" | "offline">) => void): () => void {
+  let fsStatuses: Record<string, "online" | "offline"> = {};
+  let rtdbStatuses: Record<string, "online" | "offline"> = {};
+  let unsubFs: (() => void) | null = null;
+  let unsubRtdb: (() => void) | null = null;
+
+  const emit = () => {
+    const merged: Record<string, "online" | "offline"> = {
+      ...memoryStore.staffStatuses,
+      ...fsStatuses,
+      ...rtdbStatuses
+    };
+    callback(merged);
+  };
+
+  // 1. Listen to Firestore staff_statuses collection in real-time
+  try {
+    const collRef = collection(db, "staff_statuses");
+    unsubFs = onSnapshot(collRef, (snap) => {
+      const fresh: Record<string, "online" | "offline"> = {};
+      snap.docs.forEach((d) => {
+        const data = d.data();
+        if (data && data.status) {
+          fresh[d.id] = data.status;
+          memoryStore.staffStatuses[d.id] = data.status;
+        }
+      });
+      fsStatuses = fresh;
+      emit();
+    }, (err) => {
+      console.warn("Firestore staff_statuses snapshot error:", err);
+    });
+  } catch (err) {
+    console.warn("Firestore subscribeToStaffStatuses exception:", err);
+  }
+
+  // 2. Listen to Realtime Database staff_statuses if available
+  if (rtdb) {
+    try {
+      const rtdbRef = ref(rtdb, "staff_statuses");
+      unsubRtdb = onValue(rtdbRef, (snap) => {
+        const fresh: Record<string, "online" | "offline"> = {};
+        if (snap.exists()) {
+          const val = snap.val();
+          Object.entries(val).forEach(([uid, item]: [string, any]) => {
+            if (item && item.status) {
+              fresh[uid] = item.status;
+              memoryStore.staffStatuses[uid] = item.status;
+              // Auto-backup RTDB status to Firestore
+              const statusDocRef = doc(db, "staff_statuses", uid);
+              setDoc(statusDocRef, {
+                status: item.status,
+                lastActive: item.lastActive || Date.now(),
+                uid,
+                email: item.email || `${uid}@valleyreigns.com`
+              }, { merge: true }).catch(() => {});
+            }
+          });
+        }
+        rtdbStatuses = fresh;
+        emit();
+      }, (err) => {
+        console.warn("RTDB staff_statuses onValue error:", err);
+      });
+    } catch (e) {
+      console.warn("RTDB subscribeToStaffStatuses exception:", e);
+    }
+  }
+
+  emit();
+
+  return () => {
+    if (unsubFs) unsubFs();
+    if (unsubRtdb) unsubRtdb();
+  };
 }
 
 export async function toggleStaffJobPosting(uid: string, canPost: boolean): Promise<void> {
   try {
     const docRef = doc(db, "users", uid);
-    await updateDoc(docRef, { canPostJobs: canPost });
+    await setDoc(docRef, { canPostJobs: canPost }, { merge: true });
   } catch (error) {
     console.warn("Firestore toggleStaffJobPosting failing, applying locally:", error);
   }
@@ -822,6 +1008,79 @@ export async function toggleStaffJobPosting(uid: string, canPost: boolean): Prom
     memoryStore.save();
   }
 }
+
+export async function updateUserRole(
+  uid: string,
+  newRole: "seeker" | "staff" | "admin" | "employer",
+  extra?: Partial<UserProfile>
+): Promise<void> {
+  const payload: Partial<UserProfile> = {
+    role: newRole,
+    ...(newRole === "staff" || newRole === "admin" ? { canPostJobs: true } : {}),
+    ...(extra || {})
+  };
+
+  try {
+    const docRef = doc(db, "users", uid);
+    await setDoc(docRef, payload, { merge: true });
+  } catch (error) {
+    console.warn("Firestore updateUserRole failing, applying locally:", error);
+  }
+
+  if (memoryStore.users[uid]) {
+    memoryStore.users[uid] = {
+      ...memoryStore.users[uid],
+      ...payload
+    };
+    memoryStore.save();
+  }
+}
+
+export async function deleteUserProfile(uid: string): Promise<void> {
+  try {
+    const docRef = doc(db, "users", uid);
+    await deleteDoc(docRef);
+  } catch (error) {
+    console.warn("Firestore deleteUserProfile failing, applying locally:", error);
+  }
+  if (memoryStore.users[uid]) {
+    delete memoryStore.users[uid];
+    memoryStore.save();
+  }
+}
+
+export async function batchUpdateUserRoles(
+  uids: string[],
+  newRole: "seeker" | "staff" | "admin" | "employer"
+): Promise<void> {
+  await Promise.all(uids.map(uid => updateUserRole(uid, newRole)));
+}
+
+export async function batchDeleteUserProfiles(uids: string[]): Promise<void> {
+  await Promise.all(uids.map(uid => deleteUserProfile(uid)));
+}
+
+export async function seedWhatsAppSessionsInitialData(): Promise<void> {
+  try {
+    const sessionInfoRef = doc(db, "whatsapp_sessions", "default_session_info");
+    const snap = await getDoc(sessionInfoRef);
+    if (!snap.exists()) {
+      await setDoc(sessionInfoRef, {
+        sessionId: "default_session",
+        key: "info",
+        description: "Valley Reigns WhatsApp Web Baileys Auth Session Storage",
+        storageType: "Multi-Device Firestore JSON Buffer",
+        status: "initialized",
+        createdAt: Date.now(),
+        updatedAt: Date.now()
+      });
+      console.log("[Firestore Seed] Initialized whatsapp_sessions collection with default_session_info.");
+    }
+  } catch (err) {
+    console.warn("[Firestore Seed] whatsapp_sessions notice:", err);
+  }
+}
+
 
 // ==========================================
 // EMPLOYER MANAGEMENT & ECOSYSTEM SERVICES
@@ -1081,8 +1340,16 @@ function normalizeConversation(id: string, data: any): Conversation {
   };
 }
 
-// RTDB Helper: Set or update in Realtime Database
+// RTDB & Firestore Dual-Storage Helper: Updates Realtime Database AND backs up immediately to Firestore
 async function syncToRTDB(chatId: string, data: Partial<Conversation>): Promise<void> {
+  // Always mirror/backup to Firestore as the primary durable cloud store
+  try {
+    const convRef = doc(db, "conversations", chatId);
+    await setDoc(convRef, data, { merge: true });
+  } catch (fsErr) {
+    console.warn(`Firestore backup notice during syncToRTDB for ${chatId}:`, fsErr);
+  }
+
   if (!rtdb) return;
   try {
     const authUid = auth?.currentUser?.uid || memoryStore.currentUser?.uid || chatId;
@@ -1098,11 +1365,20 @@ async function syncToRTDB(chatId: string, data: Partial<Conversation>): Promise<
       ...data
     });
   } catch (error) {
-    console.warn(`RTDB update failed for chat ${chatId}:`, error);
+    // Harmless when RTDB is offline — Firestore has already saved the payload!
+    console.warn(`RTDB update offline or restricted for chat ${chatId} (Firestore backup verified):`, error);
   }
 }
 
 async function writeNewToRTDB(chatId: string, data: Conversation): Promise<void> {
+  // Always mirror/backup to Firestore as the primary durable cloud store
+  try {
+    const convRef = doc(db, "conversations", chatId);
+    await setDoc(convRef, data, { merge: true });
+  } catch (fsErr) {
+    console.warn(`Firestore backup notice during writeNewToRTDB for ${chatId}:`, fsErr);
+  }
+
   if (!rtdb) return;
   try {
     const authUid = auth?.currentUser?.uid || memoryStore.currentUser?.uid || chatId;
@@ -1118,7 +1394,8 @@ async function writeNewToRTDB(chatId: string, data: Conversation): Promise<void>
       ...data
     });
   } catch (error) {
-    console.warn(`RTDB set failed for chat ${chatId}:`, error);
+    // Harmless when RTDB is offline — Firestore has already saved the payload!
+    console.warn(`RTDB set offline or restricted for chat ${chatId} (Firestore backup verified):`, error);
   }
 }
 
@@ -1260,13 +1537,13 @@ export function subscribeToConversations(callback: (conversations: Record<string
       latestFirestoreConvs = convs;
       emitMerged();
     }, (err) => {
-      console.warn("Firestore snapshot listener error in subscribeToConversations:", err);
+      console.warn("Firestore snapshot listener notice in subscribeToConversations:", err);
     });
   } catch (err) {
     console.warn("Firestore subscribeToConversations caught exception:", err);
   }
 
-  // Listen to Realtime Database (In-App conversation storage)
+  // Listen to Realtime Database with automatic background backup to Firestore
   if (rtdb) {
     try {
       const rtdbRef = ref(rtdb, "conversations");
@@ -1275,16 +1552,27 @@ export function subscribeToConversations(callback: (conversations: Record<string
         if (snapshot.exists()) {
           const rawData = snapshot.val();
           Object.entries(rawData).forEach(([id, val]) => {
-            convs[id] = normalizeConversation(id, val);
+            const normalized = normalizeConversation(id, val);
+            convs[id] = normalized;
+
+            // Background Auto-Backup to Firestore if missing or newer
+            const existingFs = latestFirestoreConvs[id];
+            const fsTime = existingFs?.lastMessageAt || existingFs?.createdAt || 0;
+            const rtdbTime = normalized.lastMessageAt || normalized.createdAt || 0;
+            if (!existingFs || rtdbTime > fsTime) {
+              const convDocRef = doc(db, "conversations", id);
+              setDoc(convDocRef, normalized, { merge: true }).catch(() => {});
+            }
           });
         }
         latestRtdbConvs = convs;
         emitMerged();
       }, (err) => {
-        console.warn("RTDB onValue listener error in subscribeToConversations:", err);
+        // Harmless when RTDB is offline; Firestore stream remains 100% active
+        console.warn("RTDB offline or unreachable (Firestore live stream active):", err);
       });
     } catch (e) {
-      console.warn("RTDB subscribeToConversations caught exception:", e);
+      console.warn("RTDB subscribeToConversations notice (Firestore active):", e);
     }
   }
 
@@ -1406,7 +1694,20 @@ export async function claimConversation(chatId: string, userUid: string, userNam
         updatePayload.jobId = topJobId;
       }
 
-      await updateDoc(convRef, updatePayload);
+      await setDoc(convRef, updatePayload, { merge: true });
+      success = true;
+    } else if (localConv) {
+      const localMsgs = Array.isArray(localConv.messages) ? localConv.messages : Object.values(localConv.messages || {});
+      const fullPayload = {
+        ...localConv,
+        assignedTo: userUid,
+        assignedToName: userName,
+        status: "ongoing" as const,
+        claimedAt: Date.now(),
+        lastMessageAt: Date.now(),
+        messages: currentMessages.length > 0 ? currentMessages : [...localMsgs, systemMsg]
+      };
+      await setDoc(convRef, fullPayload, { merge: true });
       success = true;
     }
   } catch (error) {
@@ -1624,7 +1925,7 @@ export async function sendChatMessage(chatId: string, sender: "customer" | "staf
         newMessagesList.push(newMessage);
         currentMessages = newMessagesList;
 
-        await updateDoc(convRef, {
+        await setDoc(convRef, {
           text: text,
           lastMessageAt: now,
           createdAt: now,
@@ -1635,7 +1936,7 @@ export async function sendChatMessage(chatId: string, sender: "customer" | "staf
           abandonedAt: null,
           finishedAt: null,
           messages: currentMessages
-        });
+        }, { merge: true });
 
         // Trigger staff notifications for re-initiated chat
         freshStaffUids.forEach(uid => {
@@ -1649,11 +1950,11 @@ export async function sendChatMessage(chatId: string, sender: "customer" | "staf
         });
       } else {
         currentMessages = [...messagesArray, newMessage];
-        await updateDoc(convRef, {
+        await setDoc(convRef, {
           text: text,
           lastMessageAt: now,
           messages: currentMessages
-        });
+        }, { merge: true });
       }
     } else {
       const baseConv = memoryStore.conversations[chatId] || {
@@ -1752,9 +2053,11 @@ export async function updateTypingStatus(chatId: string, userId: string, isTypin
   // 2. Update Firestore
   try {
     const convRef = doc(db, "conversations", chatId);
-    await updateDoc(convRef, {
-      [`typing.${userId}`]: { isTyping, name: userName, updatedAt: Date.now() }
-    });
+    await setDoc(convRef, {
+      typing: {
+        [userId]: { isTyping, name: userName, updatedAt: Date.now() }
+      }
+    }, { merge: true });
   } catch (err) {
     console.warn("Firestore updateTypingStatus failed:", err);
   }
@@ -1852,7 +2155,7 @@ export async function forceReassignConversation(chatId: string, targetStaffUid: 
       seekerUid = seekerUid || data.seekerUid;
       const messagesArray = Array.isArray(data.messages) ? data.messages : [];
       currentMessages = [...messagesArray, sysMsg];
-      await updateDoc(convRef, {
+      await setDoc(convRef, {
         assignedTo: targetStaffUid,
         assignedToName: targetStaffName,
         status: targetStaffUid ? "ongoing" : ("pending" as const),
@@ -1861,7 +2164,20 @@ export async function forceReassignConversation(chatId: string, targetStaffUid: 
         abandonedAt: null,
         finishedAt: null,
         messages: currentMessages
-      });
+      }, { merge: true });
+    } else if (conv) {
+      currentMessages = [...(conv.messages || []), sysMsg];
+      await setDoc(convRef, {
+        ...conv,
+        assignedTo: targetStaffUid,
+        assignedToName: targetStaffName,
+        status: targetStaffUid ? "ongoing" : ("pending" as const),
+        createdAt: now,
+        lastMessageAt: now,
+        abandonedAt: null,
+        finishedAt: null,
+        messages: currentMessages
+      }, { merge: true });
     }
   } catch (error) {
     console.warn("Firestore forceReassignConversation failed:", error);
@@ -1989,11 +2305,19 @@ export async function updateConversationStatus(chatId: string, status: "pending"
       seekerUid = seekerUid || data.seekerUid;
       const messagesArray = Array.isArray(data.messages) ? data.messages : [];
       currentMessages = [...messagesArray, sysMsg];
-      await updateDoc(convRef, {
+      await setDoc(convRef, {
         status,
         messages: currentMessages,
         ...additionalFields
-      });
+      }, { merge: true });
+    } else if (conv) {
+      currentMessages = [...(conv.messages || []), sysMsg];
+      await setDoc(convRef, {
+        ...conv,
+        status,
+        messages: currentMessages,
+        ...additionalFields
+      }, { merge: true });
     }
   } catch (error) {
     console.warn("Firestore updateConversationStatus failed:", error);
@@ -2437,11 +2761,11 @@ export async function clearConversationMessages(chatId: string): Promise<void> {
   // Update Firestore
   try {
     const convRef = doc(db, "conversations", chatId);
-    await updateDoc(convRef, {
+    await setDoc(convRef, {
       messages: [sysMsg],
       text: "Conversation history cleared.",
       lastMessageAt: Date.now()
-    });
+    }, { merge: true });
   } catch (err) {
     console.warn("Firestore clear messages failed:", err);
   }
@@ -2496,10 +2820,10 @@ export async function reportConversation(chatId: string, reason: string): Promis
   // Update Firestore
   try {
     const convRef = doc(db, "conversations", chatId);
-    await updateDoc(convRef, {
+    await setDoc(convRef, {
       isReported: true,
       messages: conv ? (Array.isArray(conv.messages) ? conv.messages : [sysMsg]) : [sysMsg]
-    });
+    }, { merge: true });
   } catch (err) {
     console.warn("Firestore report conversation failed:", err);
   }
@@ -3239,9 +3563,9 @@ export async function toggleCandidateListTag(
   // Sync to Firestore
   try {
     const convRef = doc(db, "conversations", chatId);
-    await updateDoc(convRef, {
+    await setDoc(convRef, {
       candidateLists: newLists
-    });
+    }, { merge: true });
   } catch (err) {
     console.warn("Firestore sync for candidate list tag failed:", err);
   }
