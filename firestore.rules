@@ -66,5 +66,9 @@ service cloud.firestore {
     match /staff_report_reopens/{reopenId} {
       allow read, write: if true;
     }
+
+    match /whatsapp_sessions/{sessionId} {
+      allow read, write: if true;
+    }
   }
 }

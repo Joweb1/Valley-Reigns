@@ -477,7 +477,7 @@ export const EmployerDashboard: React.FC = () => {
   };
 
   return (
-    <div id="employer-dashboard-container" className={`space-y-8 select-text ${activeView === "overview" ? "pt-6 sm:pt-8" : "pt-1"}`}>
+    <div id="employer-dashboard-container" className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8 select-text ${activeView === "overview" ? "pt-6 sm:pt-8" : "pt-4 sm:pt-6"}`}>
       {/* Toast notifications */}
       <AnimatePresence>
         {feedbackMsg && (

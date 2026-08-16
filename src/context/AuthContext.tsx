@@ -170,6 +170,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return;
     }
 
+    // Do NOT auto-prompt Google One Tap if user explicitly signed out in this session
+    if (sessionStorage.getItem("vr_explicit_logout") === "true") {
+      return;
+    }
+
     const initializeGis = async () => {
       try {
         // Safe check for document permission policy to prevent the FedCM iframe console error
@@ -214,6 +219,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             client_id: clientId,
             callback: async (response: any) => {
               setLoading(true);
+              sessionStorage.removeItem("vr_explicit_logout");
               try {
                 const { GoogleAuthProvider, signInWithCredential } = await import("firebase/auth");
                 const idToken = response.credential;
@@ -281,6 +287,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // One-click high-fidelity Persona Login for frictionless testing
   const loginDemo = async (role: "seeker" | "staff" | "admin" | "employer") => {
     setLoading(true);
+    sessionStorage.removeItem("vr_explicit_logout");
     let email = "";
 
     if (role === "admin") {
@@ -315,6 +322,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     extraData?: Partial<UserProfile>
   ) => {
     setLoading(true);
+    sessionStorage.removeItem("vr_explicit_logout");
     const normEmail = email.trim().toLowerCase();
     const resolvedPassword = password || "Password123";
     let finalRole = role;
@@ -376,6 +384,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const triggerGooglePopup = async () => {
     setLoading(true);
+    sessionStorage.removeItem("vr_explicit_logout");
     try {
       const { GoogleAuthProvider, signInWithPopup } = await import("firebase/auth");
       const provider = new GoogleAuthProvider();
@@ -431,6 +440,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const loginWithGoogle = async () => {
     setLoading(true);
+    sessionStorage.removeItem("vr_explicit_logout");
     try {
       const google = (window as any).google;
       
@@ -474,6 +484,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const loginWithEmail = async (email: string, password?: string): Promise<UserProfile> => {
     setLoading(true);
+    sessionStorage.removeItem("vr_explicit_logout");
     const normEmail = email.trim().toLowerCase();
     const resolvedPassword = password || "Password123";
 
@@ -593,21 +604,49 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = async () => {
     setLoading(true);
+    // 1. Immediately disable Google One Tap auto-selection
+    try {
+      if (typeof window !== "undefined" && (window as any).google?.accounts?.id) {
+        (window as any).google.accounts.id.disableAutoSelect();
+      }
+    } catch (e) {
+      console.warn("Could not disable Google auto-select:", e);
+    }
+
+    // 2. Mark explicit logout in session storage to stop One Tap auto-triggering on unauthenticated mount
+    sessionStorage.setItem("vr_explicit_logout", "true");
+    sessionStorage.removeItem("vr_virtual_user");
+    try {
+      localStorage.removeItem("emailForSignIn");
+    } catch (e) {}
+
+    // 3. Mark staff offline if applicable (with timeout so it never hangs)
     if (currentUser && (currentUser.role === "staff" || currentUser.role === "admin")) {
       try {
-        await setStaffOnlineStatus(currentUser.uid, false);
+        await Promise.race([
+          setStaffOnlineStatus(currentUser.uid, false),
+          new Promise((resolve) => setTimeout(resolve, 1200))
+        ]);
       } catch (e) {
         console.warn("Could not set staff status to offline during logout:", e);
       }
     }
-    sessionStorage.removeItem("vr_virtual_user");
+
+    // 4. Clear React auth state immediately
+    setCurrentUser(null);
+    setFirebaseUser(null);
+    memoryStore.currentUser = null;
+
+    // 5. Sign out of Firebase Auth (with timeout so it never blocks)
     try {
-      await signOut(auth);
+      await Promise.race([
+        signOut(auth),
+        new Promise((resolve) => setTimeout(resolve, 1500))
+      ]);
     } catch (e) {
       console.warn("Signout request handled:", e);
     }
-    setCurrentUser(null);
-    memoryStore.currentUser = null;
+
     setLoading(false);
   };
 

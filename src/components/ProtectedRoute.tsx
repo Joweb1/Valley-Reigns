@@ -67,11 +67,9 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowe
   // Check role authorization
   if (!allowedRoles.includes(currentUser.role)) {
     const dashboardPath = currentUser.role === "admin" 
-      ? "/admin" 
-      : currentUser.role === "staff" 
-      ? "/staff" 
+      ? "/admin/dashboard" 
       : currentUser.role === "employer"
-      ? "/employer"
+      ? "/employer/dashboard"
       : "/seeker";
     return <Navigate to={dashboardPath} replace />;
   }

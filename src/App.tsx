@@ -27,7 +27,6 @@ import { ContactsPage } from "./components/ContactsPage";
 import { EmployerManagementPage } from "./components/EmployerManagementPage";
 import { NetworkStatusMonitor } from "./components/NetworkStatusMonitor";
 import { StaffReportForm } from "./components/StaffReportForm";
-import { GuestChatWidget } from "./components/GuestChatWidget";
 import { AnniversaryGraffitiIntro } from "./components/AnniversaryGraffitiIntro";
 import { EmployerDashboard } from "./components/EmployerDashboard";
 
@@ -229,7 +228,7 @@ const HomepageFooter: React.FC = () => {
 };
 
 const JobSeekerDashboard: React.FC = () => {
-  const { currentUser } = useAuth();
+  const { currentUser, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
@@ -237,6 +236,20 @@ const JobSeekerDashboard: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [visibleCount, setVisibleCount] = useState(10);
   const sentinelRef = React.useRef<HTMLDivElement>(null);
+
+  // Strictly prevent any logged-in user from viewing or entering the homepage
+  useEffect(() => {
+    if (!authLoading && currentUser) {
+      const role = currentUser.role || "seeker";
+      if (role === "admin") {
+        navigate("/admin/dashboard", { replace: true });
+      } else if (role === "employer") {
+        navigate("/employer/dashboard", { replace: true });
+      } else {
+        navigate("/seeker", { replace: true });
+      }
+    }
+  }, [currentUser, authLoading, navigate]);
 
   useEffect(() => {
     setVisibleCount(10);
@@ -250,48 +263,6 @@ const JobSeekerDashboard: React.FC = () => {
     });
     return () => unsubscribe();
   }, []);
-
-  // Dynamically derive categories from current listings in database
-  const uniqueCategoryNames: string[] = Array.from(new Set<string>(jobs.map(j => (j.category as string || "")).filter(Boolean)))
-    .filter((name: string) => !["Tech", "Healthcare", "Finance", "AI & Analytics", "New"].includes(name));
-
-  const CATEGORIES = [
-    { 
-      name: "All", 
-      label: "All Jobs", 
-      icon: Briefcase,
-    },
-    { 
-      name: "New", 
-      label: "New", 
-      icon: Clock,
-    },
-    { 
-      name: "Tech", 
-      label: "Technology", 
-      icon: Cpu,
-    },
-    { 
-      name: "Healthcare", 
-      label: "Medical & Health", 
-      icon: HeartPulse,
-    },
-    { 
-      name: "Finance", 
-      label: "Money & Finance", 
-      icon: Banknote,
-    },
-    { 
-      name: "AI & Analytics", 
-      label: "Smart AI Systems", 
-      icon: Sparkles,
-    },
-    ...uniqueCategoryNames.map(name => ({
-      name,
-      label: name,
-      icon: getCategoryIcon(name)
-    }))
-  ];
 
   // Filter listings dynamically based on criteria
   const filteredJobs = (() => {
@@ -339,6 +310,52 @@ const JobSeekerDashboard: React.FC = () => {
     observer.observe(sentinelRef.current);
     return () => observer.disconnect();
   }, [sentinelRef, filteredJobs.length]);
+
+  if (currentUser) {
+    return null;
+  }
+
+  // Dynamically derive categories from current listings in database
+  const uniqueCategoryNames: string[] = Array.from(new Set<string>(jobs.map(j => (j.category as string || "")).filter(Boolean)))
+    .filter((name: string) => !["Tech", "Healthcare", "Finance", "AI & Analytics", "New"].includes(name));
+
+  const CATEGORIES = [
+    { 
+      name: "All", 
+      label: "All Jobs", 
+      icon: Briefcase,
+    },
+    { 
+      name: "New", 
+      label: "New", 
+      icon: Clock,
+    },
+    { 
+      name: "Tech", 
+      label: "Technology", 
+      icon: Cpu,
+    },
+    { 
+      name: "Healthcare", 
+      label: "Medical & Health", 
+      icon: HeartPulse,
+    },
+    { 
+      name: "Finance", 
+      label: "Money & Finance", 
+      icon: Banknote,
+    },
+    { 
+      name: "AI & Analytics", 
+      label: "Smart AI Systems", 
+      icon: Sparkles,
+    },
+    ...uniqueCategoryNames.map(name => ({
+      name,
+      label: name,
+      icon: getCategoryIcon(name)
+    }))
+  ];
 
   const displayedJobs = filteredJobs.slice(0, visibleCount);
 
@@ -439,7 +456,7 @@ const JobSeekerDashboard: React.FC = () => {
                 />
                 {/* Main Solid Button */}
                 <Link
-                  to={currentUser.role === "admin" ? "/admin" : currentUser.role === "staff" ? "/staff" : "/seeker"}
+                  to={currentUser.role === "admin" ? "/admin/dashboard" : currentUser.role === "employer" ? "/employer/dashboard" : "/seeker"}
                   className="inline-flex"
                 >
                   <motion.div
@@ -484,13 +501,13 @@ const JobSeekerDashboard: React.FC = () => {
               </motion.div>
             )}
     
-            {/* Employ Workers Button: triggers AuthModal with employer context if not logged in, or navigates to /employer if logged in as employer */}
+            {/* Employ Workers Button: triggers AuthModal with employer context if not logged in, or navigates to /employer/dashboard if logged in as employer */}
             <motion.button 
               whileHover={{ scale: 1.05, y: -2, backgroundColor: "rgba(11, 60, 73, 0.04)" }}
               whileTap={{ scale: 0.95 }}
               onClick={() => {
                 if (currentUser?.role === "employer") {
-                  navigate("/employer");
+                  navigate("/employer/dashboard");
                 } else {
                   window.dispatchEvent(new CustomEvent("open-auth-modal", { detail: { role: "employer", tab: "signin" } }));
                 }
@@ -922,23 +939,20 @@ function AppContent() {
     };
   }, []);
 
-  // Handle automatic dashboard redirect for users in standalone/fullscreen mode on homepage
+  // Handle automatic dashboard redirect for all authenticated users away from homepage (/)
   useEffect(() => {
-    if (!loading && isHomePage && isStandaloneOrFs) {
-      if (currentUser) {
-        const role = currentUser.role || "seeker";
-        if (role === "admin") {
-          navigate("/admin", { replace: true });
-        } else if (role === "staff") {
-          navigate("/staff", { replace: true });
-        } else if (role === "employer") {
-          navigate("/employer", { replace: true });
-        } else {
-          navigate("/seeker", { replace: true });
-        }
+    if (!loading && isHomePage && currentUser) {
+      const role = currentUser.role || "seeker";
+      if (role === "admin") {
+        navigate("/admin/dashboard", { replace: true });
+      } else if (role === "employer") {
+        navigate("/employer/dashboard", { replace: true });
+      } else {
+        // Seeker and staff go to /seeker
+        navigate("/seeker", { replace: true });
       }
     }
-  }, [currentUser, loading, isHomePage, isStandaloneOrFs, navigate]);
+  }, [currentUser, loading, isHomePage, navigate]);
 
   // Dynamic high-quality SEO meta updates per-route
   useEffect(() => {
@@ -964,8 +978,14 @@ function AppContent() {
         desc = "Monitor active candidate chat logs, check SLAs, post new roles, and coordinate candidate communication streams.";
         break;
       case "/admin":
+      case "/admin/dashboard":
         title = "System Administration | Valley Reigns Control Console";
         desc = "Configure global communication settings, manage job postings, supervise staff and active candidate chat channels.";
+        break;
+      case "/employer":
+      case "/employer/dashboard":
+        title = "Employer Dashboard & Talent Console | Valley Reigns";
+        desc = "Manage company vacancies, review talent pipelines, and communicate directly with applicants.";
         break;
       case "/admin/notifications":
         title = "System Alerts & Status | Valley Reigns Admin";
@@ -1097,6 +1117,7 @@ function AppContent() {
     "/admin/whatsapp-config",
     "/admin/contacts",
     "/admin/diagnostics",
+    "/admin/employers",
   ];
   const shouldHideHeader = (hideFloating && !isDesktop) || noHeaderPaths.includes(location.pathname);
 
@@ -1177,6 +1198,14 @@ function AppContent() {
             {/* Private Admin Routes */}
             <Route
               path="/admin"
+              element={
+                <ProtectedRoute allowedRoles={["admin"]}>
+                  <AdminDashboardView />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/dashboard"
               element={
                 <ProtectedRoute allowedRoles={["admin"]}>
                   <AdminDashboardView />
@@ -1289,6 +1318,14 @@ function AppContent() {
                 </ProtectedRoute>
               }
             />
+            <Route
+              path="/employer/dashboard"
+              element={
+                <ProtectedRoute allowedRoles={["employer", "admin"]}>
+                  <EmployerDashboard />
+                </ProtectedRoute>
+              }
+            />
 
             {/* Catch-all */}
             <Route path="*" element={<Navigate to="/" replace />} />
@@ -1340,7 +1377,7 @@ function AppContent() {
               <button
                 onClick={() => {
                   setIsAdminSettingsOpen(false);
-                  navigate("/admin?view=overview");
+                  navigate("/admin/dashboard?view=overview");
                   window.dispatchEvent(new CustomEvent("admin-home-click"));
                 }}
                 className={`p-2 border cursor-pointer transition-all duration-200 hover:scale-110 active:scale-95 flex items-center justify-center ${
@@ -1551,11 +1588,11 @@ function AppContent() {
               <button
                 onClick={() => {
                   setIsEmployerSettingsOpen(false);
-                  navigate("/employer?view=overview");
+                  navigate("/employer/dashboard?view=overview");
                   window.dispatchEvent(new CustomEvent("employer-home-click"));
                 }}
                 className={`p-2 border cursor-pointer transition-all duration-200 hover:scale-110 active:scale-95 flex items-center justify-center ${
-                  location.pathname === "/employer" && (!new URLSearchParams(location.search).get("view") || new URLSearchParams(location.search).get("view") === "overview")
+                  location.pathname.startsWith("/employer") && (!new URLSearchParams(location.search).get("view") || new URLSearchParams(location.search).get("view") === "overview")
                     ? "bg-[#0084FF]/30 border-[#0084FF]/25 text-white rounded-full"
                     : "bg-transparent border-transparent text-blue-300 hover:text-white rounded-full"
                 }`}
@@ -1568,10 +1605,10 @@ function AppContent() {
               <button
                 onClick={() => {
                   setIsEmployerSettingsOpen(false);
-                  navigate("/employer?view=jobs");
+                  navigate("/employer/dashboard?view=jobs");
                 }}
                 className={`p-2 border cursor-pointer transition-all duration-200 hover:scale-110 active:scale-95 flex items-center justify-center ${
-                  location.pathname === "/employer" && new URLSearchParams(location.search).get("view") === "jobs"
+                  location.pathname.startsWith("/employer") && new URLSearchParams(location.search).get("view") === "jobs"
                     ? "bg-[#0084FF]/30 border-[#0084FF]/25 text-white rounded-full"
                     : "bg-transparent border-transparent text-blue-300 hover:text-white rounded-full"
                 }`}
@@ -1584,10 +1621,10 @@ function AppContent() {
               <button
                 onClick={() => {
                   setIsEmployerSettingsOpen(false);
-                  navigate("/employer?view=messages");
+                  navigate("/employer/dashboard?view=messages");
                 }}
                 className={`p-2 border cursor-pointer transition-all duration-200 hover:scale-110 active:scale-95 flex items-center justify-center relative ${
-                  location.pathname === "/employer" && new URLSearchParams(location.search).get("view") === "messages"
+                  location.pathname.startsWith("/employer") && new URLSearchParams(location.search).get("view") === "messages"
                     ? "bg-[#0084FF]/30 border-[#0084FF]/25 text-white rounded-full"
                     : "bg-transparent border-transparent text-blue-300 hover:text-white rounded-full"
                 }`}
@@ -2294,12 +2331,25 @@ function AppContent() {
                   </div>
                 </div>
                 
-                <button
-                  onClick={() => setShowAdminAccountModal(false)}
-                  className="w-full py-2.5 bg-[#1E88E5] hover:bg-blue-700 text-white text-xs font-bold rounded-xl cursor-pointer mt-2 relative z-10 transition-colors border-0"
-                >
-                  Close Settings
-                </button>
+                <div className="flex items-center gap-2 mt-2 relative z-10">
+                  <button
+                    onClick={async () => {
+                      setShowAdminAccountModal(false);
+                      await logout();
+                      navigate("/");
+                    }}
+                    className="flex-1 py-2.5 bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 text-xs font-bold rounded-xl cursor-pointer transition-colors border border-rose-500/30 flex items-center justify-center gap-1.5"
+                  >
+                    <LogOut className="w-3.5 h-3.5" />
+                    <span>Sign Out</span>
+                  </button>
+                  <button
+                    onClick={() => setShowAdminAccountModal(false)}
+                    className="flex-1 py-2.5 bg-[#1E88E5] hover:bg-blue-700 text-white text-xs font-bold rounded-xl cursor-pointer transition-colors border-0"
+                  >
+                    Close
+                  </button>
+                </div>
               </motion.div>
             </div>
           )}
@@ -2358,9 +2408,6 @@ function AppContent() {
             </div>
           )}
         </AnimatePresence>
-
-        {/* Floating Guest Live Chat Widget (Visible to non-logged-in visitors) */}
-        <GuestChatWidget />
       </div>
     </>
   );

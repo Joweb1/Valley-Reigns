@@ -5,7 +5,7 @@ import { EmployerManagementView } from "./EmployerManagementView";
 
 export const EmployerManagementPage: React.FC = () => {
   return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 min-h-[85vh]">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 min-h-[85vh]">
       {/* Top Header Navigation Row */}
       <div className="flex items-center justify-between gap-3 mb-6 pb-2 border-b border-slate-200/80">
         <div className="flex items-center gap-3">

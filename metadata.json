@@ -2,5 +2,7 @@
   "name": "Valley Reigns",
   "description": "Valley Reigns is a high-fidelity recruitment routing platform designed to bridge tech talent with top companies via interactive, real-time communication routing.",
   "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }

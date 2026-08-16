@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useNotification } from "../context/NotificationContext";
 import { Briefcase, MessageSquare, ShieldCheck, LogOut, Menu, X, UserPlus, User, Bell, Info, Plus, Search, Download, Settings, Cpu, ClipboardList, Users, Building2 } from "lucide-react";
@@ -10,8 +10,17 @@ import { setStaffOnlineStatus, getAllUserProfiles } from "../lib/services";
 export const Header: React.FC = () => {
   const { currentUser, firebaseUser, loginWithGoogle, logout, updateUserPreference } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isInstalled, setIsInstalled] = useState(false);
+
+  const handleSignOut = async () => {
+    setProfilePopupOpen(false);
+    setMobileMenuOpen(false);
+    setShowAccountModal(false);
+    await logout();
+    navigate("/", { replace: true });
+  };
 
   useEffect(() => {
     const checkInstalled = () => {
@@ -104,7 +113,7 @@ export const Header: React.FC = () => {
       .catch(() => {});
   }, []);
 
-  const isDashboardPage = location.pathname === "/seeker" || location.pathname === "/seeker/messages" || location.pathname === "/seeker/notifications" || location.pathname === "/staff" || location.pathname === "/admin" || location.pathname === "/staff/manage-jobs" || location.pathname === "/admin/manage-jobs" || location.pathname === "/staff/notifications" || location.pathname === "/admin/notifications" || location.pathname === "/employer";
+  const isDashboardPage = location.pathname.startsWith("/seeker") || location.pathname.startsWith("/staff") || location.pathname.startsWith("/admin") || location.pathname.startsWith("/employer");
 
   const handleFindJobsClick = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -126,7 +135,7 @@ export const Header: React.FC = () => {
           
           {/* Left: Companies logo and Administration tag */}
           <div className="flex items-center gap-3">
-            <Link to={currentUser?.role === "employer" ? "/employer" : currentUser?.role === "seeker" ? "/seeker" : "/staff"} className="flex items-center group">
+            <Link to={currentUser?.role === "admin" ? "/admin/dashboard" : currentUser?.role === "employer" ? "/employer/dashboard" : "/seeker"} className="flex items-center group">
               <div className="w-12 h-12 flex items-center justify-center group-hover:scale-105 transition-all duration-300">
                 <img 
                   src="/icon.svg" 
@@ -414,10 +423,7 @@ export const Header: React.FC = () => {
                       <motion.button
                         whileHover={{ scale: 1.02, x: 2 }}
                         whileTap={{ scale: 0.98 }}
-                        onClick={() => {
-                          setProfilePopupOpen(false);
-                          logout();
-                        }}
+                        onClick={handleSignOut}
                         className="w-full text-left px-3.5 py-2 hover:bg-rose-50/65 text-xs font-bold text-rose-600 transition-all rounded-xl flex items-center gap-3 cursor-pointer group border-0 bg-transparent"
                       >
                         <div className="w-7 h-7 rounded-lg bg-rose-50 text-rose-500 group-hover:bg-rose-500 group-hover:text-white flex items-center justify-center transition-colors">
@@ -473,12 +479,21 @@ export const Header: React.FC = () => {
                     <span className="inline-block bg-[#1E88E5]/10 text-[#1E88E5] font-mono px-2 py-0.5 rounded font-bold">{currentUser?.role.toUpperCase()}</span>
                   </div>
                 </div>
-                <button
-                  onClick={() => setShowAccountModal(false)}
-                  className="w-full py-2.5 bg-[#1E88E5] hover:bg-[#1565C0] text-white text-xs font-bold rounded-xl cursor-pointer"
-                >
-                  Close Settings
-                </button>
+                <div className="flex items-center gap-2 pt-1">
+                  <button
+                    onClick={handleSignOut}
+                    className="flex-1 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-bold rounded-xl cursor-pointer flex items-center justify-center gap-1.5 transition-colors border border-rose-100"
+                  >
+                    <LogOut className="w-3.5 h-3.5" />
+                    <span>Sign Out</span>
+                  </button>
+                  <button
+                    onClick={() => setShowAccountModal(false)}
+                    className="flex-1 py-2.5 bg-[#1E88E5] hover:bg-[#1565C0] text-white text-xs font-bold rounded-xl cursor-pointer transition-colors border-0"
+                  >
+                    Close
+                  </button>
+                </div>
               </motion.div>
             </div>
           )}
@@ -578,7 +593,14 @@ export const Header: React.FC = () => {
       <div className="bg-white/95 backdrop-blur-md border border-slate-200/60 rounded-[28px] shadow-[0_24px_55px_-10px_rgba(30, 136, 229, 0.12),0_12px_24px_-12px_rgba(30, 136, 229, 0.08)] px-4 sm:px-6 h-16 flex items-center justify-between">
         
         {/* Brand Logo - Designed for high-end aesthetics */}
-        <Link to="/" className="flex items-center gap-2.5 group">
+        <Link 
+          to={
+            currentUser 
+              ? (currentUser.role === "admin" ? "/admin/dashboard" : currentUser.role === "employer" ? "/employer/dashboard" : "/seeker") 
+              : "/"
+          } 
+          className="flex items-center gap-2.5 group"
+        >
           <div className="w-12 h-12 flex items-center justify-center group-hover:scale-105 transition-transform duration-300">
             <img 
               src="/icon.svg" 
@@ -596,22 +618,24 @@ export const Header: React.FC = () => {
 
         {/* Desktop Navigation Links */}
         <nav className="hidden md:flex items-center gap-2">
-          <Link
-            to="/"
-            className={`px-4 py-2 rounded-xl text-xs font-bold tracking-tight transition-all ${
-              location.pathname === "/"
-                ? "bg-slate-50 text-[#1E88E5] border border-slate-150"
-                : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-            }`}
-          >
-            Find Jobs
-          </Link>
+          {!currentUser && (
+            <Link
+              to="/"
+              className={`px-4 py-2 rounded-xl text-xs font-bold tracking-tight transition-all ${
+                location.pathname === "/"
+                  ? "bg-slate-50 text-[#1E88E5] border border-slate-150"
+                  : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+              }`}
+            >
+              Find Jobs
+            </Link>
+          )}
 
           {currentUser?.role === "seeker" && (
             <Link
               to="/seeker"
               className={`px-4 py-2 rounded-xl text-xs font-bold tracking-tight transition-all flex items-center gap-1.5 ${
-                location.pathname === "/seeker"
+                location.pathname.startsWith("/seeker")
                   ? "bg-blue-50 text-[#1E88E5] border border-blue-100"
                   : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
               }`}
@@ -622,9 +646,9 @@ export const Header: React.FC = () => {
 
           {currentUser?.role === "employer" && (
             <Link
-              to="/employer"
+              to="/employer/dashboard"
               className={`px-4 py-2 rounded-xl text-xs font-bold tracking-tight transition-all flex items-center gap-1.5 ${
-                location.pathname === "/employer"
+                location.pathname.startsWith("/employer")
                   ? "bg-indigo-50 text-indigo-700 border border-indigo-200"
                   : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
               }`}
@@ -636,15 +660,15 @@ export const Header: React.FC = () => {
 
           {currentUser?.role === "staff" && (
             <Link
-              to="/staff"
+              to="/seeker"
               className={`px-4 py-2 rounded-xl text-xs font-bold tracking-tight transition-all flex items-center gap-1.5 ${
-                location.pathname === "/staff"
+                location.pathname.startsWith("/seeker")
                   ? "bg-blue-50 text-[#1E88E5] border border-blue-100"
                   : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
               }`}
             >
               <MessageSquare className="w-3.5 h-3.5" />
-              Recruiter Dashboard
+              Job Portal
             </Link>
           )}
 
@@ -662,9 +686,9 @@ export const Header: React.FC = () => {
                 Staff View
               </Link>
               <Link
-                to="/admin"
+                to="/admin/dashboard"
                 className={`px-4 py-2 rounded-xl text-xs font-bold tracking-tight transition-all flex items-center gap-1.5 ${
-                  location.pathname === "/admin"
+                  location.pathname.startsWith("/admin")
                     ? "bg-purple-50 text-purple-800 border border-purple-100"
                     : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
                 }`}
@@ -698,7 +722,7 @@ export const Header: React.FC = () => {
                 <User className="w-6 h-6 text-[#1E88E5]" />
               </motion.button>
               <button
-                onClick={() => logout()}
+                onClick={handleSignOut}
                 className="w-9 h-9 flex items-center justify-center text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all cursor-pointer border border-transparent hover:border-rose-100 hover:scale-105 active:scale-95"
                 title="Log Out"
               >
@@ -768,12 +792,14 @@ export const Header: React.FC = () => {
               className="md:hidden bg-white/95 backdrop-blur-md border border-slate-200/80 rounded-2xl shadow-lg mt-2 overflow-hidden relative z-40"
             >
             <div className="px-4 pt-2 pb-6 space-y-3">
-              <button
-                onClick={handleFindJobsClick}
-                className="w-full text-left block px-4 py-2.5 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-50 cursor-pointer"
-              >
-                Find Jobs
-              </button>
+              {!currentUser && (
+                <button
+                  onClick={handleFindJobsClick}
+                  className="w-full text-left block px-4 py-2.5 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-50 cursor-pointer"
+                >
+                  Find Jobs
+                </button>
+              )}
 
               {currentUser?.role === "staff" && (
                 <>
@@ -804,13 +830,23 @@ export const Header: React.FC = () => {
                     Staff View
                   </Link>
                   <Link
-                    to="/admin"
+                    to="/admin/dashboard"
                     onClick={() => setMobileMenuOpen(false)}
                     className="block px-4 py-2.5 rounded-xl text-sm font-bold text-purple-800 bg-purple-50 hover:bg-purple-100"
                   >
                     Admin Panel
                   </Link>
                 </>
+              )}
+
+              {currentUser?.role === "staff" && (
+                <Link
+                  to="/seeker"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="block px-4 py-2.5 rounded-xl text-sm font-bold text-[#1E88E5] bg-blue-50 hover:bg-blue-100"
+                >
+                  Job Portal
+                </Link>
               )}
 
               {currentUser?.role === "seeker" && (
@@ -825,7 +861,7 @@ export const Header: React.FC = () => {
 
               {currentUser?.role === "employer" && (
                 <Link
-                  to="/employer"
+                  to="/employer/dashboard"
                   onClick={() => setMobileMenuOpen(false)}
                   className="block px-4 py-2.5 rounded-xl text-sm font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100"
                 >
@@ -847,10 +883,7 @@ export const Header: React.FC = () => {
                       </span>
                     </div>
                     <button
-                      onClick={() => {
-                        logout();
-                        setMobileMenuOpen(false);
-                      }}
+                      onClick={handleSignOut}
                       className="w-full px-4 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-xl text-sm font-bold flex items-center justify-center gap-2 cursor-pointer transition-colors"
                     >
                       <LogOut className="w-4 h-4" />

@@ -88,8 +88,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({ forcedOpen = false, onClos
   const [isProcessing, setIsProcessing] = useState(false);
 
   // Gesture refs
-  const googleHoldTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const googleHoldTriggeredRef = useRef(false);
+  const headerHoldTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const [headerHoldProgress, setHeaderHoldProgress] = useState(false);
 
   const signupHoldTimerRef = useRef<NodeJS.Timeout | null>(null);
   const signupHoldTriggeredRef = useRef(false);
@@ -100,46 +100,50 @@ export const AuthModal: React.FC<AuthModalProps> = ({ forcedOpen = false, onClos
   // Cleanup timers on unmount
   useEffect(() => {
     return () => {
-      if (googleHoldTimerRef.current) clearTimeout(googleHoldTimerRef.current);
+      if (headerHoldTimerRef.current) clearTimeout(headerHoldTimerRef.current);
       if (signupHoldTimerRef.current) clearTimeout(signupHoldTimerRef.current);
       if (mailHoldTimerRef.current) clearTimeout(mailHoldTimerRef.current);
     };
   }, []);
 
-  // Google hold gesture handlers
-  const handleGooglePointerDown = (e: React.PointerEvent) => {
+  // Header hold gesture handlers (Hold Valley Reigns title for 5s to reveal demo portals)
+  const handleHeaderPointerDown = (e: React.PointerEvent) => {
     if (e.button !== 0) return;
-    googleHoldTriggeredRef.current = false;
-    googleHoldTimerRef.current = setTimeout(() => {
+    setHeaderHoldProgress(true);
+    if (headerHoldTimerRef.current) clearTimeout(headerHoldTimerRef.current);
+    headerHoldTimerRef.current = setTimeout(() => {
       setShowDemoPortals(true);
-      googleHoldTriggeredRef.current = true;
+      setHeaderHoldProgress(false);
     }, 5000);
   };
 
-  const handleGooglePointerUp = () => {
-    if (googleHoldTimerRef.current) {
-      clearTimeout(googleHoldTimerRef.current);
-      googleHoldTimerRef.current = null;
+  const handleHeaderPointerUp = () => {
+    if (headerHoldTimerRef.current) {
+      clearTimeout(headerHoldTimerRef.current);
+      headerHoldTimerRef.current = null;
     }
-    if (!googleHoldTriggeredRef.current) {
-      setIsProcessing(true);
-      loginWithGoogle().then(() => {
-        const userRole = memoryStore.currentUser?.role || "seeker";
-        setIsProcessing(false);
-        handleRedirect(userRole);
-        handleClose();
-      }).catch((err) => {
-        console.error("Google Auth Error:", err);
-        setIsProcessing(false);
-      });
-    }
+    setHeaderHoldProgress(false);
   };
 
-  const handleGooglePointerCancel = () => {
-    if (googleHoldTimerRef.current) {
-      clearTimeout(googleHoldTimerRef.current);
-      googleHoldTimerRef.current = null;
+  const handleHeaderPointerCancel = () => {
+    if (headerHoldTimerRef.current) {
+      clearTimeout(headerHoldTimerRef.current);
+      headerHoldTimerRef.current = null;
     }
+    setHeaderHoldProgress(false);
+  };
+
+  const handleGoogleClick = () => {
+    setIsProcessing(true);
+    loginWithGoogle().then(() => {
+      const userRole = memoryStore.currentUser?.role || "seeker";
+      setIsProcessing(false);
+      handleRedirect(userRole);
+      handleClose();
+    }).catch((err) => {
+      console.error("Google Auth Error:", err);
+      setIsProcessing(false);
+    });
   };
 
   // Signup link hold gesture handlers
@@ -208,13 +212,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({ forcedOpen = false, onClos
 
   // Central Role-based Redirection Router
   const handleRedirect = (role: string) => {
+    setShowDemoPortals(false);
     if (role === "admin") {
-      navigate("/admin");
-    } else if (role === "staff") {
-      navigate("/staff");
+      navigate("/admin/dashboard");
     } else if (role === "employer") {
-      navigate("/employer");
+      navigate("/employer/dashboard");
+    } else if (role === "staff") {
+      // Staff directed to the job seeker page
+      navigate("/seeker");
     } else {
+      // Job seeker directed to the job seeker page
       navigate("/seeker");
     }
   };
@@ -249,6 +256,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ forcedOpen = false, onClos
   useEffect(() => {
     if (currentUser) {
       setIsOpen(false);
+      setShowDemoPortals(false);
       setShowMagicLinkView(false);
       setShowEmailForm(false);
       setShowHifiPreview(false);
@@ -267,6 +275,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ forcedOpen = false, onClos
   const handleClose = () => {
     if (!canClose) return;
     setIsOpen(false);
+    setShowDemoPortals(false);
     setShowMagicLinkView(false);
     setShowEmailForm(false);
     setShowHifiPreview(false);
@@ -425,12 +434,19 @@ export const AuthModal: React.FC<AuthModalProps> = ({ forcedOpen = false, onClos
           >
             {/* Header section with Role Indicator */}
             <div className="px-6 pt-5 pb-4 flex items-center justify-between border-b border-slate-100 bg-slate-50/70">
-              <div className="flex items-center gap-2">
-                <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${isEmployerMode ? "bg-indigo-600/10 text-indigo-600" : "bg-[#1E88E5]/10 text-[#1E88E5]"}`}>
+              <div 
+                className="flex items-center gap-2 select-none cursor-pointer group"
+                onPointerDown={handleHeaderPointerDown}
+                onPointerUp={handleHeaderPointerUp}
+                onPointerLeave={handleHeaderPointerCancel}
+                onPointerCancel={handleHeaderPointerCancel}
+                title="Hold for 5 seconds to unlock developer portals"
+              >
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-transform group-active:scale-95 ${isEmployerMode ? "bg-indigo-600/10 text-indigo-600" : "bg-[#1E88E5]/10 text-[#1E88E5]"}`}>
                   {isEmployerMode ? <Building2 className="w-4 h-4" /> : <Shield className="w-4 h-4" />}
                 </div>
                 <div>
-                  <span className="font-serif italic font-bold text-sm text-[#1e3a8a] block leading-tight">
+                  <span className={`font-serif italic font-bold text-sm text-[#1e3a8a] block leading-tight transition-colors ${headerHoldProgress ? "text-[#1E88E5]" : ""}`}>
                     Valley Reigns
                   </span>
                   {isEmployerMode && (
@@ -595,10 +611,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ forcedOpen = false, onClos
                           whileHover={{ scale: 1.02 }}
                           whileTap={{ scale: 0.98 }}
                           type="button"
-                          onPointerDown={handleGooglePointerDown}
-                          onPointerUp={handleGooglePointerUp}
-                          onPointerLeave={handleGooglePointerCancel}
-                          onPointerCancel={handleGooglePointerCancel}
+                          onClick={handleGoogleClick}
                           className="w-full py-3 px-4 bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-50 text-slate-700 rounded-xl font-bold text-xs shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer select-none"
                         >
                           <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
@@ -639,17 +652,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({ forcedOpen = false, onClos
                             className={`text-[10px] font-bold hover:underline cursor-pointer select-none ${isEmployerMode ? "text-indigo-600" : "text-[#1E88E5]"}`}
                           >
                             {isEmployerMode ? "Register as Employer (Sign Up)" : signupRole === "staff" ? "Create Staff Account" : "Create New Account"}
-                          </button>
-                        </div>
-
-                        {/* Direct One-Click Testing Portals Toggle */}
-                        <div className="flex justify-center pt-2">
-                          <button
-                            type="button"
-                            onClick={() => setShowDemoPortals(!showDemoPortals)}
-                            className="text-[9px] font-mono font-bold text-slate-400 hover:text-[#1E88E5] transition-colors cursor-pointer"
-                          >
-                            {showDemoPortals ? "Hide One-Click Demo Portals" : "⚡ Click here for Instant 1-Click Demo Logins (Employer / Admin / Seeker)"}
                           </button>
                         </div>
                       </div>

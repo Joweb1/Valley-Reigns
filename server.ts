@@ -7,11 +7,10 @@ import { initializeApp } from "firebase/app";
 import { getFirestore, doc, getDoc, updateDoc, setDoc, collection, getDocs, onSnapshot, deleteDoc } from "firebase/firestore";
 import { getDatabase, ref, set } from "firebase/database";
 import webpush from "web-push";
-import makeWASocket, { useMultiFileAuthState, DisconnectReason, Browsers, fetchLatestBaileysVersion } from "@whiskeysockets/baileys";
+import makeWASocket, { DisconnectReason, Browsers, fetchLatestBaileysVersion, initAuthCreds, BufferJSON, proto } from "@whiskeysockets/baileys";
 import QRCode from "qrcode";
 
 const makeWASocketFn = (makeWASocket as any)?.default || makeWASocket;
-const useMultiFileAuthStateFn = (useMultiFileAuthState as any)?.default || useMultiFileAuthState;
 const BrowsersFn = (Browsers as any)?.default || Browsers;
 const fetchLatestBaileysVersionFn = (fetchLatestBaileysVersion as any)?.default || fetchLatestBaileysVersion;
 
@@ -259,10 +258,8 @@ app.post("/api/webhook/whatsapp", async (req, res) => {
 });
 
 // ---------------------------------------------------------
-// Baileys WhatsApp Web Engine & Dual Provider Router
+// Baileys WhatsApp Web Engine & Custom Firestore Auth Adapter
 // ---------------------------------------------------------
-const BAILEYS_AUTH_DIR = path.join(process.cwd(), "baileys_auth");
-
 const silentLogger = {
   level: "silent",
   trace: () => {},
@@ -283,72 +280,193 @@ let baileysPairingCode: string | null = null;
 let baileysUserPhone: string | null = null;
 let baileysError: string | null = null;
 let isNewSessionPairing = false;
-let consecutiveLogoutErrors = 0;
+let consecutiveReconnectAttempts = 0;
 let autoHealInterval: NodeJS.Timeout | null = null;
 
-async function saveBaileysAuthToFirestore() {
+function fixKeyName(file: string): string {
+  return file.replace(/\//g, "__").replace(/:/g, "-").replace(/\./g, "_");
+}
+
+/**
+ * Custom Firestore Auth State Adapter for Baileys
+ * Persists WhatsApp session credentials & keys directly in the Firestore database collection `whatsapp_sessions`.
+ * On boot or container spin-up, preloads auth state into memory so credentials remain intact across all rebuilds/migrations.
+ */
+async function useFirestoreAuthState(sessionId: string = "default_session") {
+  const sessionDocPrefix = `${sessionId}_`;
+  const inMemoryCache = new Map<string, any>();
+
+  // 1. Preload all existing session keys from Firestore into memory on initialization
   try {
-    if (!fs.existsSync(BAILEYS_AUTH_DIR)) return;
-    const credsFile = path.join(BAILEYS_AUTH_DIR, "creds.json");
-    if (!fs.existsSync(credsFile)) return;
-
-    const files = fs.readdirSync(BAILEYS_AUTH_DIR);
-    const backup: Record<string, string> = {};
-
-    for (const file of files) {
-      if (file.endsWith(".json")) {
-        const filePath = path.join(BAILEYS_AUTH_DIR, file);
-        backup[file] = fs.readFileSync(filePath, "utf-8");
+    const sessionsCol = collection(db, "whatsapp_sessions");
+    const snap = await getDocs(sessionsCol);
+    for (const d of snap.docs) {
+      if (d.id.startsWith(sessionDocPrefix)) {
+        const keyName = d.id.substring(sessionDocPrefix.length);
+        const data = d.data();
+        if (data?.value) {
+          try {
+            const parsed = JSON.parse(data.value, BufferJSON.reviver);
+            inMemoryCache.set(keyName, parsed);
+          } catch (err) {
+            console.warn(`[Firestore Auth] Error parsing key '${d.id}':`, err);
+          }
+        }
       }
     }
+    console.log(`[Firestore Auth] Loaded ${inMemoryCache.size} persistent auth key(s) from Firestore for session '${sessionId}'.`);
+  } catch (err) {
+    console.warn(`[Firestore Auth] Initial session preload notice for '${sessionId}':`, err);
+  }
 
-    if (Object.keys(backup).length > 0) {
-      await setDoc(doc(db, "settings", "baileys_session_backup"), {
-        files: backup,
+  // 2. Automatic one-time migration from legacy settings backup if Firestore collection is fresh
+  if (inMemoryCache.size === 0) {
+    try {
+      const backupDoc = await getDoc(doc(db, "settings", "baileys_session_backup"));
+      if (backupDoc.exists()) {
+        const data = backupDoc.data();
+        const files: Record<string, string> = data?.files || {};
+        if (files["creds.json"] || files["creds"]) {
+          console.log(`[Firestore Auth] Migrating legacy session backup (${Object.keys(files).length} keys) into Firestore 'whatsapp_sessions'...`);
+          for (const [fName, fContent] of Object.entries(files)) {
+            const cleanKey = fixKeyName(fName.replace(/\.json$/, ""));
+            try {
+              const parsed = JSON.parse(fContent, BufferJSON.reviver);
+              inMemoryCache.set(cleanKey, parsed);
+              await setDoc(doc(db, "whatsapp_sessions", `${sessionDocPrefix}${cleanKey}`), {
+                sessionId,
+                key: cleanKey,
+                value: fContent,
+                updatedAt: Date.now()
+              });
+            } catch (pErr) {}
+          }
+        }
+      }
+    } catch (mErr) {
+      console.warn("[Firestore Auth] Legacy migration check notice:", mErr);
+    }
+  }
+
+  const writeData = async (data: any, file: string) => {
+    const keyName = fixKeyName(file.replace(/\.json$/, ""));
+    inMemoryCache.set(keyName, data);
+    try {
+      const serialized = JSON.stringify(data, BufferJSON.replacer);
+      const docRef = doc(db, "whatsapp_sessions", `${sessionDocPrefix}${keyName}`);
+      await setDoc(docRef, {
+        sessionId,
+        key: keyName,
+        value: serialized,
         updatedAt: Date.now()
       });
-      console.log(`[Baileys Auth Sync] Successfully backed up ${Object.keys(backup).length} auth files to Firestore.`);
+    } catch (err) {
+      console.error(`[Firestore Auth] Failed to write key '${keyName}' to Firestore:`, err);
     }
-  } catch (err) {
-    console.warn("[Baileys Auth Sync Warning] Error backing up auth files to Firestore:", err);
-  }
+  };
+
+  const readData = async (file: string) => {
+    const keyName = fixKeyName(file.replace(/\.json$/, ""));
+    if (inMemoryCache.has(keyName)) {
+      return inMemoryCache.get(keyName);
+    }
+    try {
+      const docRef = doc(db, "whatsapp_sessions", `${sessionDocPrefix}${keyName}`);
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        if (data?.value) {
+          const parsed = JSON.parse(data.value, BufferJSON.reviver);
+          inMemoryCache.set(keyName, parsed);
+          return parsed;
+        }
+      }
+    } catch (err) {
+      console.warn(`[Firestore Auth] Failed to read key '${keyName}' from Firestore:`, err);
+    }
+    return null;
+  };
+
+  const removeData = async (file: string) => {
+    const keyName = fixKeyName(file.replace(/\.json$/, ""));
+    inMemoryCache.delete(keyName);
+    try {
+      const docRef = doc(db, "whatsapp_sessions", `${sessionDocPrefix}${keyName}`);
+      await deleteDoc(docRef);
+    } catch (err) {
+      console.warn(`[Firestore Auth] Failed to delete key '${keyName}' from Firestore:`, err);
+    }
+  };
+
+  const clearAuth = async () => {
+    inMemoryCache.clear();
+    try {
+      const sessionsCol = collection(db, "whatsapp_sessions");
+      const snap = await getDocs(sessionsCol);
+      const deleteTasks: Promise<any>[] = [];
+      for (const d of snap.docs) {
+        if (d.id.startsWith(sessionDocPrefix)) {
+          deleteTasks.push(deleteDoc(d.ref));
+        }
+      }
+      await Promise.all(deleteTasks);
+      console.log(`[Firestore Auth] Successfully purged all credentials for session '${sessionId}' from Firestore.`);
+    } catch (err) {
+      console.error(`[Firestore Auth] Error clearing session '${sessionId}' from Firestore:`, err);
+    }
+  };
+
+  const creds = (await readData("creds")) || initAuthCreds();
+
+  return {
+    state: {
+      creds,
+      keys: {
+        get: async (type: string, ids: string[]) => {
+          const data: { [key: string]: any } = {};
+          await Promise.all(
+            ids.map(async (id) => {
+              let value = await readData(`${type}-${id}`);
+              if (type === "app-state-sync-key" && value) {
+                value = proto.Message.AppStateSyncKeyData.fromObject(value);
+              }
+              data[id] = value;
+            })
+          );
+          return data;
+        },
+        set: async (data: any) => {
+          const tasks: Promise<any>[] = [];
+          for (const category in data) {
+            for (const id in data[category]) {
+              const value = data[category][id];
+              const file = `${category}-${id}`;
+              tasks.push(value ? writeData(value, file) : removeData(file));
+            }
+          }
+          await Promise.all(tasks);
+        }
+      }
+    },
+    saveCreds: async () => {
+      return writeData(creds, "creds");
+    },
+    clearAuth
+  };
 }
 
-async function restoreBaileysAuthFromFirestore(): Promise<boolean> {
+async function hasStoredAuthCreds(sessionId: string = "default_session"): Promise<boolean> {
   try {
-    const credsFile = path.join(BAILEYS_AUTH_DIR, "creds.json");
-    if (fs.existsSync(credsFile)) {
-      return true;
-    }
-
-    const backupDoc = await getDoc(doc(db, "settings", "baileys_session_backup"));
-    if (backupDoc.exists()) {
-      const data = backupDoc.data();
-      const files: Record<string, string> = data?.files || {};
-      if (files["creds.json"]) {
-        if (!fs.existsSync(BAILEYS_AUTH_DIR)) {
-          fs.mkdirSync(BAILEYS_AUTH_DIR, { recursive: true });
-        }
-        for (const [fileName, fileContent] of Object.entries(files)) {
-          fs.writeFileSync(path.join(BAILEYS_AUTH_DIR, fileName), fileContent, "utf-8");
-        }
-        console.log(`[Baileys Auth Restore] Successfully restored ${Object.keys(files).length} session auth files from Firestore!`);
-        return true;
+    const credsSnap = await getDoc(doc(db, "whatsapp_sessions", `${sessionId}_creds`));
+    if (credsSnap.exists()) {
+      const val = credsSnap.data()?.value;
+      if (val) {
+        const parsed = JSON.parse(val, BufferJSON.reviver);
+        return Boolean(parsed?.registered || parsed?.me);
       }
     }
-  } catch (err) {
-    console.warn("[Baileys Auth Restore Warning] Failed to restore auth files from Firestore:", err);
-  }
+  } catch (e) {}
   return false;
-}
-
-async function clearBaileysAuthFromFirestore() {
-  try {
-    await deleteDoc(doc(db, "settings", "baileys_session_backup"));
-    console.log("[Baileys Auth Clear] Cleared session backup from Firestore.");
-  } catch (e) {
-    console.warn("[Baileys Auth Clear Warning]:", e);
-  }
 }
 
 function startBaileysAutoHealLoop() {
@@ -357,21 +475,12 @@ function startBaileysAutoHealLoop() {
     try {
       if (baileysStatus === "connected") return;
       if (baileysStatus === "qr_ready" && baileysQrCode) return;
+      if (baileysStatus === "connecting") return;
 
-      const restored = await restoreBaileysAuthFromFirestore();
-      const credsExist = fs.existsSync(path.join(BAILEYS_AUTH_DIR, "creds.json"));
-
-      if (restored || credsExist) {
-        let isRegistered = false;
-        try {
-          const rawCreds = JSON.parse(fs.readFileSync(path.join(BAILEYS_AUTH_DIR, "creds.json"), "utf-8"));
-          isRegistered = Boolean(rawCreds.registered || rawCreds.me);
-        } catch (e) {}
-
-        if (isRegistered && !baileysSocket && baileysStatus !== "connecting") {
-          console.log("[Baileys Auto-Heal] Registered session found offline. Re-establishing WhatsApp connection...");
-          await initBaileysSocket(true);
-        }
+      const hasCreds = await hasStoredAuthCreds("default_session");
+      if (hasCreds && !baileysSocket) {
+        console.log("[Baileys Auto-Heal] Persistent registered credentials found offline. Re-establishing WhatsApp socket connection...");
+        await initBaileysSocket(true);
       }
     } catch (err) {
       console.warn("[Baileys Auto-Heal Notice]:", err);
@@ -769,13 +878,7 @@ async function initBaileysSocket(forceReconnect = false) {
   }
 
   try {
-    await restoreBaileysAuthFromFirestore();
-
-    if (!fs.existsSync(BAILEYS_AUTH_DIR)) {
-      fs.mkdirSync(BAILEYS_AUTH_DIR, { recursive: true });
-    }
-
-    const { state, saveCreds } = await useMultiFileAuthStateFn(BAILEYS_AUTH_DIR);
+    const { state, saveCreds, clearAuth } = await useFirestoreAuthState("default_session");
 
     // Fetch latest WhatsApp Web version to prevent session handshake rejection
     let version: [number, number, number] = [2, 3000, 1035194821];
@@ -815,11 +918,13 @@ async function initBaileysSocket(forceReconnect = false) {
 
     baileysSocket = sock;
 
+    // Listen to creds.update and persist serialized credentials directly to Firestore
     sock.ev.on("creds.update", async () => {
       try {
         await saveCreds();
-        saveBaileysAuthToFirestore().catch(console.error);
-      } catch (e) {}
+      } catch (e) {
+        console.warn("[Baileys] Error persisting credentials to Firestore:", e);
+      }
     });
 
     sock.ev.on("connection.update", async (update: any) => {
@@ -840,16 +945,21 @@ async function initBaileysSocket(forceReconnect = false) {
         baileysQrCode = null;
         baileysPairingCode = null;
         baileysError = null;
-        consecutiveLogoutErrors = 0;
+        consecutiveReconnectAttempts = 0;
+        if (baileysReconnectTimer) {
+          clearTimeout(baileysReconnectTimer);
+          baileysReconnectTimer = null;
+        }
+
         const userJid = sock.user?.id || "";
         baileysUserPhone = userJid.split("@")[0].split(":")[0] || "Connected";
         console.log(`[Baileys] Successfully connected to WhatsApp Web as +${baileysUserPhone}!`);
 
-        // Backup authenticated session to Firestore
-        saveBaileysAuthToFirestore().catch(console.error);
+        // Ensure current creds are securely synced
+        saveCreds().catch(console.error);
 
         if (isNewSessionPairing) {
-          console.log("[Baileys] New WhatsApp connection established. Wiping previous conversations...");
+          console.log("[Baileys] New WhatsApp connection established. Preserving conversations...");
           await clearPreviousWhatsAppConversations();
           isNewSessionPairing = false;
         }
@@ -897,45 +1007,50 @@ async function initBaileysSocket(forceReconnect = false) {
           baileysPresenceInterval = null;
         }
 
-        const statusCode = lastDisconnect?.error?.output?.statusCode || lastDisconnect?.error?.statusCode;
+        const statusCode = (lastDisconnect?.error as any)?.output?.statusCode || (lastDisconnect?.error as any)?.statusCode;
         const errMessage = lastDisconnect?.error?.message || String(lastDisconnect?.error || "");
-        const credsExist = fs.existsSync(path.join(BAILEYS_AUTH_DIR, "creds.json"));
-
-        let isRegistered = false;
-        if (credsExist) {
-          try {
-            const rawCreds = JSON.parse(fs.readFileSync(path.join(BAILEYS_AUTH_DIR, "creds.json"), "utf-8"));
-            isRegistered = Boolean(rawCreds.registered || rawCreds.me);
-          } catch (e) {}
-        }
-
-        const isExplicitLoggedOut = statusCode === DisconnectReason?.loggedOut;
+        const isExplicitLoggedOut = statusCode === DisconnectReason.loggedOut || statusCode === 401;
 
         // Only clear baileysSocket if THIS closed socket is still the active one
         if (baileysSocket === sock) {
           baileysSocket = null;
         }
 
-        if (isExplicitLoggedOut && !isRegistered) {
+        if (isExplicitLoggedOut) {
+          // If statusCode === DisconnectReason.loggedOut (401): Only then delete stored session credentials and request a fresh QR code
+          console.log(`[Baileys Disconnect] Explicit loggedOut received (statusCode 401). Purging Firestore session credentials and requesting a fresh QR code...`);
           baileysStatus = "disconnected";
           baileysQrCode = null;
+          baileysPairingCode = null;
           baileysUserPhone = null;
-          baileysError = "Session disconnected.";
-          console.log("[Baileys] Unregistered session closed. Clearing auth files.");
+          baileysError = "Session logged out from device.";
+          consecutiveReconnectAttempts = 0;
+
+          await clearAuth();
+
           try {
-            fs.rmSync(BAILEYS_AUTH_DIR, { recursive: true, force: true });
+            await setDoc(doc(db, "settings", "whatsapp"), {
+              baileysConnected: false,
+              baileysUserPhone: null,
+              lastDisconnectedAt: Date.now()
+            }, { merge: true });
           } catch (e) {}
-          await clearBaileysAuthFromFirestore();
+
+          // Request fresh QR code / fresh socket initialization
+          setTimeout(() => {
+            initBaileysSocket(true).catch(console.error);
+          }, 1000);
         } else {
-          // If session was registered OR is reconnecting, DO NOT wipe session auth files!
+          // If statusCode !== DisconnectReason.loggedOut (e.g. 408 Timeout, 428 Restart Required, 500 Server Error, 515 Stream Error):
+          // Do not wipe credentials. Automatically trigger initBaileysSocket() with exponential backoff (2s, 5s, 10s)
           baileysStatus = "connecting";
           baileysQrCode = null;
 
-          consecutiveLogoutErrors++;
-          console.log(`[Baileys Connection Disconnect] Socket closed (statusCode ${statusCode}, msg: ${errMessage}). Registered: ${isRegistered}. Retrying connection attempt #${consecutiveLogoutErrors}...`);
+          consecutiveReconnectAttempts++;
+          const backoffDelays = [2000, 5000, 10000, 15000, 20000];
+          const delay = backoffDelays[Math.min(consecutiveReconnectAttempts - 1, backoffDelays.length - 1)] || 10000;
 
-          // Exponential backoff reconnect delay
-          const delay = Math.min(1500 * Math.pow(1.4, Math.min(consecutiveLogoutErrors, 6)), 25000);
+          console.log(`[Baileys Auto-Reconnection] Socket closed (statusCode: ${statusCode}, reason: ${errMessage}). Firestore credentials preserved intact. Automatically reconnecting in ${delay / 1000}s (Attempt #${consecutiveReconnectAttempts})...`);
 
           if (baileysReconnectTimer) {
             clearTimeout(baileysReconnectTimer);
@@ -1019,6 +1134,10 @@ async function disconnectBaileys() {
     clearInterval(baileysPresenceInterval);
     baileysPresenceInterval = null;
   }
+  if (baileysReconnectTimer) {
+    clearTimeout(baileysReconnectTimer);
+    baileysReconnectTimer = null;
+  }
   if (baileysSocket) {
     try {
       await baileysSocket.sendPresenceUpdate("unavailable");
@@ -1031,16 +1150,14 @@ async function disconnectBaileys() {
   baileysStatus = "disconnected";
   baileysQrCode = null;
   baileysUserPhone = null;
+  consecutiveReconnectAttempts = 0;
 
   try {
-    if (fs.existsSync(BAILEYS_AUTH_DIR)) {
-      fs.rmSync(BAILEYS_AUTH_DIR, { recursive: true, force: true });
-    }
+    const { clearAuth } = await useFirestoreAuthState("default_session");
+    await clearAuth();
   } catch (e) {
-    console.warn("[Baileys] Error wiping auth folder on disconnect:", e);
+    console.warn("[Baileys] Error clearing Firestore auth on disconnect:", e);
   }
-
-  await clearBaileysAuthFromFirestore();
 
   try {
     await setDoc(doc(db, "settings", "whatsapp"), {
@@ -1063,10 +1180,10 @@ async function sendWhatsAppMessage(toPhone: string, text: string) {
   }
 
   const dispatchViaBaileys = async (attempt = 1): Promise<any> => {
-    // If socket is not connected, check if saved creds exist and auto-reconnect
+    // If socket is not connected, check if saved creds exist in Firestore and auto-reconnect
     if (!baileysSocket || baileysStatus !== "connected") {
-      const credsFile = path.join(BAILEYS_AUTH_DIR, "creds.json");
-      if (fs.existsSync(credsFile)) {
+      const hasCreds = await hasStoredAuthCreds("default_session");
+      if (hasCreds) {
         console.log(`[WhatsApp Dispatch: Baileys] Socket status is '${baileysStatus}'. Attempting auto-reconnect (Attempt ${attempt})...`);
         await initBaileysSocket(!baileysSocket || baileysStatus === "error" || baileysStatus === "disconnected");
         let attempts = 0;
@@ -1167,8 +1284,8 @@ async function sendWhatsAppMessage(toPhone: string, text: string) {
 
     if (!phoneAccountId || !accessToken) {
       // Check if Baileys is available as fallback
-      const credsFile = path.join(BAILEYS_AUTH_DIR, "creds.json");
-      if (baileysSocket || fs.existsSync(credsFile)) {
+      const hasCreds = await hasStoredAuthCreds("default_session");
+      if (baileysSocket || hasCreds) {
         console.log("[WhatsApp Dispatch] Official Meta credentials missing. Falling back to Baileys WhatsApp Web mode...");
         return await dispatchViaBaileys(1);
       }
@@ -1247,20 +1364,17 @@ app.post("/api/baileys/request-pairing-code", async (req, res) => {
       return;
     }
 
-    // Check if auth folder exists with unregistered creds - if so, perform a clean wipe so fresh keys are issued
-    const credsFile = path.join(BAILEYS_AUTH_DIR, "creds.json");
-    if (fs.existsSync(credsFile)) {
+    // Check if unregistered creds exist in memory/Firestore - if so, purge to allow fresh code request
+    if (baileysSocket?.authState?.creds && !baileysSocket.authState.creds.registered) {
+      console.log("[Baileys Pairing Code] Purging old unregistered credentials before fresh pairing code request...");
       try {
-        const rawCreds = JSON.parse(fs.readFileSync(credsFile, "utf-8"));
-        if (!rawCreds.registered) {
-          console.log("[Baileys Pairing Code] Purging old unregistered credentials before fresh pairing code request...");
-          if (baileysSocket) {
-            try { baileysSocket.end(undefined); } catch (e) {}
-            baileysSocket = null;
-          }
-          fs.rmSync(BAILEYS_AUTH_DIR, { recursive: true, force: true });
-        }
+        const { clearAuth } = await useFirestoreAuthState("default_session");
+        await clearAuth();
       } catch (e) {}
+      if (baileysSocket) {
+        try { baileysSocket.end(undefined); } catch (e) {}
+        baileysSocket = null;
+      }
     }
 
     // Always ensure socket is cleanly initialized when requesting a fresh pairing code
@@ -1298,12 +1412,15 @@ app.post("/api/baileys/request-pairing-code", async (req, res) => {
       code = await baileysSocket.requestPairingCode(cleanedPhone);
     } catch (firstErr: any) {
       console.warn("[Baileys Pairing Code] Initial attempt failed:", firstErr?.message || firstErr);
-      // Purge auth dir, re-initialize socket cleanly and retry
+      // Purge auth and re-initialize socket cleanly to retry
       if (baileysSocket) {
         try { baileysSocket.end(undefined); } catch (e) {}
         baileysSocket = null;
       }
-      fs.rmSync(BAILEYS_AUTH_DIR, { recursive: true, force: true });
+      try {
+        const { clearAuth } = await useFirestoreAuthState("default_session");
+        await clearAuth();
+      } catch (e) {}
       await initBaileysSocket(true);
       await new Promise((r) => setTimeout(r, 1200));
       if (baileysSocket) {
@@ -1465,15 +1582,6 @@ app.post("/api/whatsapp/send", async (req, res) => {
     res.status(500).json({ error: err.message || "Failed to dispatch WhatsApp message." });
   }
 });
-
-// Auto-start Baileys on startup only if saved credentials exist
-const credsFilePath = path.join(BAILEYS_AUTH_DIR, "creds.json");
-if (fs.existsSync(credsFilePath)) {
-  console.log("[Baileys Boot] Saved session found. Initializing Baileys engine on server startup...");
-  initBaileysSocket().catch(err => console.warn("[Baileys Boot] Warning:", err));
-} else {
-  console.log("[Baileys Boot] No active Baileys session saved. Awaiting QR scan in WhatsApp config.");
-}
 
 // Vite & Static file serving setup
 async function setupVite() {
@@ -1898,15 +2006,16 @@ async function startServer() {
   startConversationsListener();
   startSystemNotificationsListener();
   
-  // Auto-restore active WhatsApp Baileys session if credentials exist on disk or Firestore
+  // Auto-connect active WhatsApp Baileys session if credentials exist in Firestore
   try {
-    const hasRestored = await restoreBaileysAuthFromFirestore();
-    const credsFile = path.join(BAILEYS_AUTH_DIR, "creds.json");
-    if (hasRestored || fs.existsSync(credsFile)) {
-      console.log("[Baileys Boot] Found active WhatsApp session credentials. Auto-connecting...");
+    const hasCreds = await hasStoredAuthCreds("default_session");
+    if (hasCreds) {
+      console.log("[Baileys Boot] Found active persistent WhatsApp session in Firestore. Auto-connecting...");
       initBaileysSocket(false).catch((err) => {
         console.warn("[Baileys Boot] Auto-connect failed:", err);
       });
+    } else {
+      console.log("[Baileys Boot] No saved WhatsApp session in Firestore. Awaiting pairing / QR scan.");
     }
   } catch (err) {
     console.warn("[Baileys Boot] Warning checking initial auth state:", err);
