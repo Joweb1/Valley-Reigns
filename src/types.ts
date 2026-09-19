@@ -58,7 +58,7 @@ export interface UserProfile {
   email: string;
   displayName: string;
   role: "seeker" | "staff" | "admin" | "employer";
-  canPostJobs: boolean;
+  canPostJobs?: boolean;
   canMessageSeekers?: boolean;
   isVerifiedEmployer?: boolean;
   companyName?: string;
@@ -125,7 +125,7 @@ export interface EmployerApplicant {
 export interface ChatMessage {
   id?: string;
   chatId?: string;
-  sender: "customer" | "staff" | "system" | "guest";
+  sender: "customer" | "staff" | "system" | "guest" | "seeker";
   text: string;
   timestamp: number;
   senderUid?: string;
@@ -133,6 +133,8 @@ export interface ChatMessage {
   senderAvatar?: string;
   senderRole?: string;
   attachmentUrl?: string;
+  attachmentType?: "file" | "image" | "pdf" | string;
+  attachmentName?: string;
   fileType?: string;
   read?: boolean;
   readAt?: number;

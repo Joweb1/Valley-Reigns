@@ -1265,12 +1265,14 @@ export const ChatInbox: React.FC<ChatInboxProps> = ({ jobsList, searchQuery: ext
                           {isStaffOrSelf && (
                             <>
                               {msg.deliveryStatus === "sending" && (
-                                <Clock className="w-3.5 h-3.5 text-slate-400 animate-pulse" title="Sending to Firestore..." />
+                                <span title="Sending to Firestore...">
+                                  <Clock className="w-3.5 h-3.5 text-slate-400 animate-pulse" />
+                                </span>
                               )}
                               {msg.deliveryStatus === "failed" && (
                                 <button
                                   type="button"
-                                  onClick={() => handleSendDirectMessage(msg.text, { attachmentUrl: msg.attachmentUrl, fileType: msg.fileType })}
+                                  onClick={() => handleSendDirectMessage(msg.text, { attachmentUrl: msg.attachmentUrl, fileType: (msg.fileType as "file" | "image" | "pdf") || undefined })}
                                   className="inline-flex items-center gap-0.5 text-rose-600 hover:text-rose-700 text-[10px] font-bold cursor-pointer"
                                   title="Failed to deliver. Click to retry"
                                 >
@@ -1279,10 +1281,14 @@ export const ChatInbox: React.FC<ChatInboxProps> = ({ jobsList, searchQuery: ext
                                 </button>
                               )}
                               {(msg.deliveryStatus === "sent" || (!msg.deliveryStatus && !msg.read)) && !msg.read && (
-                                <Check className="w-3.5 h-3.5 text-slate-400" title="Sent to server" />
+                                <span title="Sent to server">
+                                  <Check className="w-3.5 h-3.5 text-slate-400" />
+                                </span>
                               )}
                               {(msg.read || msg.deliveryStatus === "delivered") && (
-                                <CheckCheck className="w-3.5 h-3.5 text-[#34B7F1]" title="Read by recipient" />
+                                <span title="Read by recipient">
+                                  <CheckCheck className="w-3.5 h-3.5 text-[#34B7F1]" />
+                                </span>
                               )}
                             </>
                           )}

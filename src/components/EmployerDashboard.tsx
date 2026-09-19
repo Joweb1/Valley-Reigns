@@ -402,11 +402,11 @@ export const EmployerDashboard: React.FC = () => {
   // Derived metrics for KPI cards
   const activeJobsCount = jobs.filter(j => !j.isUnavailable).length;
   const totalApplicantsCount = applicants.length;
-  const activeRequestsCount = recruitmentRequests.filter(r => r.status !== "fulfilled" && r.status !== "closed").length;
-  const newApplicantsCount = applicants.filter(a => a.status === "new").length;
-  const screeningCount = applicants.filter(a => a.status === "screening").length;
-  const interviewCount = applicants.filter(a => a.status === "interview").length;
-  const offeredCount = applicants.filter(a => a.status === "offered").length;
+  const activeRequestsCount = recruitmentRequests.filter(r => r.status !== "completed" && r.status !== "cancelled").length;
+  const newApplicantsCount = applicants.filter(a => a.status === "reviewing").length;
+  const screeningCount = applicants.filter(a => a.status === "shortlisted").length;
+  const interviewCount = applicants.filter(a => a.status === "interview_scheduled").length;
+  const offeredCount = applicants.filter(a => a.status === "hired").length;
 
   // Filtered applicants
   const filteredApplicants = applicants.filter(a => {
@@ -1060,10 +1060,12 @@ export const EmployerDashboard: React.FC = () => {
                           {req.jobCategory}
                         </span>
                         <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-md ${
-                          req.status === "fulfilled"
+                          req.status === "completed"
                             ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
-                            : req.status === "in_progress"
+                            : req.status === "sourcing" || req.status === "reviewing"
                             ? "bg-blue-50 text-blue-800 border border-blue-200"
+                            : req.status === "cancelled"
+                            ? "bg-rose-50 text-rose-800 border border-rose-200"
                             : "bg-amber-50 text-amber-800 border border-amber-200"
                         }`}>
                           {String(req.status || "").replace("_", " ").toUpperCase()}
@@ -1256,15 +1258,20 @@ export const EmployerDashboard: React.FC = () => {
             <div className="flex-1 p-6 overflow-y-auto space-y-3 bg-slate-50/30">
               {(() => {
                 const conv = conversations[selectedChatId];
-                const msgs: ChatMessage[] = conv?.messages || [
-                  {
-                    id: "init-1",
-                    chatId: selectedChatId,
-                    sender: "staff",
-                    text: `Hello ${companyProfile.displayName}! I am your dedicated recruitment lead from Valley Reigns. We are actively coordinating your vacancy candidate sourcing. Feel free to send us any specifications here.`,
-                    timestamp: Date.now() - 3600000
-                  }
-                ];
+                const rawMsgs = conv?.messages;
+                const msgs: ChatMessage[] = Array.isArray(rawMsgs)
+                  ? rawMsgs
+                  : rawMsgs && typeof rawMsgs === "object"
+                  ? Object.values(rawMsgs)
+                  : [
+                      {
+                        id: "init-1",
+                        chatId: selectedChatId,
+                        sender: "staff",
+                        text: `Hello ${companyProfile.displayName}! I am your dedicated recruitment lead from Valley Reigns. We are actively coordinating your vacancy candidate sourcing. Feel free to send us any specifications here.`,
+                        timestamp: Date.now() - 3600000
+                      }
+                    ];
 
                 return msgs.map((m: ChatMessage, idx: number) => {
                   const isMe = m.sender === "customer" || m.sender === "guest";

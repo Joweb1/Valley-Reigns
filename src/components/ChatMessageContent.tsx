@@ -28,7 +28,7 @@ export const ChatMessageContent: React.FC<ChatMessageContentProps> = ({ msg, isS
     if (msg.attachmentUrl) {
       attachments.push({
         url: msg.attachmentUrl,
-        type: msg.attachmentType || (isImageUrl(msg.attachmentUrl) ? "image" : isPdfUrl(msg.attachmentUrl) ? "pdf" : "file"),
+        type: (msg.attachmentType as "image" | "pdf" | "file") || (isImageUrl(msg.attachmentUrl) ? "image" : isPdfUrl(msg.attachmentUrl) ? "pdf" : "file"),
         name: msg.attachmentName
       });
     }
