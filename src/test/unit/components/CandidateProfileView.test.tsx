@@ -1,6 +1,7 @@
 import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render } from '@testing-library/react';
+import { fireEvent } from '@testing-library/dom';
 import { CandidateProfileView } from '../../../components/CandidateProfileView';
 import type { Conversation, Job } from '../../../types';
 
@@ -53,7 +54,7 @@ describe('Unit Tests: CandidateProfileView Component', () => {
     const handleBack = vi.fn();
     const handleOpenChat = vi.fn();
 
-    render(
+    const { getByText, getAllByText } = render(
       <CandidateProfileView
         conversation={mockConversation}
         currentUser={{ uid: 'staff-1', email: 'staff@valleyreigns.com', displayName: 'Staff Sarah', role: 'staff' }}
@@ -63,15 +64,15 @@ describe('Unit Tests: CandidateProfileView Component', () => {
       />
     );
 
-    expect(screen.getByText('Samuel Adebayo')).toBeTruthy();
-    expect(screen.getAllByText(/Senior React Developer/i).length).toBeGreaterThan(0);
+    expect(getByText('Samuel Adebayo')).toBeTruthy();
+    expect(getAllByText(/Senior React Developer/i).length).toBeGreaterThan(0);
   });
 
   it('triggers onBack or action callback appropriately', () => {
     const handleBack = vi.fn();
     const handleOpenChat = vi.fn();
 
-    render(
+    const { getByRole } = render(
       <CandidateProfileView
         conversation={mockConversation}
         currentUser={{ uid: 'staff-1', email: 'staff@valleyreigns.com', displayName: 'Staff Sarah', role: 'staff' }}
@@ -81,10 +82,11 @@ describe('Unit Tests: CandidateProfileView Component', () => {
       />
     );
 
-    const backBtn = screen.getByRole('button', { name: /back/i });
+    const backBtn = getByRole('button', { name: /back/i });
     if (backBtn) {
-      fireEvent.click(backBtn);
+      backBtn.click();
       expect(handleBack).toHaveBeenCalled();
     }
   });
 });
+

@@ -1,6 +1,6 @@
 import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { Header } from '../../../components/Header';
 
@@ -36,23 +36,23 @@ vi.mock('../../../context/NotificationContext', () => ({
 
 describe('Unit Tests: Header Component', () => {
   it('renders application branding and navigation links', () => {
-    render(
+    const { getByText } = render(
       <MemoryRouter>
         <Header />
       </MemoryRouter>
     );
 
-    expect(screen.getByText(/Valley Reigns/i)).toBeTruthy();
+    expect(getByText(/Valley Reigns/i)).toBeTruthy();
   });
 
   it('displays user greeting or role badge for authenticated users', () => {
-    render(
+    const { getAllByText } = render(
       <MemoryRouter>
         <Header />
       </MemoryRouter>
     );
 
     // Platform Admin role is reflected in header
-    expect(screen.getAllByText(/Admin/i).length).toBeGreaterThan(0);
+    expect(getAllByText(/Admin/i).length).toBeGreaterThan(0);
   });
 });

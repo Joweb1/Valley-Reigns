@@ -1,6 +1,7 @@
 import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render } from '@testing-library/react';
+import { fireEvent } from '@testing-library/dom';
 import { MemoryRouter } from 'react-router-dom';
 import { JobCard } from '../../../components/JobCard';
 import type { Job } from '../../../types';
@@ -36,39 +37,40 @@ const mockJob: Job = {
 
 describe('Unit Tests: JobCard Component', () => {
   it('renders job title and location accurately', () => {
-    render(
+    const { getByText, getAllByText } = render(
       <MemoryRouter>
         <JobCard job={mockJob} />
       </MemoryRouter>
     );
 
-    expect(screen.getByText('Lead Frontend Developer')).toBeTruthy();
-    expect(screen.getAllByText(/Victoria Island/i).length).toBeGreaterThan(0);
-    expect(screen.getByText('Vacancy')).toBeTruthy();
+    expect(getByText('Lead Frontend Developer')).toBeTruthy();
+    expect(getAllByText(/Victoria Island/i).length).toBeGreaterThan(0);
+    expect(getByText('Vacancy')).toBeTruthy();
   });
 
   it('renders apply action button', () => {
-    render(
+    const { getByText } = render(
       <MemoryRouter>
         <JobCard job={mockJob} />
       </MemoryRouter>
     );
 
-    expect(screen.getByText(/Apply Now|Copy Link/i)).toBeTruthy();
+    expect(getByText(/Apply Now|Copy Link/i)).toBeTruthy();
   });
 
   it('expands description and toggles details state when Show Details button is clicked', () => {
-    render(
+    const { getByText } = render(
       <MemoryRouter>
         <JobCard job={mockJob} />
       </MemoryRouter>
     );
 
-    const showDetailsBtn = screen.getByText(/Show Details/i);
+    const showDetailsBtn = getByText(/Show Details/i);
     expect(showDetailsBtn).toBeTruthy();
     fireEvent.click(showDetailsBtn);
 
     // After expanding, details are rendered
-    expect(screen.getByText(/Hide Details/i)).toBeTruthy();
+    expect(getByText(/Hide Details/i)).toBeTruthy();
   });
 });
+
