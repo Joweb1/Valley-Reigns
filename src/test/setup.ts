@@ -1,6 +1,16 @@
 import '@testing-library/jest-dom';
 import { vi } from 'vitest';
 
+// Polyfill node:worker_threads markAsUncloneable for environments running Node < 21 with newer Undici / JSDOM
+try {
+  const workerThreads = require('node:worker_threads');
+  if (workerThreads && typeof workerThreads.markAsUncloneable !== 'function') {
+    workerThreads.markAsUncloneable = (obj: any) => obj;
+  }
+} catch {
+  // Not in a Node worker thread environment
+}
+
 // Mock window.matchMedia
 Object.defineProperty(window, 'matchMedia', {
   writable: true,
