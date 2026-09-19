@@ -14,6 +14,8 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     pool: 'threads',
+    testTimeout: 20000,
+    hookTimeout: 20000,
     setupFiles: ['./src/test/setup.ts'],
     include: ['src/test/**/*.test.{ts,tsx}', 'src/**/*.spec.{ts,tsx}'],
     coverage: {

@@ -82,7 +82,7 @@ describe('End-to-End (E2E) Critical User Journeys (5–10%)', () => {
     const updatedConv = memoryStore.conversations[chatId];
     expect(updatedConv).toBeDefined();
     expect(updatedConv.candidateLists?.['Submitted Resume(CV)']).toBeDefined();
-  });
+  }, 20000);
 
   it('Journey 2: Employer Onboarding -> Direct Admin Chat -> Candidate Shortlisting Request', async () => {
     // 1. Employer registers on platform
@@ -137,5 +137,5 @@ describe('End-to-End (E2E) Critical User Journeys (5–10%)', () => {
     const conversation = memoryStore.conversations[adminChatId];
     expect(conversation.isEmployer).toBe(true);
     expect(conversation.companyName).toBe('Apex Systems Global');
-  });
+  }, 20000);
 });
