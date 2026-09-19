@@ -3,8 +3,11 @@ name: CI/CD Pipeline
 on:
   push:
     branches: [main, master, develop]
+    tags:
+      - 'v*.*.*'
   pull_request:
     branches: [main, master, develop]
+  workflow_dispatch:
 
 env:
   NODE_VERSION: '20'
@@ -28,7 +31,7 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --legacy-peer-deps || npm install --legacy-peer-deps
 
       - name: Run TypeScript type check
         run: npm run lint
@@ -52,7 +55,7 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --legacy-peer-deps || npm install --legacy-peer-deps
 
       - name: Run Unit Tests with Vitest & React Testing Library
         run: npm run test:unit
@@ -76,7 +79,7 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --legacy-peer-deps || npm install --legacy-peer-deps
 
       - name: Run Integration Tests
         run: npm run test:integration
@@ -100,7 +103,7 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --legacy-peer-deps || npm install --legacy-peer-deps
 
       - name: Run E2E Test Suite
         run: npm run test:e2e
@@ -124,7 +127,7 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --legacy-peer-deps || npm install --legacy-peer-deps
 
       - name: Compile client bundle and server binary
         run: npm run build
@@ -143,7 +146,7 @@ jobs:
   deploy:
     name: 🚀 Continuous Deployment
     needs: build-verification
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -161,3 +164,93 @@ jobs:
           echo "🚀 Deploying verified production bundle to target Cloud environment..."
           # Deploy step target (e.g. Cloud Run / Firebase / Container Registry)
           echo "Deployment successful."
+
+  # =========================================================================
+  # Stage 7: Release & Package Publishing
+  # Creates and publishes the first package release and distribution assets
+  # =========================================================================
+  release:
+    name: 🏷️ Release & Publish Package
+    needs: [build-verification, deploy]
+    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v')) && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps || npm install --legacy-peer-deps
+
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: dist-bundle
+          path: dist/
+
+      - name: Package application release archive
+        id: package_step
+        run: |
+          VERSION=$(node -p "require('./package.json').version || '0.1.0'")
+          PKG_NAME=$(node -p "require('./package.json').name || 'valley-reigns'")
+          echo "PACKAGE_VERSION=$VERSION" >> $GITHUB_ENV
+          echo "PACKAGE_NAME=$PKG_NAME" >> $GITHUB_ENV
+          
+          # Create distributable archive bundles
+          tar -czvf "${PKG_NAME}-v0.1-production.tar.gz" dist/ package.json
+          zip -r "${PKG_NAME}-v0.1-production.zip" dist/ package.json
+          
+          # Create official npm package tarball
+          npm pack
+          echo "✅ Application package v0.1 generated successfully."
+
+      - name: Upload Release Package Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-packages
+          path: |
+            *.tgz
+            *.tar.gz
+            *.zip
+          retention-days: 30
+
+      - name: Create GitHub Release & Publish First Package
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+        with:
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || 'v0.1' }}
+          name: Valley Reigns v0.1 Production Release
+          body: |
+            ## Valley Reigns Recruitment Platform - Release v0.1 🎉
+
+            ### 🚀 Summary of Release
+            - **Real-Time Communication**: Multi-role messaging between Candidates, Employers, and Administrators with Firestore and local fallback.
+            - **Employer Management & Direct Sourcing**: Dedicated corporate onboarding, verified company tags, and streamlined talent shortlisting.
+            - **Verified Security & Routing**: Role-based access control (RBAC), end-to-end type safety, and real-time push notification sync.
+            - **Chat Isolation**: Office 1-on-1 chats and team group chats remain strictly isolated from public customer service queues and admin routing boards.
+            - **Full Test Pyramid Verification**: Unit tests (60–70%), Integration tests (20–30%), and E2E critical user journey tests (5–10%) passing green.
+
+            ### 📦 Included Packages & Distribution Artifacts
+            - `valley-reigns-0.1.0.tgz` (npm package tarball)
+            - `valley-reigns-v0.1-production.tar.gz` (Standalone production bundle)
+            - `valley-reigns-v0.1-production.zip` (Zip archive)
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          files: |
+            *.tgz
+            *.tar.gz
+            *.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+

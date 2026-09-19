@@ -1810,6 +1810,35 @@ export function extractConversationMessages(
   return valid;
 }
 
+/**
+ * Utility to identify internal staff conversations (Office Chat 1-on-1, Staff Team Hub group chat, test diagnostic logs).
+ * These must remain isolated within OfficeChatView and GroupChatView and must never appear in candidate/employer customer service inboxes,
+ * the Admin Chat page ("All" tab), or the Chat Management / Ticket Routing board ("Pending", "Ongoing", etc.).
+ */
+export function isInternalStaffChat(c: Partial<Conversation> | any): boolean {
+  if (!c) return false;
+  if (
+    c.conversationType === "staff_direct" || 
+    c.conversationType === "staff_group" || 
+    c.conversationType === "test_report"
+  ) {
+    return true;
+  }
+  const chatId = String(c.chatId || c.id || "");
+  if (
+    chatId.startsWith("direct_") || 
+    chatId.startsWith("group_") || 
+    chatId.startsWith("test_log_") || 
+    chatId.startsWith("test_run_")
+  ) {
+    return true;
+  }
+  if (c.channelId || c.directChatId) {
+    return true;
+  }
+  return false;
+}
+
 // Helper to normalize conversation data from Firestore
 function normalizeConversation(id: string, data: any): Conversation {
   if (!data) return data;
@@ -3056,6 +3085,7 @@ export async function checkAndEnforceSLAs(): Promise<void> {
   // Check local memoryStore
   const convs = Object.values(memoryStore.conversations);
   for (const conv of convs) {
+    if (isInternalStaffChat(conv)) continue;
     // Only pending chats are marked as abandoned when SLA countdown elapses; ongoing chats are never abandoned
     if (conv.status !== "pending") continue;
 
@@ -3091,6 +3121,7 @@ export async function checkAndEnforceSLAs(): Promise<void> {
     const snap = await getDocs(collRef);
     for (const d of snap.docs) {
       const conv = d.data() as Conversation;
+      if (isInternalStaffChat(conv) || isInternalStaffChat({ chatId: d.id, ...conv })) continue;
       // Only pending chats are marked as abandoned when SLA countdown elapses; ongoing chats are never abandoned
       if (conv.status !== "pending") continue;
 
@@ -3143,6 +3174,7 @@ export async function pruneExpiredConversations(): Promise<void> {
   const localChatsToDelete: string[] = [];
 
   for (const conv of localConvs) {
+    if (isInternalStaffChat(conv)) continue;
     if (conv.status === "abandoned") {
       const abandonedTime = conv.abandonedAt || conv.lastMessageAt || conv.createdAt;
       if (now - abandonedTime > sixMonths) {
@@ -3170,6 +3202,7 @@ export async function pruneExpiredConversations(): Promise<void> {
     const snap = await getDocs(collRef);
     for (const d of snap.docs) {
       const conv = d.data() as Conversation;
+      if (isInternalStaffChat(conv) || isInternalStaffChat({ chatId: d.id, ...conv })) continue;
       let shouldDelete = false;
 
       if (conv.status === "abandoned") {

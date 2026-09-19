@@ -23,7 +23,8 @@ import {
   memoryStore,
   subscribeToAppSettings,
   getCachedAppSettingsTimeout,
-  getStaffReportDeadlineConfig
+  getStaffReportDeadlineConfig,
+  isInternalStaffChat
 } from "../lib/services";
 import { 
   BarChart3, 
@@ -466,14 +467,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ jobsList }) => {
   // Chat queries
   const getActiveChatsCount = (staffUid: string) => {
     return (Object.values(conversations) as Conversation[]).filter(
-      c => c.status === "ongoing" && c.assignedTo === staffUid
+      c => !isInternalStaffChat(c) && c.status === "ongoing" && c.assignedTo === staffUid
     ).length;
   };
 
   // Unclaimed routed chats (available requests in recruiter pending inbox)
   const getUnclaimedRoutedChatsCount = (staffUid: string) => {
     return (Object.values(conversations) as Conversation[]).filter(
-      c => c.status === "pending" && (!c.assignedTo) && (!c.sharedWith || c.sharedWith.length === 0 || c.sharedWith.includes(staffUid))
+      c => !isInternalStaffChat(c) && c.status === "pending" && (!c.assignedTo) && (!c.sharedWith || c.sharedWith.length === 0 || c.sharedWith.includes(staffUid))
     ).length;
   };
 
@@ -594,7 +595,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ jobsList }) => {
     (c.chatId && c.chatId.startsWith("employer_"))
   );
   
-  const conversationsList = (Object.values(conversations) as Conversation[]).sort(sortByRecentlyAdded);
+  const conversationsList = (Object.values(conversations) as Conversation[])
+    .filter(c => !isInternalStaffChat(c))
+    .sort(sortByRecentlyAdded);
   const pendingChats = conversationsList.filter(c => c.status === "pending" && !isEmployerConv(c)).sort(sortByRecentlyAdded);
   const ongoingChats = conversationsList.filter(c => c.status === "ongoing" || (isEmployerConv(c) && c.status !== "finished" && c.status !== "abandoned")).sort(sortByRecentlyAdded);
   const finishedChats = conversationsList.filter(c => c.status === "finished").sort(sortByRecentlyAdded);

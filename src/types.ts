@@ -235,6 +235,10 @@ export interface Conversation {
   userRole?: string;
   seekerRole?: string;
   employerUid?: string;
+  conversationType?: "staff_direct" | "staff_group" | "test_report" | string;
+  channelId?: string;
+  directChatId?: string;
+  participantUids?: string[];
   status: "pending" | "ongoing" | "finished" | "abandoned";
   assignedTo: string | null;
   assignedToName: string | null;

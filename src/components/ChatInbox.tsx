@@ -17,7 +17,8 @@ import {
   clearAllDatabaseChatsAndContacts,
   refreshConversationsFromFirestore,
   fetchLatestConversationMessages,
-  checkAndEnforceSLAs
+  checkAndEnforceSLAs,
+  isInternalStaffChat
 } from "../lib/services";
 import { useAuth } from "../context/AuthContext";
 import { ThreadCardSkeleton } from "./ThreadCardSkeleton";
@@ -369,6 +370,9 @@ export const ChatInbox: React.FC<ChatInboxProps> = ({ jobsList, searchQuery: ext
   // User-visible conversations
   const conversationsList = Object.values(conversations) as Conversation[];
   const userVisibleConversations = conversationsList.filter(c => {
+    // Exclude internal staff chats (office chat, group chat, test diagnostic logs)
+    if (isInternalStaffChat(c)) return false;
+
     // 2-Hour Claim Rule
     const isClaimedByOther = !!c.assignedTo && c.assignedTo !== currentUser?.uid;
     if (isClaimedByOther) {
@@ -391,6 +395,8 @@ export const ChatInbox: React.FC<ChatInboxProps> = ({ jobsList, searchQuery: ext
 
   // Tag filter matcher
   const matchesTagFilter = (c: Conversation, tagId: string) => {
+    if (isInternalStaffChat(c)) return false;
+
     const isEmployer = Boolean(
       c.isEmployer ||
       c.userRole === "employer" ||

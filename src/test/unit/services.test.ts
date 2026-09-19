@@ -3,7 +3,8 @@ import {
   normalizePhoneNumber, 
   sanitizeForFirestore, 
   extractConversationMessages,
-  generateMessageId
+  generateMessageId,
+  isInternalStaffChat
 } from '../../lib/services';
 import { isBootstrapAdminEmail } from '../../context/AuthContext';
 import type { ChatMessage } from '../../types';
@@ -112,6 +113,41 @@ describe('Unit Tests: Core Services & Utility Logic', () => {
       expect(id1).toContain('msg_');
       expect(typeof id1).toBe('string');
       expect(id1).not.toBe(id2);
+    });
+  });
+
+  describe('isInternalStaffChat', () => {
+    it('identifies 1-on-1 office chats and staff direct messages', () => {
+      expect(isInternalStaffChat({ conversationType: 'staff_direct' })).toBe(true);
+      expect(isInternalStaffChat({ chatId: 'direct_user1_user2' })).toBe(true);
+      expect(isInternalStaffChat({ directChatId: 'direct_user1_user2' })).toBe(true);
+    });
+
+    it('identifies staff team hub group chats', () => {
+      expect(isInternalStaffChat({ conversationType: 'staff_group' })).toBe(true);
+      expect(isInternalStaffChat({ chatId: 'group_staff_team_hub' })).toBe(true);
+      expect(isInternalStaffChat({ channelId: 'staff_team_hub' })).toBe(true);
+    });
+
+    it('identifies test diagnostic runs and logs', () => {
+      expect(isInternalStaffChat({ conversationType: 'test_report' })).toBe(true);
+      expect(isInternalStaffChat({ chatId: 'test_log_run_123' })).toBe(true);
+      expect(isInternalStaffChat({ chatId: 'test_run_456' })).toBe(true);
+    });
+
+    it('returns false for public candidate and job applicant conversations', () => {
+      expect(isInternalStaffChat({ chatId: 'chat_08012345678', customerPhone: '+2348012345678' })).toBe(false);
+      expect(isInternalStaffChat({ chatId: 'applicant_123', status: 'pending' })).toBe(false);
+    });
+
+    it('returns false for employer conversations', () => {
+      expect(isInternalStaffChat({ chatId: 'employer_google_nigeria', isEmployer: true })).toBe(false);
+      expect(isInternalStaffChat({ chatId: 'employer_08123456789', userRole: 'employer' })).toBe(false);
+    });
+
+    it('returns false for null/undefined objects', () => {
+      expect(isInternalStaffChat(null)).toBe(false);
+      expect(isInternalStaffChat(undefined)).toBe(false);
     });
   });
 });

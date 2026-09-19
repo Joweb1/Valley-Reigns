@@ -7,7 +7,8 @@ import {
   deleteConversation, 
   updateConversationStatus,
   subscribeToAppSettings,
-  getCachedAppSettingsTimeout
+  getCachedAppSettingsTimeout,
+  isInternalStaffChat
 } from "../lib/services";
 import { 
   BarChart3, 
@@ -180,10 +181,10 @@ export const TicketRoutingBoard: React.FC<TicketRoutingBoardProps> = ({
   );
 
   // Group counts and sorted arrays (most recently added first)
-  const pendingChats = conversationsList.filter(c => c.status === "pending" && !isEmployerConv(c)).sort(sortByRecentlyAdded);
-  const ongoingChats = conversationsList.filter(c => c.status === "ongoing" || (isEmployerConv(c) && c.status !== "finished" && c.status !== "abandoned")).sort(sortByRecentlyAdded);
-  const finishedChats = conversationsList.filter(c => c.status === "finished").sort(sortByRecentlyAdded);
-  const abandonedChats = conversationsList.filter(c => c.status === "abandoned" && !isEmployerConv(c)).sort(sortByRecentlyAdded);
+  const pendingChats = conversationsList.filter(c => !isInternalStaffChat(c) && c.status === "pending" && !isEmployerConv(c)).sort(sortByRecentlyAdded);
+  const ongoingChats = conversationsList.filter(c => !isInternalStaffChat(c) && (c.status === "ongoing" || (isEmployerConv(c) && c.status !== "finished" && c.status !== "abandoned"))).sort(sortByRecentlyAdded);
+  const finishedChats = conversationsList.filter(c => !isInternalStaffChat(c) && c.status === "finished").sort(sortByRecentlyAdded);
+  const abandonedChats = conversationsList.filter(c => !isInternalStaffChat(c) && c.status === "abandoned" && !isEmployerConv(c)).sort(sortByRecentlyAdded);
 
   const toggleSelectChat = (chatId: string) => {
     setSelectedChatIds(prev => {
@@ -251,7 +252,7 @@ export const TicketRoutingBoard: React.FC<TicketRoutingBoardProps> = ({
 
   const getActiveChatsCount = (staffUid: string) => {
     return conversationsList.filter(
-      c => c.status === "ongoing" && c.assignedTo === staffUid
+      c => !isInternalStaffChat(c) && c.status === "ongoing" && c.assignedTo === staffUid
     ).length;
   };
 

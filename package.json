@@ -1,7 +1,8 @@
 {
-  "name": "react-example",
+  "name": "valley-reigns",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.1.0",
+  "description": "Valley Reigns recruitment platform with real-time candidate routing and communication",
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
@@ -15,7 +16,8 @@
     "test:unit": "vitest run src/test/unit",
     "test:integration": "vitest run src/test/integration",
     "test:e2e": "vitest run src/test/e2e",
-    "test:ci": "npm run lint && npm run test:unit && npm run test:integration && npm run test:e2e && npm run build"
+    "test:ci": "npm run lint && npm run test:unit && npm run test:integration && npm run test:e2e && npm run build",
+    "package": "npm pack"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",

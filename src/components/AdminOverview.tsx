@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Job, Conversation, DailyStat } from "../types";
+import { isInternalStaffChat } from "../lib/services";
 import { 
   Eye, 
   Users, 
@@ -43,7 +44,7 @@ export const AdminOverview: React.FC<AdminOverviewProps> = ({
 
   // Total metrics
   const totalImpressions = jobsList.reduce((acc, job) => acc + job.impressions, 0);
-  const abandonedChats = conversationsList.filter(c => c.status === "abandoned");
+  const abandonedChats = conversationsList.filter(c => !isInternalStaffChat(c) && c.status === "abandoned");
 
   // Get data for recharts based on selected timeframe
   const getChartData = () => {
