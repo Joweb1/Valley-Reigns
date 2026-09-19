@@ -16,9 +16,11 @@ interface ParsedAttachment {
 export const ChatMessageContent: React.FC<ChatMessageContentProps> = ({ msg, isSelf }) => {
   const [activeImageModal, setActiveImageModal] = useState<string | null>(null);
 
+  if (!msg) return null;
+
   // Extract attachments from msg.attachmentUrl or parse msg.text
   const parseMessage = () => {
-    const text = msg.text || "";
+    const text = String(msg.text || "");
     const attachments: ParsedAttachment[] = [];
     let cleanText = text;
 

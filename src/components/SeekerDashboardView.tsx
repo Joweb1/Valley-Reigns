@@ -5,6 +5,7 @@ import { JobCardSkeleton } from "./JobCardSkeleton";
 import { getJobs, subscribeToJobs } from "../lib/services";
 import { Job } from "../types";
 import { getCategoryImage, getCategoryThemeColor } from "../lib/categories";
+import { useInfinitePagination, InfiniteScrollLoader } from "./InfiniteScrollLoader";
 import { 
   Search, 
   Briefcase, 
@@ -102,12 +103,6 @@ export const SeekerDashboardView: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
-  const [visibleCount, setVisibleCount] = useState(10);
-  const sentinelRef = React.useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    setVisibleCount(10);
-  }, [selectedCategory, searchQuery]);
 
   useEffect(() => {
     setLoading(true);
@@ -174,20 +169,15 @@ export const SeekerDashboardView: React.FC = () => {
     return list;
   })();
 
-  useEffect(() => {
-    if (!sentinelRef.current) return;
-    const observer = new IntersectionObserver((entries) => {
-      if (entries[0].isIntersecting) {
-        setVisibleCount((prev) => prev + 10);
-      }
-    }, {
-      rootMargin: "250px"
-    });
-    observer.observe(sentinelRef.current);
-    return () => observer.disconnect();
-  }, [sentinelRef, filteredJobs.length]);
-
-  const displayedJobs = filteredJobs.slice(0, visibleCount);
+  const {
+    displayedItems: displayedJobs,
+    hasMore,
+    isLoadingMore,
+    loadMore,
+    sentinelRef,
+    totalCount,
+    displayedCount
+  } = useInfinitePagination<Job>(filteredJobs, { pageSize: 8, initialPageSize: 8 }, [selectedCategory, searchQuery]);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-10 pb-8 sm:pb-16 space-y-6">
@@ -204,8 +194,8 @@ export const SeekerDashboardView: React.FC = () => {
       {/* Main Discover Workspace Section */}
       <div id="jobs-explore" className="space-y-6 pt-0">
         {/* Search Input bar */}
-        <div className="relative max-w-lg bg-slate-100/80 border border-slate-200 p-2.5 rounded-[24px] shadow-none hover:border-slate-300 focus-within:ring-2 focus-within:ring-[#1E88E5]/20 focus-within:border-[#1E88E5] transition-all duration-300 flex items-center gap-2.5 md:mx-auto">
-          <Search className="w-5 h-5 text-slate-400 ml-3 shrink-0" />
+        <div className="relative max-w-lg bg-white/90 border border-[#2d3a4e] p-2.5 rounded-[24px] shadow-none hover:border-[#1a2332] focus-within:ring-2 focus-within:ring-[#0B1B3D]/15 focus-within:border-[#0B1B3D] transition-all duration-300 flex items-center gap-2.5 md:mx-auto">
+          <Search className="w-5 h-5 text-slate-500 ml-3 shrink-0" />
           <input
             type="text"
             placeholder="Search..."
@@ -220,10 +210,6 @@ export const SeekerDashboardView: React.FC = () => {
 
         {/* Carousel Categories Container */}
         <div className="space-y-2 text-left">
-          <span className="text-[9px] font-mono font-bold text-[#0a3822] uppercase tracking-widest block px-1.5">
-            Tap a Category Card to Filter
-          </span>
-          
           {/* Horizontal Scrolling Carousel with springy hover animations */}
           <div className="overflow-x-auto flex gap-2 pb-4 px-1 scrollbar-none snap-x snap-mandatory">
             {CATEGORIES.map((cat) => {
@@ -310,11 +296,15 @@ export const SeekerDashboardView: React.FC = () => {
                   <JobCard job={job} />
                 </motion.div>
               ))}
-              {filteredJobs.length > visibleCount && (
-                <div ref={sentinelRef} className="h-14 flex items-center justify-center pt-4">
-                  <div className="w-6 h-6 border-2 border-[#1E88E5] border-t-transparent rounded-full animate-spin" />
-                </div>
-              )}
+              <InfiniteScrollLoader
+                hasMore={hasMore}
+                isLoadingMore={isLoadingMore}
+                onLoadMore={loadMore}
+                sentinelRef={sentinelRef}
+                totalCount={totalCount}
+                displayedCount={displayedCount}
+                itemLabel="jobs"
+              />
             </>
           )}
         </motion.div>

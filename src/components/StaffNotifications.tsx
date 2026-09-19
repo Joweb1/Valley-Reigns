@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { getSystemNotifications, markNotificationAsRead } from "../lib/services";
 import { SystemNotification } from "../types";
+import { useInfinitePagination, InfiniteScrollLoader } from "./InfiniteScrollLoader";
 import { 
   Bell, 
   ArrowLeft, 
@@ -91,6 +92,16 @@ export const StaffNotifications: React.FC = () => {
     }
     return true;
   });
+
+  const {
+    displayedItems: displayedNotifications,
+    hasMore,
+    isLoadingMore,
+    loadMore,
+    sentinelRef,
+    totalCount,
+    displayedCount
+  } = useInfinitePagination<SystemNotification>(filteredNotifications, { pageSize: 10, initialPageSize: 10 }, [filter, notifications.length]);
 
   const getIconForType = (type: string) => {
     switch (type) {
@@ -256,7 +267,7 @@ export const StaffNotifications: React.FC = () => {
       ) : (
         <div className="border border-slate-200 divide-y divide-slate-150 w-full bg-white rounded-none shadow-none overflow-hidden">
           <AnimatePresence initial={false}>
-            {filteredNotifications.map((notif) => (
+            {displayedNotifications.map((notif) => (
               <motion.div
                 key={notif.id}
                 initial={{ opacity: 0 }}
@@ -329,6 +340,17 @@ export const StaffNotifications: React.FC = () => {
               </motion.div>
             ))}
           </AnimatePresence>
+          <div className="p-4 bg-slate-50/50">
+            <InfiniteScrollLoader
+              hasMore={hasMore}
+              isLoadingMore={isLoadingMore}
+              onLoadMore={loadMore}
+              sentinelRef={sentinelRef}
+              totalCount={totalCount}
+              displayedCount={displayedCount}
+              itemLabel="notifications"
+            />
+          </div>
         </div>
       )}
     </div>

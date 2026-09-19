@@ -1,10 +1,29 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
-import { onAuthStateChanged, User, signOut } from "firebase/auth";
-import { auth, getUserProfile, saveUserProfile, memoryStore, getUserProfileByEmail, rtdb, setStaffOnlineStatus, recordStaffResumption } from "../lib/services";
+import { 
+  onAuthStateChanged, 
+  User, 
+  signOut,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signInWithPopup,
+  GoogleAuthProvider
+} from "firebase/auth";
+import { auth, getUserProfile, saveUserProfile, memoryStore, getUserProfileByEmail, setStaffOnlineStatus, recordStaffResumption } from "../lib/services";
 import { UserProfile } from "../types";
-import { ref, onValue, onDisconnect } from "firebase/database";
 
-interface AuthContextType {
+// Root bootstrap administrator emails that receive automatic admin privileges on sign-in
+const BOOTSTRAP_ADMIN_EMAILS = [
+  "admin@valleyreigns.com",
+  "genesisjosephoghene@gmail.com",
+  "genesisjosephoghene+admin@gmail.com"
+];
+
+export function isBootstrapAdminEmail(email?: string | null): boolean {
+  if (!email) return false;
+  return BOOTSTRAP_ADMIN_EMAILS.includes(email.trim().toLowerCase());
+}
+
+export interface AuthContextType {
   currentUser: UserProfile | null;
   firebaseUser: User | null;
   loading: boolean;
@@ -20,11 +39,11 @@ interface AuthContextType {
   loginWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
   updateUserPermission: (canPost: boolean) => void;
-  updateUserPreference: (preference: "whatsapp" | "in-app") => Promise<void>;
+  updateProfileData: (updates: Partial<UserProfile>) => Promise<void>;
   sendPasswordlessLink: (email: string) => Promise<void>;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
@@ -52,22 +71,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // If we have a Firebase Auth user, they take precedence over virtual session
         sessionStorage.removeItem("vr_virtual_user");
         let profile = await getUserProfile(user.uid);
-        
-        const adminEmails = [
-          "admin@valleyreigns.com"
-        ];
+        const userEmail = user.email || profile?.email || "";
+        const isAdminEmail = isBootstrapAdminEmail(userEmail);
         
         if (profile) {
-          const userEmail = profile.email || "";
-          const isAdminEmail = adminEmails.includes(userEmail.toLowerCase());
           let profileChanged = false;
           if (isAdminEmail && profile.role !== "admin") {
             profile.role = "admin";
             profile.canPostJobs = true;
-            profileChanged = true;
-          } else if (!isAdminEmail && profile.role === "admin") {
-            profile.role = "seeker";
-            profile.canPostJobs = false;
             profileChanged = true;
           }
           if (user.photoURL && profile.photoURL !== user.photoURL) {
@@ -84,8 +95,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
         } else {
           // Create a default profile
-          const userEmail = user.email || "";
-          const isAdminEmail = adminEmails.includes(userEmail.toLowerCase());
           const newProfile: UserProfile = {
             uid: user.uid,
             email: userEmail,
@@ -125,11 +134,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             const user = result.user;
             
             let profile = await getUserProfile(user.uid);
-            const adminEmails = ["admin@valleyreigns.com"];
+            const userEmail = user.email || email || profile?.email || "";
+            const isAdminEmail = isBootstrapAdminEmail(userEmail);
             
             if (profile) {
-              const userEmail = profile.email || "";
-              const isAdminEmail = adminEmails.includes(userEmail.toLowerCase());
               if (isAdminEmail && profile.role !== "admin") {
                 profile.role = "admin";
                 profile.canPostJobs = true;
@@ -138,8 +146,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               setCurrentUser(profile);
               memoryStore.currentUser = profile;
             } else {
-              const userEmail = user.email || email || "";
-              const isAdminEmail = adminEmails.includes(userEmail.toLowerCase());
               const newProfile: UserProfile = {
                 uid: user.uid,
                 email: userEmail,
@@ -212,7 +218,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         const google = (window as any).google;
         const env = (import.meta as any).env || {};
-        const clientId = env.VITE_FIREBASE_CLIENT_ID || "926249999164-fkqln5tu3922ovbtbi8a4fnsbnu4r151.apps.googleusercontent.com";
+        const clientId = env.VITE_FIREBASE_CLIENT_ID || "1003207364039-nbua57sirlsj60n52sgsd22c9u493dc0.apps.googleusercontent.com";
 
         if (google && google.accounts && google.accounts.id) {
           google.accounts.id.initialize({
@@ -228,26 +234,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 const user = result.user;
 
                 const profile = await getUserProfile(user.uid);
-                const adminEmails = [
-                  "admin@valleyreigns.com"
-                ];
+                const userEmail = user.email || profile?.email || "";
+                const isAdminEmail = isBootstrapAdminEmail(userEmail);
                 if (profile) {
-                  const userEmail = profile.email || "";
-                  const isAdminEmail = adminEmails.includes(userEmail.toLowerCase());
                   if (isAdminEmail && profile.role !== "admin") {
                     profile.role = "admin";
                     profile.canPostJobs = true;
-                    await saveUserProfile(profile);
-                  } else if (!isAdminEmail && profile.role === "admin") {
-                    profile.role = "seeker";
-                    profile.canPostJobs = false;
                     await saveUserProfile(profile);
                   }
                   setCurrentUser(profile);
                   memoryStore.currentUser = profile;
                 } else {
-                  const userEmail = user.email || "";
-                  const isAdminEmail = adminEmails.includes(userEmail.toLowerCase());
                   const newProfile: UserProfile = {
                     uid: user.uid,
                     email: userEmail,
@@ -325,12 +322,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     sessionStorage.removeItem("vr_explicit_logout");
     const normEmail = email.trim().toLowerCase();
     const resolvedPassword = password || "Password123";
-    let finalRole = role;
-    if (finalRole === "admin" && !normEmail.includes("admin@valleyreigns.com")) {
-      finalRole = "seeker";
-    }
+    const finalRole = isBootstrapAdminEmail(normEmail) ? "admin" : role;
     try {
-      const { createUserWithEmailAndPassword, signInWithEmailAndPassword } = await import("firebase/auth");
       let user;
       try {
         const userCredential = await createUserWithEmailAndPassword(auth, normEmail, resolvedPassword);
@@ -364,21 +357,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         authProvider: "email",
         messagingPreference: "in-app"
       };
-      await saveUserProfile(newProfile);
 
-      if (finalRole === "admin" || finalRole === "staff") {
-        await setStaffOnlineStatus(user.uid, true).catch(e => console.warn("Could not set staff online status:", e));
-        await recordStaffResumption(user.uid, displayName).catch(e => console.warn("Could not record staff resumption:", e));
-      }
-
+      // Set user immediately in UI state
       setCurrentUser(newProfile);
       memoryStore.currentUser = newProfile;
       sessionStorage.removeItem("vr_virtual_user");
+      sessionStorage.removeItem(`vr_dismissed_phone_prompt_${newProfile.uid}`);
+      setLoading(false);
+
+      // Run persistent sync in background
+      Promise.allSettled([
+        saveUserProfile(newProfile),
+        finalRole === "admin" || finalRole === "staff" 
+          ? setStaffOnlineStatus(user.uid, true).then(() => recordStaffResumption(user.uid, displayName))
+          : Promise.resolve()
+      ]).catch(e => console.warn("Background profile sync notice:", e));
+
     } catch (e) {
       console.error("Could not complete Firebase signup:", e);
-      throw e;
-    } finally {
       setLoading(false);
+      throw e;
     }
   };
 
@@ -386,54 +384,47 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setLoading(true);
     sessionStorage.removeItem("vr_explicit_logout");
     try {
-      const { GoogleAuthProvider, signInWithPopup } = await import("firebase/auth");
       const provider = new GoogleAuthProvider();
       const result = await signInWithPopup(auth, provider);
       const user = result.user;
       
       const profile = await getUserProfile(user.uid);
-      const adminEmails = [
-        "admin@valleyreigns.com"
-      ];
+      const userEmail = user.email || profile?.email || "";
+      const isAdminEmail = isBootstrapAdminEmail(userEmail);
       if (profile) {
-        const userEmail = profile.email || "";
-        const isAdminEmail = adminEmails.includes(userEmail.toLowerCase());
         let profileChanged = false;
         if (isAdminEmail && profile.role !== "admin") {
           profile.role = "admin";
           profile.canPostJobs = true;
-          profileChanged = true;
-        } else if (!isAdminEmail && profile.role === "admin") {
-          profile.role = "seeker";
-          profile.canPostJobs = false;
           profileChanged = true;
         }
         if (user.photoURL && profile.photoURL !== user.photoURL) {
           profile.photoURL = user.photoURL;
           profileChanged = true;
         }
-        if (profileChanged) {
-          await saveUserProfile(profile);
-        }
         setCurrentUser(profile);
         memoryStore.currentUser = profile;
+        setLoading(false);
+        if (profileChanged) {
+          saveUserProfile(profile).catch(() => {});
+        }
       } else {
         const newProfile: UserProfile = {
           uid: user.uid,
-          email: user.email || "",
+          email: userEmail,
           displayName: user.displayName || "Google Job Seeker",
-          role: "seeker",
-          canPostJobs: false,
+          role: isAdminEmail ? "admin" : "seeker",
+          canPostJobs: isAdminEmail ? true : false,
           authProvider: "google",
           photoURL: user.photoURL || undefined
         };
-        await saveUserProfile(newProfile);
         setCurrentUser(newProfile);
         memoryStore.currentUser = newProfile;
+        setLoading(false);
+        saveUserProfile(newProfile).catch(() => {});
       }
     } catch (e: any) {
       console.error("Google popup sign-in failed:", e);
-    } finally {
       setLoading(false);
     }
   };
@@ -491,11 +482,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       // 1. Fetch user by email to verify if registered or seed profile
       let profile = await getUserProfileByEmail(normEmail);
-      const adminEmails = [
-        "admin@valleyreigns.com",
-        "genesisjosephoghene+admin@gmail.com"
-      ];
-      const isAdminEmail = adminEmails.includes(normEmail);
+      const isAdminEmail = isBootstrapAdminEmail(normEmail);
       const isStaffEmail = normEmail.includes("staff") || normEmail.includes("recruiter");
 
       // If user profile is not found, check if it's a known admin/staff or seed user
@@ -523,7 +510,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       let firebaseUserObj: User | null = null;
       if (resolvedPassword !== "magic-link-bypass") {
         try {
-          const { signInWithEmailAndPassword, createUserWithEmailAndPassword } = await import("firebase/auth");
           try {
             const res = await signInWithEmailAndPassword(auth, normEmail, resolvedPassword);
             firebaseUserObj = res.user;
@@ -577,24 +563,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         profile.canPostJobs = true;
       }
 
-      // Save user profile under their active UID in Firestore
-      await saveUserProfile(profile);
-
-      // Also seed staff online status and record morning resumption if admin/staff
-      if (profile.role === "admin" || profile.role === "staff") {
-        await setStaffOnlineStatus(profile.uid, true).catch(err => console.warn("Could not set staff online status:", err));
-        await recordStaffResumption(profile.uid, profile.displayName).catch(err => console.warn("Could not record staff resumption:", err));
-      }
-
+      // Set user immediately in UI state
       setCurrentUser(profile);
       memoryStore.currentUser = profile;
+      sessionStorage.removeItem(`vr_dismissed_phone_prompt_${profile.uid}`);
       if (firebaseUserObj) {
         sessionStorage.removeItem("vr_virtual_user");
       } else {
         sessionStorage.setItem("vr_virtual_user", JSON.stringify(profile));
       }
-
       setLoading(false);
+
+      // Save user profile under active UID & update staff presence in background
+      Promise.allSettled([
+        saveUserProfile(profile),
+        (profile.role === "admin" || profile.role === "staff")
+          ? setStaffOnlineStatus(profile.uid, true).then(() => recordStaffResumption(profile.uid, profile.displayName))
+          : Promise.resolve()
+      ]).catch(err => console.warn("Background auth profile sync notice:", err));
+
       return profile;
     } catch (err) {
       setLoading(false);
@@ -616,6 +603,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // 2. Mark explicit logout in session storage to stop One Tap auto-triggering on unauthenticated mount
     sessionStorage.setItem("vr_explicit_logout", "true");
     sessionStorage.removeItem("vr_virtual_user");
+    try {
+      Object.keys(sessionStorage).forEach(key => {
+        if (key.startsWith("vr_dismissed_phone_prompt_")) {
+          sessionStorage.removeItem(key);
+        }
+      });
+    } catch (e) {}
     try {
       localStorage.removeItem("emailForSignIn");
     } catch (e) {}
@@ -663,18 +657,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const updateUserPreference = async (preference: "whatsapp" | "in-app") => {
+  const updateProfileData = async (updates: Partial<UserProfile>) => {
     if (currentUser) {
-      const updated = { ...currentUser, messagingPreference: preference };
+      const updated: UserProfile = { ...currentUser, ...updates };
       setCurrentUser(updated);
       memoryStore.currentUser = updated;
-      if (sessionStorage.getItem("vr_virtual_user")) {
-        sessionStorage.setItem("vr_virtual_user", JSON.stringify(updated));
+      const virtualSession = sessionStorage.getItem("vr_virtual_user");
+      if (virtualSession) {
+        try {
+          sessionStorage.setItem("vr_virtual_user", JSON.stringify(updated));
+        } catch (e) {}
       }
       try {
         await saveUserProfile(updated);
       } catch (e) {
-        console.warn("Could not sync updated preference to Firestore:", e);
+        console.warn("Could not sync updated profile data to Firestore:", e);
       }
     }
   };
@@ -690,7 +687,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     window.localStorage.setItem("emailForSignIn", normEmail);
   };
 
-  // Staff real-time presence heartbeat and onDisconnect registration
+  // Staff real-time presence heartbeat and lifecycle handlers
   useEffect(() => {
     if (!currentUser || (currentUser.role !== "staff" && currentUser.role !== "admin")) {
       return;
@@ -698,10 +695,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const uid = currentUser.uid;
     let presenceWorker: Worker | null = null;
-    let connectedUnsubscribe: any = null;
-    let disconnectRef: any = null;
 
-    // Heartbeat to update lastActive in Firestore & RTDB every 1 minute
+    // Heartbeat to update lastActive in Firestore every 1 minute
     const sendHeartbeat = async () => {
       try {
         await setStaffOnlineStatus(uid, true);
@@ -712,6 +707,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // Send immediate heartbeat on login/mount
     sendHeartbeat();
+
+    // Mark offline on tab close or page hide
+    const handleUnload = () => {
+      setStaffOnlineStatus(uid, false).catch(() => {});
+    };
+
+    window.addEventListener("beforeunload", handleUnload);
+    window.addEventListener("pagehide", handleUnload);
 
     // Set up Web Worker for non-throttled background heartbeat interval (1 minute)
     try {
@@ -749,36 +752,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       };
     }
 
-    // Set up Realtime Database onDisconnect trigger
-    if (rtdb) {
-      try {
-        const connectedRef = ref(rtdb, ".info/connected");
-        connectedUnsubscribe = onValue(connectedRef, async (snap) => {
-          const isConnected = snap.val() === true;
-          
-          window.dispatchEvent(new CustomEvent("rtdb-connection-changed", {
-            detail: { connected: isConnected }
-          }));
-
-          if (isConnected) {
-            console.log("[Presence] Connected to Firebase RTDB. Configuring onDisconnect handler.");
-            // Re-assert online status when reconnected
-            await setStaffOnlineStatus(uid, true);
-
-            const statusRef = ref(rtdb, `staff_statuses/${uid}`);
-            disconnectRef = onDisconnect(statusRef);
-            await disconnectRef.set({
-              status: "offline",
-              lastActive: Date.now()
-            });
-          }
-        });
-      } catch (e) {
-        console.warn("[Presence] Could not set up RTDB disconnect handler:", e);
-      }
-    }
-
     return () => {
+      window.removeEventListener("beforeunload", handleUnload);
+      window.removeEventListener("pagehide", handleUnload);
+
       if (presenceWorker) {
         try {
           if (typeof presenceWorker.postMessage === "function") {
@@ -789,21 +766,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           console.warn("[Presence] Failed to terminate worker:", e);
         }
       }
-      if (connectedUnsubscribe) {
-        connectedUnsubscribe();
-      }
-      if (disconnectRef) {
-        try {
-          disconnectRef.cancel();
-        } catch (e) {
-          console.warn("[Presence] Failed to cancel RTDB onDisconnect hook:", e);
-        }
-      }
     };
   }, [currentUser]);
 
   return (
-    <AuthContext.Provider value={{ currentUser, firebaseUser, loading, loginDemo, signupUser, loginWithEmail, loginWithGoogle, logout, updateUserPermission, updateUserPreference, sendPasswordlessLink }}>
+    <AuthContext.Provider value={{ currentUser, firebaseUser, loading, loginDemo, signupUser, loginWithEmail, loginWithGoogle, logout, updateUserPermission, updateProfileData, sendPasswordlessLink }}>
       {children}
     </AuthContext.Provider>
   );

@@ -1,10 +1,10 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { useWhatsAppConfig } from "../hooks/useWhatsAppConfig";
 import { Job } from "../types";
 import { incrementJobImpressions, simulateIncomingChat } from "../lib/services";
 import { getCategoryImage, getCategoryThemeColor } from "../lib/categories";
+import { copyToClipboard } from "../lib/clipboard";
 import { 
   ChevronDown, 
   MapPin, 
@@ -24,7 +24,8 @@ import {
   Heart,
   Briefcase,
   Clock,
-  ArrowRight
+  ArrowRight,
+  ExternalLink
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
@@ -295,6 +296,8 @@ export const JobCard: React.FC<JobCardProps> = ({ job, onImpressionsUpdate }) =>
   }, []);
 
   const isStaffOrAdmin = currentUser?.role === "staff" || currentUser?.role === "admin";
+  const isEmployer = currentUser?.role === "employer";
+  const canOnlyCopyLink = isStaffOrAdmin || isEmployer;
 
   const handleRestrictedAction = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -306,15 +309,18 @@ export const JobCard: React.FC<JobCardProps> = ({ job, onImpressionsUpdate }) =>
     e.preventDefault();
     e.stopPropagation();
     try {
-      await navigator.clipboard.writeText(whatsappLink);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      const isStaffOrAdmin = currentUser && (currentUser.role === "staff" || currentUser.role === "admin");
+      const refParam = isStaffOrAdmin ? `?ref=${currentUser.uid}` : "";
+      const shareUrl = `${window.location.origin}/jobs/${job.id}${refParam}`;
+      const success = await copyToClipboard(shareUrl);
+      if (success) {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      }
     } catch (err) {
-      console.error("Failed to copy link:", err);
+      console.debug("Failed to copy link:", err);
     }
   };
-
-  const isInApp = currentUser?.messagingPreference === "in-app";
 
   const handleInAppApply = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -322,6 +328,10 @@ export const JobCard: React.FC<JobCardProps> = ({ job, onImpressionsUpdate }) =>
 
     if (!currentUser) {
       window.dispatchEvent(new CustomEvent("open-auth-modal"));
+      return;
+    }
+
+    if (isEmployer) {
       return;
     }
 
@@ -356,12 +366,6 @@ export const JobCard: React.FC<JobCardProps> = ({ job, onImpressionsUpdate }) =>
     }
   };
 
-  const { getWhatsAppLink } = useWhatsAppConfig();
-
-  // Compile formatted WhatsApp deep link including connected phone number
-  const messageText = `I am applying for the ${job.title} position. Reference ID: ${job.id}`;
-  const whatsappLink = getWhatsAppLink(messageText);
-
   // Simulates direct application routing
   const triggerMockWebhook = async () => {
     setWebhookSent(true);
@@ -376,7 +380,7 @@ export const JobCard: React.FC<JobCardProps> = ({ job, onImpressionsUpdate }) =>
     }, 4000);
   };
 
-  const formattedSalary = job.salary.replace(/\$/g, "₦");
+  const formattedSalary = String(job.salary || "").replace(/\$/g, "₦");
 
   const theme = getJobTheme(job.category, job.title);
 
@@ -400,7 +404,7 @@ export const JobCard: React.FC<JobCardProps> = ({ job, onImpressionsUpdate }) =>
   return (
     <div 
       id={`job-card-${job.id}`} 
-      className={`bg-white border border-slate-200 rounded-[24px] sm:rounded-[32px] overflow-hidden shadow-sm hover:shadow-md transition-all duration-300 text-left relative flex flex-col border-l-4 ${isOpen ? "ring-1" : ""}`}
+      className={`bg-white border border-slate-200/90 rounded-[24px] sm:rounded-[32px] overflow-hidden shadow-[0_4px_24px_-4px_rgba(15,23,42,0.05),0_2px_8px_-2px_rgba(15,23,42,0.02)] hover:shadow-[0_12px_32px_-4px_rgba(15,23,42,0.08),0_4px_12px_-2px_rgba(15,23,42,0.03)] transition-all duration-300 text-left relative flex flex-col border-l-4 ${isOpen ? "ring-1" : ""}`}
       style={{ borderLeftColor: theme.primary, borderColor: isOpen ? theme.primary : undefined }}
     >
       {/* Top main split row */}
@@ -427,7 +431,7 @@ export const JobCard: React.FC<JobCardProps> = ({ job, onImpressionsUpdate }) =>
 
         {/* OVERLAPPING ROUNDED BADGE EXACTLY SITUATED ON DECORATIVE ARC DIVIDE */}
         <div 
-          className="absolute left-[20%] top-[82%] -translate-y-1/2 -translate-x-1/2 z-20 w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center bg-white shadow-md border-2"
+          className="absolute left-[20%] top-[82%] -translate-y-1/2 -translate-x-1/2 z-20 w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center bg-white shadow-[0_4px_14px_rgba(0,0,0,0.06)] border-2"
           style={{ borderColor: theme.primary }}
         >
           <div 
@@ -441,7 +445,7 @@ export const JobCard: React.FC<JobCardProps> = ({ job, onImpressionsUpdate }) =>
         {/* Right Section: Details */}
         <div className="flex-1 py-2.5 px-3.5 sm:py-4 sm:px-6 flex flex-col justify-between space-y-1.5 sm:space-y-2 pl-5 sm:pl-7 bg-white rounded-tl-[20px] sm:rounded-tl-[24px] -ml-4 relative z-10">
           {/* Top Header Row */}
-          <div className="flex items-center justify-between gap-4 w-full">
+          <div className="flex items-center justify-between gap-2 w-full">
             {/* Vacancy Badge */}
             <span 
               className="text-[8px] sm:text-[9px] font-sans font-black tracking-widest text-white px-2 py-0.5 rounded uppercase"
@@ -452,7 +456,7 @@ export const JobCard: React.FC<JobCardProps> = ({ job, onImpressionsUpdate }) =>
 
             {/* Location pill */}
             <div 
-              className={`flex items-center gap-1 px-2 py-0.5 rounded-full border border-opacity-30 ${theme.bgLight}`}
+              className={`flex items-center gap-1 px-2 py-0.5 rounded-full border border-opacity-30 ${theme.bgLight} shrink-0`}
               style={{ borderColor: theme.primary }}
             >
               <MapPin className="w-3 h-3 shrink-0" style={{ color: theme.primary }} />
@@ -516,7 +520,7 @@ export const JobCard: React.FC<JobCardProps> = ({ job, onImpressionsUpdate }) =>
               {/* Core Apply Action Button */}
               <div onClick={(e) => e.stopPropagation()}>
                 <motion.div whileHover="hover" whileTap="tap">
-                  {isStaffOrAdmin ? (
+                  {canOnlyCopyLink ? (
                     <motion.button
                       variants={{ hover: { scale: 1.03 }, tap: { scale: 0.97 } }}
                       onClick={handleCopyLink}
@@ -532,7 +536,7 @@ export const JobCard: React.FC<JobCardProps> = ({ job, onImpressionsUpdate }) =>
                       </div>
                       <span>{copied ? "Copied!" : "Copy Link"}</span>
                     </motion.button>
-                  ) : isInApp ? (
+                  ) : (
                     <motion.button
                       variants={{ hover: { scale: 1.03 }, tap: { scale: 0.97 } }}
                       onClick={handleInAppApply}
@@ -545,23 +549,6 @@ export const JobCard: React.FC<JobCardProps> = ({ job, onImpressionsUpdate }) =>
                       </div>
                       <span>{sendingInApp ? "Wait..." : "Apply Now"}</span>
                     </motion.button>
-                  ) : (
-                    <motion.a
-                      variants={{ hover: { scale: 1.03 }, tap: { scale: 0.97 } }}
-                      href={whatsappLink}
-                      target="_blank"
-                      referrerPolicy="no-referrer"
-                      rel="noreferrer"
-                      className="relative z-10 px-3 py-1.5 sm:px-4 sm:py-2 text-white font-sans font-black text-[10px] sm:text-xs rounded-xl flex items-center gap-1.5 cursor-pointer shadow-sm uppercase tracking-wider inline-flex decoration-none border-0"
-                      style={{ backgroundColor: theme.primary }}
-                    >
-                      <div className="flex items-center justify-center shrink-0">
-                        <svg className="w-4 h-4 fill-current text-white" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L0 24l6.335-1.662c1.746.953 3.71 1.458 5.704 1.459h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z" />
-                        </svg>
-                      </div>
-                      <span>Apply Now</span>
-                    </motion.a>
                   )}
                 </motion.div>
               </div>
@@ -671,11 +658,22 @@ export const JobCard: React.FC<JobCardProps> = ({ job, onImpressionsUpdate }) =>
 
               {/* Utility Panel */}
               <div className="pt-3 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div className="flex items-center gap-1.5 text-[9px] font-mono text-slate-400">
+                <div className="flex items-center gap-1.5 text-[9px] font-mono text-slate-400 flex-wrap">
                   <Calendar className="w-3.5 h-3.5" />
-                  Posted {new Date(job.createdAt).toLocaleDateString()}
+                  <span>Posted {new Date(job.createdAt).toLocaleDateString()}</span>
                   <span className="mx-1.5">•</span>
-                  <span>ID: {job.id}</span>
+                  <a
+                    href={`/jobs/${job.id}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigate(`/jobs/${job.id}`);
+                    }}
+                    title="Open public job view & SEO page"
+                    className="hover:text-blue-600 underline font-semibold transition-colors flex items-center gap-1 text-slate-600"
+                  >
+                    <span>ID: {job.id}</span>
+                    <ExternalLink className="w-2.5 h-2.5" />
+                  </a>
                   <span className="mx-1.5">•</span>
                   <span>{localImpressions} views</span>
                 </div>

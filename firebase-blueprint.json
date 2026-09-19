@@ -56,6 +56,24 @@
       },
       "required": ["chatId", "status", "createdAt", "lastMessageAt"]
     },
+    "ChatMessage": {
+      "title": "ChatMessage",
+      "description": "Subcollection document representing an individual message with a stable identifier.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Stable unique identifier for the message." },
+        "chatId": { "type": "string", "description": "Conversation ID this message belongs to." },
+        "sender": { "type": "string", "enum": ["customer", "staff", "system", "guest"], "description": "Origin category of the sender." },
+        "text": { "type": "string", "description": "Body content of the message." },
+        "timestamp": { "type": "number", "description": "Epoch timestamp when the message was sent." },
+        "senderUid": { "type": "string", "description": "Authenticated UID of the user who sent the message." },
+        "senderName": { "type": "string", "description": "Display name of the sender." },
+        "attachmentUrl": { "type": "string", "description": "ImageKit URL of any attached file or image." },
+        "fileType": { "type": "string", "description": "MIME type or category of the attachment." },
+        "read": { "type": "boolean", "description": "Whether message has been marked as read." }
+      },
+      "required": ["id", "chatId", "sender", "text", "timestamp"]
+    },
     "StaffStatus": {
       "title": "StaffStatus",
       "description": "Real-time presence and availability status for recruiter staff.",
@@ -196,7 +214,11 @@
     },
     "/conversations/{chatId}": {
       "schema": "Conversation",
-      "description": "Global durable storage for all messaging conversations, messages, and typing states."
+      "description": "Global durable storage for all messaging conversations, thread status, and typing states."
+    },
+    "/conversations/{chatId}/messages/{messageId}": {
+      "schema": "ChatMessage",
+      "description": "Subcollection storing individual chat messages with stable IDs, timestamps, and attachments."
     },
     "/staff_statuses/{uid}": {
       "schema": "StaffStatus",

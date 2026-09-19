@@ -1,3 +1,18 @@
+export interface JobSEOMetadata {
+  slug: string;
+  metaTitle: string;
+  metaDescription: string;
+  metaKeywords: string[];
+  canonicalUrl: string;
+  ogImageUrl: string;
+  employmentType: string;
+  currency: string;
+  baseSalaryNumeric: number | null;
+  validThroughDate: string;
+  faqSnippet?: Array<{ question: string; answer: string }>;
+  aiSummary: string;
+}
+
 export interface Job {
   id: string;
   title: string;
@@ -12,11 +27,12 @@ export interface Job {
   createdAt: number;
   postedByUid?: string;
   isUnavailable?: boolean;
+  seo?: JobSEOMetadata;
 }
 
 export interface SystemNotification {
   id: string;
-  type: "offline_routing" | "closed_conversation" | "reported_conversation" | "finished_conversation" | "new_job_posted" | "job_updated" | "job_deleted" | "report_submitted" | "awaiting_claim" | "abandoned_conversation" | "transferred_conversation" | "conversation_started" | "conversation_closed" | "conversation_finished" | "conversation_transferred" | "conversation_claimed" | "permission_request";
+  type: "offline_routing" | "closed_conversation" | "reported_conversation" | "finished_conversation" | "new_job_posted" | "job_updated" | "job_deleted" | "report_submitted" | "awaiting_claim" | "abandoned_conversation" | "transferred_conversation" | "conversation_started" | "conversation_closed" | "conversation_finished" | "conversation_transferred" | "conversation_claimed" | "permission_request" | "recruitment_request_submitted";
   title: string;
   message: string;
   timestamp: number;
@@ -55,10 +71,16 @@ export interface UserProfile {
   createdAt?: number;
   password?: string;
   authProvider?: "email" | "google";
-  messagingPreference?: "whatsapp" | "in-app";
   phoneNumber?: string;
   jobTitle?: string;
   photoURL?: string;
+  messagingPreference?: string;
+  cvUrl?: string;
+  cvName?: string;
+  cvUploadedAt?: number;
+  cvSize?: number;
+  bio?: string;
+  location?: string;
 }
 
 export interface EmployerRecruitmentRequest {
@@ -92,6 +114,7 @@ export interface EmployerApplicant {
   seekerEmail?: string;
   seekerPhoneMasked?: string;
   seekerCategory?: string;
+  seekerAvatar?: string;
   appliedAt: number;
   status: "reviewing" | "shortlisted" | "interview_scheduled" | "hired" | "rejected";
   interviewDate?: string;
@@ -101,9 +124,92 @@ export interface EmployerApplicant {
 
 export interface ChatMessage {
   id?: string;
+  chatId?: string;
   sender: "customer" | "staff" | "system" | "guest";
   text: string;
   timestamp: number;
+  senderUid?: string;
+  senderName?: string;
+  senderAvatar?: string;
+  senderRole?: string;
+  attachmentUrl?: string;
+  fileType?: string;
+  read?: boolean;
+  readAt?: number;
+  deliveryStatus?: "sending" | "sent" | "delivered" | "failed";
+  errorMessage?: string;
+}
+
+export interface StaffDirectConversation {
+  id: string; // sorted composite e.g. "staff1_staff2"
+  participantUids: string[];
+  participantNames: Record<string, string>;
+  participantAvatars?: Record<string, string>;
+  participantRoles?: Record<string, string>;
+  lastMessageText: string;
+  lastMessageAt: number;
+  lastSenderUid: string;
+  unreadCount?: Record<string, number>;
+  createdAt: number;
+}
+
+export interface StaffDirectMessage {
+  id: string;
+  directChatId: string;
+  senderUid: string;
+  senderName: string;
+  senderAvatar?: string;
+  senderRole?: "staff" | "admin";
+  recipientUid: string;
+  text: string;
+  timestamp: number;
+  attachmentUrl?: string;
+  fileType?: string;
+  deliveryStatus?: "sending" | "sent" | "delivered" | "failed";
+}
+
+export interface StaffGroupChatMessage {
+  id: string;
+  channelId: string; // e.g. "staff_team_hub"
+  senderUid: string;
+  senderName: string;
+  senderAvatar?: string;
+  senderRole?: "staff" | "admin";
+  text: string;
+  timestamp: number;
+  attachmentUrl?: string;
+  fileType?: string;
+  deliveryStatus?: "sending" | "sent" | "delivered" | "failed";
+}
+
+export interface ChatTestScenarioResult {
+  id: string;
+  name: string;
+  description: string;
+  status: "pending" | "running" | "passed" | "failed";
+  durationMs: number;
+  details: string;
+  assertions: { name: string; passed: boolean; error?: string }[];
+  metrics?: {
+    latencyMs?: number;
+    firestoreWriteTimeMs?: number;
+    roundtripTimeMs?: number;
+    docId?: string;
+  };
+}
+
+export interface ChatTestSuiteReport {
+  timestamp: number;
+  executedBy: string;
+  totalDurationMs: number;
+  scenarios: ChatTestScenarioResult[];
+  overallStatus: "passed" | "failed" | "running" | "idle";
+  summary: {
+    total: number;
+    passed: number;
+    failed: number;
+    avgLatencyMs: number;
+  };
 }
 
 export interface CandidateListLog {
@@ -123,9 +229,19 @@ export interface Conversation {
   chatId: string;
   customerPhone: string;
   name?: string;
+  companyName?: string;
+  companyIndustry?: string;
+  isEmployer?: boolean;
+  userRole?: string;
+  seekerRole?: string;
+  employerUid?: string;
   status: "pending" | "ongoing" | "finished" | "abandoned";
   assignedTo: string | null;
   assignedToName: string | null;
+  assignedStaffUid?: string;
+  assignedStaffName?: string;
+  adminUid?: string;
+  adminName?: string;
   sharedWith: string[];
   text: string;
   jobId: string;
@@ -212,6 +328,18 @@ export interface StaffReportReopenOverride {
   staffName?: string;
   reopenedAt: number; // timestamp when admin reopened submission
   targetDate?: string; // YYYY-MM-DD date
+}
+
+export interface AppSettings {
+  unclaimedChatTimeoutHours: number; // Duration in hours before an unclaimed chat becomes abandoned (default 24)
+  staffReportDeadlineTime?: string; // 24-hour time "HH:MM" e.g. "21:00" for 9:00 PM daily SLA target time
+  staffReportDeadlineLabel?: string; // Formatted label e.g. "9:00 PM Daily"
+  autoPruneMonths?: number;
+  companyName?: string;
+  supportEmail?: string;
+  officeHours?: string;
+  updatedAt?: number;
+  updatedBy?: string;
 }
 
 

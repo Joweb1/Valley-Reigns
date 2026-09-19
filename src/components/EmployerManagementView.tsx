@@ -10,6 +10,7 @@ import {
   getJobs,
   getEmployerRecruitmentRequests
 } from "../lib/services";
+import { useInfinitePagination, InfiniteScrollLoader } from "./InfiniteScrollLoader";
 import { 
   Building2, 
   Phone, 
@@ -166,6 +167,16 @@ export const EmployerManagementView: React.FC<EmployerManagementViewProps> = ({ 
 
     return true;
   });
+
+  const {
+    displayedItems: displayedEmployers,
+    hasMore,
+    isLoadingMore,
+    loadMore,
+    sentinelRef,
+    totalCount: totalPaginationCount,
+    displayedCount
+  } = useInfinitePagination<UserProfile>(filteredEmployers, { pageSize: 9, initialPageSize: 9 }, [searchQuery, filterType, viewMode]);
 
   const formatDate = (timestamp?: number) => {
     if (!timestamp) return "Active Corporate Partner";
@@ -415,7 +426,7 @@ export const EmployerManagementView: React.FC<EmployerManagementViewProps> = ({ 
            CARD GRID VIEW (With Expandable Details & Permission Switch)
            ========================================================= */
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
-          {filteredEmployers.map((emp) => {
+          {displayedEmployers.map((emp) => {
             const isExpanded = expandedEmployerId === emp.uid;
             const jobCount = getEmployerJobCount(emp);
             const ticketCount = getEmployerTicketCount(emp);
@@ -514,7 +525,7 @@ export const EmployerManagementView: React.FC<EmployerManagementViewProps> = ({ 
                             </div>
                           </div>
 
-                          {/* Company Phone & WhatsApp */}
+                          {/* Company Phone */}
                           <div className="space-y-0.5">
                             <span className="text-[10px] font-mono font-bold text-slate-400 uppercase">Corporate Phone</span>
                             <div className="flex items-center gap-1.5 text-slate-800 font-semibold truncate">
@@ -544,7 +555,7 @@ export const EmployerManagementView: React.FC<EmployerManagementViewProps> = ({ 
                                   rel="noreferrer" 
                                   className="text-blue-600 hover:underline flex items-center gap-1 truncate"
                                 >
-                                  <span className="truncate">{emp.companyWebsite.replace(/^https?:\/\//, "")}</span>
+                                  <span className="truncate">{String(emp.companyWebsite || "").replace(/^https?:\/\//, "")}</span>
                                   <ExternalLink className="w-2.5 h-2.5 shrink-0 opacity-70" />
                                 </a>
                               ) : (
@@ -703,17 +714,15 @@ export const EmployerManagementView: React.FC<EmployerManagementViewProps> = ({ 
                     {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
                   </button>
 
-                  {/* WhatsApp Liaison Link (Matching Saved Contacts) */}
+                  {/* Corporate Phone Direct Link */}
                   {emp.companyPhone && (
                     <a
-                      href={`https://wa.me/${emp.companyPhone.replace(/[^0-9]/g, "")}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="py-1.5 px-3 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-none cursor-pointer no-underline shrink-0"
-                      title="Contact Employer on WhatsApp"
+                      href={`tel:${emp.companyPhone}`}
+                      className="py-1.5 px-3 bg-[#0B1B3D] hover:bg-[#162A52] text-white text-xs font-extrabold rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-none cursor-pointer no-underline shrink-0"
+                      title="Call Employer Phone"
                     >
                       <Phone className="w-3.5 h-3.5" />
-                      <span className="hidden sm:inline">WhatsApp</span>
+                      <span className="hidden sm:inline">Call</span>
                     </a>
                   )}
                 </div>
@@ -739,7 +748,7 @@ export const EmployerManagementView: React.FC<EmployerManagementViewProps> = ({ 
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-medium text-xs">
-                {filteredEmployers.map((emp) => {
+                {displayedEmployers.map((emp) => {
                   const isExpanded = expandedEmployerId === emp.uid;
                   return (
                     <React.Fragment key={emp.uid}>
@@ -839,11 +848,9 @@ export const EmployerManagementView: React.FC<EmployerManagementViewProps> = ({ 
 
                             {emp.companyPhone && (
                               <a
-                                href={`https://wa.me/${emp.companyPhone.replace(/[^0-9]/g, "")}`}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="p-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-all cursor-pointer inline-flex items-center gap-1 font-bold text-[10px] no-underline"
-                                title="Open WhatsApp chat"
+                                href={`tel:${emp.companyPhone}`}
+                                className="p-1.5 bg-[#0B1B3D] hover:bg-[#162A52] text-white rounded-lg transition-all cursor-pointer inline-flex items-center gap-1 font-bold text-[10px] no-underline"
+                                title="Call Employer Phone"
                               >
                                 <Phone className="w-3 h-3" />
                               </a>
@@ -909,6 +916,17 @@ export const EmployerManagementView: React.FC<EmployerManagementViewProps> = ({ 
           </div>
         </div>
       )}
+
+      {/* Infinite Scroll Loader for Employers */}
+      <InfiniteScrollLoader
+        hasMore={hasMore}
+        isLoadingMore={isLoadingMore}
+        onLoadMore={loadMore}
+        sentinelRef={sentinelRef}
+        totalCount={totalPaginationCount}
+        displayedCount={displayedCount}
+        itemLabel="employers"
+      />
 
       {/* Delete Confirmation Modal (Matching Saved Contacts Modal) */}
       <AnimatePresence>

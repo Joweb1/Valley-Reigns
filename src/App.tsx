@@ -1,35 +1,20 @@
-import React, { useState, useEffect } from "react";
-import { BrowserRouter, Routes, Route, Navigate, Link, useLocation, useNavigate } from "react-router-dom";
+import React, { useState, useEffect, Suspense, lazy } from "react";
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { NotificationProvider } from "./context/NotificationContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { Header } from "./components/Header";
-import { JobCard } from "./components/JobCard";
-import { JobCardSkeleton } from "./components/JobCardSkeleton";
-import { AuthModal } from "./components/AuthModal";
-import { ChatInbox } from "./components/ChatInbox";
-import { AdminPanel } from "./components/AdminPanel";
-import { JobPostingForm } from "./components/JobPostingForm";
-import { SeekerDashboardView, getCategoryStyles } from "./components/SeekerDashboardView";
-import { SeekerMessagesView } from "./components/SeekerMessagesView";
-import { SeekerNotifications } from "./components/SeekerNotifications";
-import { WhatsAppSimulator } from "./components/WhatsAppSimulator";
-import { DatabaseSeederModal } from "./components/DatabaseSeederModal";
-import { DatabaseTesterModal } from "./components/DatabaseTesterModal";
-import { AdminDiagnosticsPage } from "./components/AdminDiagnosticsPage";
-import { AdminNotifications } from "./components/AdminNotifications";
-import { StaffNotifications } from "./components/StaffNotifications";
-import { AdminPostJobPage } from "./components/AdminPostJobPage";
-import { JobManagement } from "./components/JobManagement";
-import { PwaInstallPrompt } from "./components/PwaInstallPrompt";
-import { WhatsAppConfigPage } from "./components/WhatsAppConfigPage";
-import { ContactsPage } from "./components/ContactsPage";
-import { EmployerManagementPage } from "./components/EmployerManagementPage";
-import { StaffPromotionPage } from "./components/StaffPromotionPage";
 import { NetworkStatusMonitor } from "./components/NetworkStatusMonitor";
-import { StaffReportForm } from "./components/StaffReportForm";
-import { AnniversaryGraffitiIntro } from "./components/AnniversaryGraffitiIntro";
-import { EmployerDashboard } from "./components/EmployerDashboard";
+import { RouteLoadingFallback } from "./components/RouteLoadingFallback";
+import { RoleBottomNavigation } from "./components/RoleBottomNavigation";
+import { RoleSettingsSheets } from "./components/RoleSettingsSheets";
+import { AdminModals } from "./components/AdminModals";
+import { PreparingMessageOverlay } from "./components/PreparingMessageOverlay";
+
+// Lazy-loaded auxiliary modals & overlays
+const AuthModal = lazy(() => import("./components/AuthModal").then(m => ({ default: m.AuthModal })));
+const PwaInstallPrompt = lazy(() => import("./components/PwaInstallPrompt").then(m => ({ default: m.PwaInstallPrompt })));
+const AnniversaryGraffitiIntro = lazy(() => import("./components/AnniversaryGraffitiIntro").then(m => ({ default: m.AnniversaryGraffitiIntro })));
 
 // ==========================================
 // ANNIVERSARY CELEBRATION CONFIGURATION
@@ -37,811 +22,34 @@ import { EmployerDashboard } from "./components/EmployerDashboard";
 // Keep set to false during regular operation.
 export const ENABLE_ANNIVERSARY_CELEBRATION = false;
 // ==========================================
-import { getJobs, subscribeToJobs, checkAndEnforceSLAs } from "./lib/services";
-import { getCategoryImage } from "./lib/categories";
-import { Job } from "./types";
-import { 
-  Search, 
-  MapPin, 
-  DollarSign, 
-  Briefcase, 
-  Layers, 
-  Users, 
-  ShieldCheck, 
-  HelpCircle, 
-  Sparkles, 
-  UserPlus, 
-  ChevronRight, 
-  ArrowRight,
-  UserCheck,
-  Cpu,
-  HeartPulse,
-  Banknote,
-  LogIn,
-  Home,
-  Settings,
-  User,
-  MessageCircle,
-  MessageSquare,
-  ClipboardList,
-  Plus,
-  Info,
-  Download,
-  LogOut,
-  Clock,
-  BookUser,
-  Building2,
-  FileText
-} from "lucide-react";
-import { motion, AnimatePresence } from "motion/react";
 
-// ==========================================
-// 1. PUBLIC LANDING & JOB DISCOVERY FEED (/)
-// ==========================================
-const containerVariants = {
-  hidden: { opacity: 0 },
-  show: {
-    opacity: 1,
-    transition: {
-      staggerChildren: 0.05,
-    },
-  },
-};
+// Lazy-loaded route components for high performance route-level code splitting
+const JobSeekerDashboard = lazy(() => import("./components/JobSeekerDashboard"));
+const StaffDashboardView = lazy(() => import("./components/StaffDashboardView"));
+const AdminDashboardView = lazy(() => import("./components/AdminDashboardView"));
+const StaffPortalInvite = lazy(() => import("./components/StaffPortalInvite"));
+const SeekerDashboardView = lazy(() => import("./components/SeekerDashboardView").then(m => ({ default: m.SeekerDashboardView })));
+const SeekerMessagesView = lazy(() => import("./components/SeekerMessagesView").then(m => ({ default: m.SeekerMessagesView })));
+const SeekerNotifications = lazy(() => import("./components/SeekerNotifications").then(m => ({ default: m.SeekerNotifications })));
+const StaffNotifications = lazy(() => import("./components/StaffNotifications").then(m => ({ default: m.StaffNotifications })));
+const AdminNotifications = lazy(() => import("./components/AdminNotifications").then(m => ({ default: m.AdminNotifications })));
+const AdminPostJobPage = lazy(() => import("./components/AdminPostJobPage").then(m => ({ default: m.AdminPostJobPage })));
+const ContactsPage = lazy(() => import("./components/ContactsPage").then(m => ({ default: m.ContactsPage })));
+const EmployerManagementPage = lazy(() => import("./components/EmployerManagementPage").then(m => ({ default: m.EmployerManagementPage })));
+const StaffPromotionPage = lazy(() => import("./components/StaffPromotionPage").then(m => ({ default: m.StaffPromotionPage })));
+const AdminDiagnosticsPage = lazy(() => import("./components/AdminDiagnosticsPage").then(m => ({ default: m.AdminDiagnosticsPage })));
+const JobManagement = lazy(() => import("./components/JobManagement").then(m => ({ default: m.JobManagement })));
+const EmployerMessagesView = lazy(() => import("./components/EmployerMessagesView").then(m => ({ default: m.EmployerMessagesView })));
+const OfficeChatView = lazy(() => import("./components/OfficeChatView").then(m => ({ default: m.OfficeChatView })));
+const GroupChatView = lazy(() => import("./components/GroupChatView").then(m => ({ default: m.GroupChatView })));
+const AppSettingsPage = lazy(() => import("./components/AppSettingsPage").then(m => ({ default: m.AppSettingsPage })));
+const JobSeekerProfileView = lazy(() => import("./components/JobSeekerProfileView").then(m => ({ default: m.JobSeekerProfileView })));
+const StaffProfileView = lazy(() => import("./components/StaffProfileView").then(m => ({ default: m.StaffProfileView })));
+const SeekerPhonePromptModal = lazy(() => import("./components/SeekerPhonePromptModal").then(m => ({ default: m.SeekerPhonePromptModal })));
+const PublicJobView = lazy(() => import("./components/PublicJobView").then(m => ({ default: m.PublicJobView })));
 
-const itemVariants = {
-  hidden: { opacity: 0, y: 15 },
-  show: { 
-    opacity: 1, 
-    y: 0,
-    transition: {
-      type: "spring" as const,
-      stiffness: 110,
-      damping: 15,
-    },
-  },
-};
-
-const getCategoryIcon = (categoryName: string) => {
-  const normalized = categoryName.trim();
-  switch (normalized) {
-    case "Tech":
-      return Cpu;
-    case "Healthcare":
-      return HeartPulse;
-    case "Finance":
-      return Banknote;
-    case "AI & Analytics":
-      return Sparkles;
-    default:
-      return Briefcase;
-  }
-};
-
-const HomepageFooter: React.FC = () => {
-  return (
-    <footer className="relative bg-[#111827] text-white/90 overflow-hidden border-t border-[#1E88E5]/20 font-sans mt-24 select-none">
-      {/* Geometric / Vector Wave Pattern Overlay */}
-      <div className="absolute inset-0 opacity-[0.03] pointer-events-none">
-        <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
-          <defs>
-            <pattern id="footer-grid" width="40" height="40" patternUnits="userSpaceOnUse">
-              <path d="M 40 0 L 0 0 0 40" fill="none" stroke="white" strokeWidth="1" />
-            </pattern>
-          </defs>
-          <rect width="100%" height="100%" fill="url(#footer-grid)" />
-        </svg>
-      </div>
-
-      {/* Modern Wave Divider at the top */}
-      <div className="absolute top-0 left-0 right-0 h-4 bg-gradient-to-b from-[#FAFCFD] to-transparent opacity-10" />
-
-      {/* Vector lines glowing effect */}
-      <div className="absolute -left-20 -bottom-20 w-80 h-80 bg-[#1E88E5]/30 rounded-full blur-[80px] pointer-events-none" />
-      <div className="absolute -right-20 -top-20 w-80 h-80 bg-[#005F73]/20 rounded-full blur-[80px] pointer-events-none" />
-
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 relative z-10">
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-8 md:gap-12 pb-10 border-b border-white/10">
-          {/* Logo & Headline */}
-          <div className="col-span-1 md:col-span-5 space-y-4">
-            <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-xl overflow-hidden flex items-center justify-center shadow-md">
-                <img 
-                  src="/icon.svg" 
-                  alt="Valley Reigns Logo" 
-                  className="w-full h-full object-cover"
-                  referrerPolicy="no-referrer"
-                />
-              </div>
-              <span className="font-display font-extrabold tracking-wider text-xl text-white uppercase">
-                Valley Reigns
-              </span>
-            </div>
-            <p className="text-xs text-white/70 max-w-sm leading-relaxed">
-              We help you secure the highest paying, most fulfilling opportunities. Friendly local experts guiding you to beautiful careers across technology, healthcare, and finance.
-            </p>
-            {/* Dynamic visual vector graphic accent */}
-            <div className="flex items-center gap-1.5 pt-1">
-              <span className="w-2.5 h-2.5 bg-blue-400 rounded-full animate-pulse" />
-              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-blue-400">
-                100% Kind human recruitment support
-              </span>
-            </div>
-          </div>
-
-          {/* Quick Links */}
-          <div className="col-span-1 md:col-span-3 space-y-3">
-            <h4 className="text-xs font-mono font-bold uppercase tracking-widest text-blue-400">
-              Browse Sectors
-            </h4>
-            <ul className="space-y-2 text-xs">
-              {["Technology", "Medical & Health", "Money & Finance", "Smart AI Systems"].map((sec) => (
-                <li key={sec}>
-                  <button 
-                    onClick={() => {
-                      const el = document.getElementById("jobs-explore");
-                      if (el) el.scrollIntoView({ behavior: "smooth" });
-                    }}
-                    className="hover:text-blue-300 text-white/75 transition-colors cursor-pointer text-left font-medium"
-                  >
-                    {sec}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* Support Info */}
-          <div className="col-span-1 md:col-span-4 space-y-3">
-            <h4 className="text-xs font-mono font-bold uppercase tracking-widest text-blue-400">
-              Immediate Help
-            </h4>
-            <p className="text-xs text-white/75 leading-relaxed">
-              Have questions? Click the WhatsApp launcher or start a conversation in our live workspace sandbox below. No credit cards or complex registrations required.
-            </p>
-            <div className="pt-1">
-              <button 
-                onClick={() => window.dispatchEvent(new CustomEvent("open-auth-modal"))}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-800 hover:bg-blue-700 active:scale-95 text-white text-xs font-bold rounded-xl transition-all border border-blue-600/30"
-              >
-                <span>Get Started Now</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Footer bottom bar */}
-        <div className="pt-8 flex flex-col sm:flex-row justify-between items-center gap-4 text-[11px] text-white/50 font-mono">
-          <div>
-            &copy; {new Date().getFullYear()} Valley Reigns Recruitment. Designed with meticulous human care.
-          </div>
-          <div className="flex items-center gap-4">
-            <span className="hover:text-blue-400 cursor-pointer transition-colors">Privacy Charter</span>
-            <span>&bull;</span>
-            <span className="hover:text-blue-400 cursor-pointer transition-colors">Terms of Work</span>
-            <span>&bull;</span>
-            <span className="hover:text-blue-400 cursor-pointer transition-colors">Workspace API</span>
-          </div>
-        </div>
-      </div>
-    </footer>
-  );
-};
-
-const JobSeekerDashboard: React.FC = () => {
-  const { currentUser, loading: authLoading } = useAuth();
-  const navigate = useNavigate();
-  const [jobs, setJobs] = useState<Job[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedCategory, setSelectedCategory] = useState("All");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [visibleCount, setVisibleCount] = useState(10);
-  const sentinelRef = React.useRef<HTMLDivElement>(null);
-
-  // Strictly prevent any logged-in user from viewing or entering the homepage
-  useEffect(() => {
-    if (!authLoading && currentUser) {
-      const role = currentUser.role || "seeker";
-      if (role === "admin") {
-        navigate("/admin/dashboard", { replace: true });
-      } else if (role === "employer") {
-        navigate("/employer/dashboard", { replace: true });
-      } else {
-        navigate("/seeker", { replace: true });
-      }
-    }
-  }, [currentUser, authLoading, navigate]);
-
-  useEffect(() => {
-    setVisibleCount(10);
-  }, [selectedCategory, searchQuery]);
-
-  useEffect(() => {
-    setLoading(true);
-    const unsubscribe = subscribeToJobs((allJobs) => {
-      setJobs(allJobs);
-      setLoading(false);
-    });
-    return () => unsubscribe();
-  }, []);
-
-  // Filter listings dynamically based on criteria
-  const filteredJobs = (() => {
-    const list = jobs.filter((job) => {
-      if (job.isUnavailable) return false;
-      let matchesCategory = false;
-      if (selectedCategory === "All") {
-        matchesCategory = true;
-      } else if (selectedCategory === "New") {
-        const sevenDaysAgo = Date.now() - (7 * 24 * 60 * 60 * 1000);
-        const hasRecent = jobs.some(j => j.createdAt && j.createdAt >= sevenDaysAgo);
-        if (hasRecent) {
-          matchesCategory = !!(job.createdAt && job.createdAt >= sevenDaysAgo);
-        } else {
-          const sortedByNewest = [...jobs].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-          const top5Ids = sortedByNewest.slice(0, 5).map(j => j.id);
-          matchesCategory = top5Ids.includes(job.id);
-        }
-      } else {
-        matchesCategory = job.category === selectedCategory;
-      }
-
-      const matchesSearch = 
-        job.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        job.company.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        job.description.toLowerCase().includes(searchQuery.toLowerCase());
-      return matchesCategory && matchesSearch;
-    });
-
-    if (selectedCategory === "New") {
-      return [...list].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-    }
-    return list;
-  })();
-
-  useEffect(() => {
-    if (!sentinelRef.current) return;
-    const observer = new IntersectionObserver((entries) => {
-      if (entries[0].isIntersecting) {
-        setVisibleCount((prev) => prev + 10);
-      }
-    }, {
-      rootMargin: "250px"
-    });
-    observer.observe(sentinelRef.current);
-    return () => observer.disconnect();
-  }, [sentinelRef, filteredJobs.length]);
-
-  if (currentUser) {
-    return null;
-  }
-
-  // Dynamically derive categories from current listings in database
-  const uniqueCategoryNames: string[] = Array.from(new Set<string>(jobs.map(j => (j.category as string || "")).filter(Boolean)))
-    .filter((name: string) => !["Tech", "Healthcare", "Finance", "AI & Analytics", "New"].includes(name));
-
-  const CATEGORIES = [
-    { 
-      name: "All", 
-      label: "All Jobs", 
-      icon: Briefcase,
-    },
-    { 
-      name: "New", 
-      label: "New", 
-      icon: Clock,
-    },
-    { 
-      name: "Tech", 
-      label: "Technology", 
-      icon: Cpu,
-    },
-    { 
-      name: "Healthcare", 
-      label: "Medical & Health", 
-      icon: HeartPulse,
-    },
-    { 
-      name: "Finance", 
-      label: "Money & Finance", 
-      icon: Banknote,
-    },
-    { 
-      name: "AI & Analytics", 
-      label: "Smart AI Systems", 
-      icon: Sparkles,
-    },
-    ...uniqueCategoryNames.map(name => ({
-      name,
-      label: name,
-      icon: getCategoryIcon(name)
-    }))
-  ];
-
-  const displayedJobs = filteredJobs.slice(0, visibleCount);
-
-  return (
-    <div className="flex flex-col justify-between bg-[#FAFCFD]">
-      <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 pt-8 sm:pt-12 pb-8 sm:pb-16 space-y-6 flex-grow">
-        {/* Sleek Minimalist Header & Information Section matching Image Style */}
-        <section className="space-y-6 text-slate-900 text-center flex flex-col items-center">
-          <div className="space-y-2.5">
-            {/* Custom Badged Subtitle with Arrows and Slashes - VERY SMALL, NO SHADOW, BLACK TEXT, BLACK BORDER */}
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-              <motion.div 
-                initial={{ opacity: 0, scale: 0.85, y: -12 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                transition={{ duration: 0.6, ease: "easeOut" }}
-                className="inline-flex items-center gap-2 bg-white border border-black rounded-full px-4 py-1.5 shadow-none text-[10px] sm:text-xs font-bold text-black tracking-wider uppercase"
-              >
-                <span className="text-black">We find you awesome jobs</span>
-              </motion.div>
-
-              {ENABLE_ANNIVERSARY_CELEBRATION && (
-                <motion.button
-                  onClick={() => window.dispatchEvent(new CustomEvent("open-graffiti-intro"))}
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  className="inline-flex items-center gap-2 px-4 py-1.5 bg-slate-950 hover:bg-slate-900 text-white font-black text-[10px] sm:text-xs rounded-full shadow-[0_0_20px_rgba(245,158,11,0.35)] cursor-pointer transition-all border border-amber-400/50 uppercase tracking-wider"
-                >
-                  <Sparkles className="w-3.5 h-3.5 text-amber-400 animate-spin" style={{ animationDuration: "6s" }} />
-                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-pink-400 to-sky-300">
-                    🎉 3 Year Anniversary Intro
-                  </span>
-                  <span className="bg-gradient-to-r from-amber-500 to-pink-500 text-white text-[9px] font-black px-1.5 py-0.2 rounded-full">
-                    REPLAY
-                  </span>
-                </motion.button>
-              )}
-            </div>
-    
-            {/* Unique Display Typography: Valley Reigns Recruitment for Everyone */}
-            <div className="space-y-3 overflow-visible">
-              <h1 className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-display font-black tracking-tight leading-tight sm:leading-[1.05] select-none py-1 overflow-visible">
-                {/* The text Valley Reigns: bigger, darker, animated, and with padding to prevent clipping */}
-                <motion.span 
-                  initial={{ opacity: 0, y: 30, scale: 0.95 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  transition={{ 
-                    type: "spring",
-                    stiffness: 100,
-                    damping: 15,
-                    delay: 0.1 
-                  }}
-                  whileHover={{ scale: 1.02 }}
-                  className="bg-gradient-to-r from-slate-950 via-slate-900 to-[#0f172a] bg-clip-text text-transparent inline-block sm:inline cursor-default font-extrabold tracking-tighter py-3 pr-2"
-                >
-                  Valley Reigns
-                </motion.span>
-                
-                <motion.span 
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.7, delay: 0.3, ease: "easeOut" }}
-                  className="block mt-2 sm:mt-3 text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-sans font-light text-black tracking-tight"
-                >
-                  Recruitment for everyone
-                </motion.span>
-              </h1>
-            </div>
-          </div>
-    
-          {/* 12-Year-Old Level Layman Explanation */}
-          <motion.div 
-            initial={{ opacity: 0, y: 15 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.4, ease: "easeOut" }}
-            className="space-y-4 max-w-2xl mx-auto text-sm sm:text-base text-black font-normal leading-relaxed text-center"
-          >
-            <p>
-              Welcome to Valley Reigns! We are a friendly group of people who help you find really cool, high-paying jobs in technology, health, finance, and smart computer systems.
-            </p>
-          </motion.div>
-    
-          {/* Interactive Action Gateways with Cool Compressed/Lifting Animations */}
-          <div className="flex flex-row justify-center items-center gap-4 sm:gap-8 py-2 w-full">
-            {currentUser ? (
-              /* My Dashboard Button when Logged In with Animated Offset Retro Layering */
-              <motion.div 
-                whileHover="hover"
-                whileTap="tap"
-                className="relative inline-block"
-              >
-                {/* Background offset box */}
-                <motion.div 
-                  variants={{
-                    hover: { x: 3, y: 3 },
-                    tap: { x: 0, y: 0 }
-                  }}
-                  className="absolute -left-2 -top-2 w-full h-full border-2 border-[#0B1B3D] rounded-xl bg-transparent pointer-events-none transition-transform" 
-                />
-                {/* Main Solid Button */}
-                <Link
-                  to={currentUser.role === "admin" ? "/admin/dashboard" : currentUser.role === "employer" ? "/employer/dashboard" : "/seeker"}
-                  className="inline-flex"
-                >
-                  <motion.div
-                    variants={{
-                      hover: { x: -3, y: -3 },
-                      tap: { x: 0, y: 0 }
-                    }}
-                    className="relative z-10 px-6 py-3.5 sm:px-10 sm:py-4 bg-[#0B1B3D] text-white hover:bg-[#07132C] font-bold text-sm sm:text-lg rounded-xl flex items-center gap-2 cursor-pointer shadow-md inline-flex"
-                  >
-                    <Briefcase className="w-4 h-4 sm:w-5.5 sm:h-5.5 text-white" />
-                    <span>My Dashboard</span>
-                  </motion.div>
-                </Link>
-              </motion.div>
-            ) : (
-              /* Sign In Button with Animated Offset Retro Layering */
-              <motion.div 
-                whileHover="hover"
-                whileTap="tap"
-                className="relative inline-block"
-              >
-                {/* Background offset box */}
-                <motion.div 
-                  variants={{
-                    hover: { x: 3, y: 3 },
-                    tap: { x: 0, y: 0 }
-                  }}
-                  className="absolute -left-2 -top-2 w-full h-full border-2 border-[#0B1B3D] rounded-xl bg-transparent pointer-events-none transition-transform" 
-                />
-                {/* Main Solid Button */}
-                <motion.button 
-                  variants={{
-                    hover: { x: -3, y: -3 },
-                    tap: { x: 0, y: 0 }
-                  }}
-                  onClick={() => window.dispatchEvent(new CustomEvent("open-auth-modal"))}
-                  className="relative z-10 px-6 py-3.5 sm:px-10 sm:py-4 bg-[#0B1B3D] text-white hover:bg-[#07132C] font-bold text-sm sm:text-lg rounded-xl flex items-center gap-2 cursor-pointer shadow-md"
-                >
-                  <LogIn className="w-4 h-4 sm:w-5.5 sm:h-5.5 text-white" />
-                  <span>Sign In</span>
-                </motion.button>
-              </motion.div>
-            )}
-    
-            {/* Employ Workers Button: triggers AuthModal with employer context if not logged in, or navigates to /employer/dashboard if logged in as employer */}
-            <motion.button 
-              whileHover={{ scale: 1.05, y: -2, backgroundColor: "rgba(11, 60, 73, 0.04)" }}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => {
-                if (currentUser?.role === "employer") {
-                  navigate("/employer/dashboard");
-                } else {
-                  window.dispatchEvent(new CustomEvent("open-auth-modal", { detail: { role: "employer", tab: "signin" } }));
-                }
-              }}
-              className="px-6 py-3.5 sm:px-10 sm:py-4 bg-transparent border-2 border-[#1e3a8a] text-[#1e3a8a] font-bold text-sm sm:text-lg rounded-xl flex items-center gap-2 cursor-pointer transition-all shadow-sm"
-            >
-              <Building2 className="w-4 h-4 sm:w-5.5 sm:h-5.5 text-[#1e3a8a]" />
-              <span>Employ Workers</span>
-            </motion.button>
-          </div>
-  
-          {/* Employ Workers action */}
-        </section>
-  
-        {/* Main Discover Workspace Section */}
-        <div id="jobs-explore" className="space-y-6 text-left">
-          {/* Search Input bar */}
-          <div className="relative max-w-lg bg-slate-100/80 border border-slate-200 p-2.5 rounded-[24px] shadow-none hover:border-slate-300 focus-within:ring-2 focus-within:ring-[#1E88E5]/20 focus-within:border-[#1E88E5] transition-all duration-300 flex items-center gap-2.5 md:mx-auto">
-            <Search className="w-5 h-5 text-slate-400 ml-3 shrink-0" />
-            <input
-              type="text"
-              placeholder="Search..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full py-1.5 bg-transparent text-sm font-normal focus:outline-none text-slate-800 placeholder-gray-400"
-            />
-            <span className="text-[10px] font-mono font-bold bg-white text-[#1E88E5] px-3 py-1.5 rounded-xl uppercase tracking-wider shrink-0 hidden sm:inline border border-slate-200">
-              {filteredJobs.length} Vacancies
-            </span>
-          </div>
-  
-          {/* Carousel Categories Container */}
-          <div className="space-y-2">
-            <span className="text-[9px] font-mono font-bold text-[#0a3822] uppercase tracking-widest block px-1.5">
-              Tap a Category Card to Filter
-            </span>
-            
-            {/* Horizontal Scrolling Carousel with Cool background-image category buttons */}
-            <div className="overflow-x-auto flex gap-2 pb-4 px-1 scrollbar-none snap-x snap-mandatory">
-              {CATEGORIES.map((cat) => {
-                const IconComp = cat.icon;
-                const isSelected = selectedCategory === cat.name;
-                const styles = getCategoryStyles(cat.name);
-                const bgImg = getCategoryImage(cat.name);
-                return (
-                  <motion.button
-                    whileHover={{ 
-                      scale: 1.05, 
-                      y: -2,
-                      boxShadow: isSelected ? `0 8px 20px -8px ${styles.primary}33` : "0 8px 20px -8px rgba(0, 0, 0, 0.15)"
-                    }}
-                    whileTap={{ scale: 0.95 }}
-                    key={cat.name}
-                    onClick={() => setSelectedCategory(isSelected ? "All" : cat.name)}
-                    className={`w-[18%] min-w-[80px] sm:w-[9%] sm:min-w-[85px] h-16 sm:h-18 flex-shrink-0 flex flex-col items-center justify-center rounded-xl cursor-pointer transition-all snap-start select-none bg-cover bg-center border text-center relative overflow-hidden group`}
-                    style={{
-                      backgroundImage: `url(${bgImg})`,
-                      borderColor: isSelected ? styles.primary : "rgba(226, 232, 240, 0.2)",
-                      borderWidth: isSelected ? "3px" : "1px"
-                    }}
-                  >
-                    {/* Category accent color transparent overlay */}
-                    <div 
-                      className={`absolute inset-0 transition-all duration-200 z-0 ${
-                        isSelected 
-                          ? "opacity-85" 
-                          : "opacity-65 group-hover:opacity-45"
-                      }`}
-                      style={{
-                        backgroundColor: styles.primary
-                      }}
-                    />
-                    
-                    {/* Overlay content */}
-                    <div className="relative z-10 flex flex-col items-center justify-center space-y-1.5 w-full h-full p-1 text-white">
-                      <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 transition-colors ${
-                        isSelected ? "bg-white text-slate-950 shadow-sm" : "bg-white/20 text-white backdrop-blur-sm"
-                      }`}>
-                        {IconComp ? (
-                          <IconComp className="w-3.5 h-3.5" />
-                        ) : (
-                          <Briefcase className="w-3.5 h-3.5" />
-                        )}
-                      </div>
-                      <span className="text-[9px] sm:text-[11px] font-sans font-black tracking-tight block text-white drop-shadow-sm px-1 line-clamp-2 leading-tight">
-                        {cat.label}
-                      </span>
-                    </div>
-                  </motion.button>
-                );
-              })}
-            </div>
-          </div>
-  
-          {/* Job Accordions Feed */}
-          <motion.div 
-            className="space-y-4 max-w-4xl mx-auto"
-            variants={containerVariants}
-            initial="hidden"
-            animate="show"
-            key={`${selectedCategory}-${searchQuery}`}
-          >
-            {loading ? (
-              <div className="space-y-4">
-                {[1, 2, 3].map((n) => (
-                  <JobCardSkeleton key={n} />
-                ))}
-              </div>
-            ) : filteredJobs.length === 0 ? (
-              <div className="bg-white border border-slate-150 rounded-3xl p-12 text-center">
-                <Briefcase className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-                <h4 className="text-sm font-sans font-extrabold text-slate-800">No Jobs Listed Here</h4>
-                <p className="text-xs font-sans text-slate-400 max-w-sm mx-auto mt-1 leading-relaxed">
-                  We couldn't find any jobs matching that description! Try selecting another category card or clearing your search.
-                </p>
-              </div>
-            ) : (
-              <>
-                {displayedJobs.map((job) => (
-                  <motion.div key={job.id} variants={itemVariants}>
-                    <JobCard job={job} />
-                  </motion.div>
-                ))}
-                {filteredJobs.length > visibleCount && (
-                  <div ref={sentinelRef} className="h-14 flex items-center justify-center pt-4">
-                    <div className="w-6 h-6 border-2 border-[#1E88E5] border-t-transparent rounded-full animate-spin" />
-                  </div>
-                )}
-              </>
-            )}
-          </motion.div>
-        </div>
-      </div>
-
-      {/* Deep Green Vector Design Footer (Home page only) */}
-      <HomepageFooter />
-    </div>
-  );
-};
-
-// ==========================================
-// 2. STAFF WORKSPACE DASHBOARD VIEW (/staff)
-// ==========================================
-const StaffDashboardView: React.FC = () => {
-  const { currentUser } = useAuth();
-  const navigate = useNavigate();
-
-  const [jobs, setJobs] = useState<Job[]>([]);
-  const location = useLocation();
-  const searchParams = new URLSearchParams(location.search);
-  const tabParam = searchParams.get("tab");
-  const staffTab = (tabParam === "post-job") ? "post-job" : (tabParam === "report" ? "report" : "inbox");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [hasActiveChat, setHasActiveChat] = useState(false);
-
-  const refreshJobs = async () => {
-    const list = await getJobs();
-    setJobs(list);
-  };
-
-  useEffect(() => {
-    refreshJobs();
-  }, []);
-
-  const isInbox = staffTab === "inbox";
-
-  return (
-    <div className={isInbox ? (hasActiveChat ? "w-full h-full flex flex-col bg-white min-h-0 md:max-w-7xl md:mx-auto md:px-4 sm:px-6 lg:px-8 md:pt-12 md:pb-12 md:h-auto" : "w-full min-h-screen bg-white pt-2 sm:pt-4 pb-12 md:max-w-7xl md:mx-auto md:px-4 sm:px-6 lg:px-8 md:pt-12 md:pb-12") : "max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10 space-y-6"}>
-      
-      {/* Render selected workspace tabs */}
-      <div className={isInbox && hasActiveChat ? "w-full h-full flex flex-col min-h-0" : "w-full"}>
-        {staffTab === "inbox" && (
-          <ChatInbox jobsList={jobs} searchQuery={searchQuery} onActiveChatChange={setHasActiveChat} />
-        )}
-        
-        {staffTab === "post-job" && (
-          <div className="max-w-3xl mx-auto">
-            <JobPostingForm onJobAdded={refreshJobs} />
-          </div>
-        )}
-
-        {staffTab === "report" && (
-          <div className="py-2">
-            <StaffReportForm />
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
-
-// ==========================================
-// 3. ADMIN OPERATIONS PANEL VIEW (/admin)
-// ==========================================
-const AdminDashboardView: React.FC = () => {
-  const [jobs, setJobs] = useState<Job[]>([]);
-
-  const refreshJobs = async () => {
-    const list = await getJobs();
-    setJobs(list);
-  };
-
-  useEffect(() => {
-    refreshJobs();
-  }, []);
-
-  return (
-    <div className="max-w-7xl mx-auto px-2.5 sm:px-4 lg:px-6 pt-10 sm:pt-14 pb-8 sm:pb-12 space-y-8">
-      <AdminPanel jobsList={jobs} />
-    </div>
-  );
-};
-
-// ==========================================
-// 4. HIDDEN RECRUITER REGISTRATION PORTAL ROUTE (/auth/staff-portal-invite)
-// ==========================================
-const StaffPortalInvite: React.FC = () => {
-  const { signupUser, currentUser } = useAuth();
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [complete, setComplete] = useState(false);
-
-  const handleRegister = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSubmitting(true);
-    
-    // Register as 'staff'
-    await signupUser(email, name, "staff");
-    
-    setSubmitting(false);
-    setComplete(true);
-  };
-
-  if (complete || currentUser?.role === "staff") {
-    return (
-      <div className="min-h-[500px] flex items-center justify-center p-4">
-        <div className="bg-white border border-slate-100 shadow-xl rounded-3xl p-8 max-w-md w-full text-center space-y-5">
-          <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center text-[#1E88E5] mx-auto">
-            <UserCheck className="w-6 h-6" />
-          </div>
-          <div>
-            <h3 className="text-xl font-sans font-bold text-slate-900 tracking-tight">
-              Recruiter Account Unlocked!
-            </h3>
-            <p className="text-xs font-sans text-slate-400 leading-relaxed mt-1">
-              Your staff credentials have been configured and session authenticated.
-            </p>
-          </div>
-          <Link
-            to="/staff"
-            className="w-full py-3 bg-[#1E88E5] hover:bg-[#1565C0] text-white rounded-xl text-xs font-sans font-extrabold flex items-center justify-center gap-1.5 transition-colors shadow-md"
-          >
-            Enter Staff Dashboard Console <ChevronRight className="w-4 h-4" />
-          </Link>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="min-h-[600px] flex items-center justify-center p-4">
-      <div className="bg-white border border-slate-100 shadow-xl rounded-3xl p-8 max-w-md w-full space-y-6">
-        <div className="text-center">
-          <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center text-[#1E88E5] mx-auto mb-3">
-            <UserPlus className="w-5 h-5" />
-          </div>
-          <h2 className="text-xl font-sans font-extrabold text-slate-900 tracking-tight">
-            Recruiter Enrollment Portal
-          </h2>
-          <span className="text-[10px] font-mono text-[#1E88E5] font-bold uppercase tracking-wider block mt-1">
-            Secure Staff Invite Route
-          </span>
-        </div>
-
-        <form onSubmit={handleRegister} className="space-y-4 text-slate-800">
-          <div className="space-y-1">
-            <label className="text-[10px] font-mono font-bold text-slate-400 uppercase block">
-              Full Legal Name
-            </label>
-            <input
-              type="text"
-              required
-              placeholder="e.g. Marcus Vance"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-sans font-medium focus:border-[#1E88E5] focus:outline-none"
-            />
-          </div>
-
-          <div className="space-y-1">
-            <label className="text-[10px] font-mono font-bold text-slate-400 uppercase block">
-              Recruiter Email
-            </label>
-            <input
-              type="email"
-              required
-              placeholder="e.g. vance@valleyreigns.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-sans font-medium focus:border-[#1E88E5] focus:outline-none"
-            />
-          </div>
-
-          <div className="space-y-1">
-            <label className="text-[10px] font-mono font-bold text-slate-400 uppercase block">
-              Enrollment Token Key
-            </label>
-            <input
-              type="password"
-              required
-              placeholder="••••••••"
-              defaultValue="VALLEY_STAFF_2026"
-              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-sans font-medium focus:border-[#1E88E5] focus:outline-none"
-            />
-          </div>
-
-          <button
-            type="submit"
-            disabled={submitting}
-            className="w-full py-3 bg-[#1E88E5] hover:bg-[#1565C0] text-white rounded-xl text-xs font-sans font-extrabold shadow-md shadow-blue-950/10 flex items-center justify-center cursor-pointer"
-          >
-            {submitting ? "Registering Credentials..." : "Enroll Recruiter & Log In"}
-          </button>
-        </form>
-
-        <p className="text-[10px] font-sans text-slate-400 text-center leading-relaxed">
-          Enrolling will register your profile, assigning the role of <strong>'staff'</strong>. Your profile will instantly be authorized to route conversation payloads.
-        </p>
-      </div>
-    </div>
-  );
-};
+import { checkAndEnforceSLAs, simulateIncomingChat } from "./lib/services";
+import { AnimatePresence, motion } from "motion/react";
 
 // ==========================================
 // MAIN REUTER LAYOUT CONFIGURATION
@@ -870,9 +78,34 @@ function AppContent() {
   const [isStaffSettingsOpen, setIsStaffSettingsOpen] = useState(false);
   const [isSeekerSettingsOpen, setIsSeekerSettingsOpen] = useState(false);
   const [isEmployerSettingsOpen, setIsEmployerSettingsOpen] = useState(false);
+  const [isEmployerTicketOpen, setIsEmployerTicketOpen] = useState(false);
   const [showAdminAccountModal, setShowAdminAccountModal] = useState(false);
   const [showAdminAboutModal, setShowAdminAboutModal] = useState(false);
+  const [showSeekerPhonePrompt, setShowSeekerPhonePrompt] = useState(false);
   const [isAppInstalled, setIsAppInstalled] = useState(false);
+
+  // Trigger phone prompt on sign in for job seekers without stored phone number
+  useEffect(() => {
+    if (!currentUser) {
+      setShowSeekerPhonePrompt(false);
+      return;
+    }
+
+    const isSeeker = currentUser.role === "seeker" || (!currentUser.role && !["admin", "staff", "employer"].includes(currentUser.role as any));
+    const isMissingPhone = !currentUser.phoneNumber || !currentUser.phoneNumber.trim();
+
+    if (isSeeker && isMissingPhone) {
+      const isDismissed = sessionStorage.getItem(`vr_dismissed_phone_prompt_${currentUser.uid}`);
+      if (!isDismissed) {
+        const timer = setTimeout(() => {
+          setShowSeekerPhonePrompt(true);
+        }, 600);
+        return () => clearTimeout(timer);
+      }
+    } else {
+      setShowSeekerPhonePrompt(false);
+    }
+  }, [currentUser]);
   const [isDesktop, setIsDesktop] = useState(() => {
     if (typeof window === "undefined") return true;
     return window.innerWidth >= 768;
@@ -940,23 +173,88 @@ function AppContent() {
     };
   }, []);
 
+  const [isPreparingDm, setIsPreparingDm] = useState(false);
+
+  // Handle URL query parameters for direct DM (?dm=STAFF_ID) and direct Job view (?jobId=JOB_ID)
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    const dmParam = searchParams.get("dm");
+    const jobIdParam = searchParams.get("jobId");
+    const refParam = searchParams.get("ref");
+
+    if (jobIdParam) {
+      navigate(`/jobs/${jobIdParam}${refParam ? `?ref=${refParam}` : ""}`, { replace: true });
+      return;
+    }
+
+    if (dmParam) {
+      sessionStorage.setItem("vr_pending_dm_inquiry", JSON.stringify({ staffId: dmParam }));
+      if (!loading) {
+        if (!currentUser) {
+          window.dispatchEvent(new CustomEvent("open-auth-modal", {
+            detail: {
+              tab: "signin",
+              role: "seeker",
+              title: "Direct Recruiter Inquiry"
+            }
+          }));
+        } else {
+          const triggerDm = async () => {
+            sessionStorage.removeItem("vr_pending_dm_inquiry");
+            setIsPreparingDm(true);
+            const seekerPhoneIdentifier = currentUser.displayName || currentUser.email || "Candidate";
+            const initialMsg = "I want to make inquiries";
+            try {
+              await Promise.all([
+                simulateIncomingChat(
+                  seekerPhoneIdentifier,
+                  initialMsg,
+                  "general-inquiry",
+                  "General Inquiry",
+                  currentUser.uid,
+                  dmParam
+                ),
+                new Promise((resolve) => setTimeout(resolve, 1000))
+              ]);
+            } catch (err) {
+              console.warn("Direct DM initialization error:", err);
+            }
+            setIsPreparingDm(false);
+            navigate("/seeker/messages", { replace: true });
+          };
+          triggerDm();
+        }
+      }
+    }
+  }, [location.search, currentUser, loading, navigate]);
+
   // Handle automatic dashboard redirect for all authenticated users away from homepage (/)
   useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    if (searchParams.get("dm") || searchParams.get("jobId")) {
+      return;
+    }
+
     if (!loading && isHomePage && currentUser) {
       const role = currentUser.role || "seeker";
       if (role === "admin") {
         navigate("/admin/dashboard", { replace: true });
       } else if (role === "employer") {
-        navigate("/employer/dashboard", { replace: true });
+        navigate("/employer/chat", { replace: true });
       } else {
         // Seeker and staff go to /seeker
         navigate("/seeker", { replace: true });
       }
     }
-  }, [currentUser, loading, isHomePage, navigate]);
+  }, [currentUser, loading, isHomePage, location.search, navigate]);
 
   // Dynamic high-quality SEO meta updates per-route
   useEffect(() => {
+    // If viewing a specific job page, let PublicJobView manage custom rich dynamic SEO tags
+    if (location.pathname.startsWith("/jobs/")) {
+      return;
+    }
+
     let title = "Valley Reigns | High-Fidelity Tech Recruitment & Communication Routing";
     let desc = "Valley Reigns is a premier high-fidelity recruitment routing platform bridging exceptional tech talent with top-tier companies through interactive, real-time communication channels.";
     let keywords = "Valley Reigns, tech recruitment, developer jobs, recruitment routing, real-time communication routing, hire engineers, elite tech talent, interactive hiring platform";
@@ -996,10 +294,6 @@ function AppContent() {
         title = "Publish Tech Jobs & Careers | Valley Reigns";
         desc = "Create and publish fresh technology openings, configure automatic communication routing pipelines for candidates.";
         break;
-      case "/admin/whatsapp-config":
-        title = "WhatsApp Webhook Integration Console | Valley Reigns";
-        desc = "Supervise and link live WhatsApp Webhooks, verify verification tokens, and configure Meta Business WhatsApp APIs.";
-        break;
       case "/admin/diagnostics":
         title = "Engineering Diagnostics Center | Valley Reigns Admin";
         desc = "Verify live database status, test communications routing pipelines, and audit API health.";
@@ -1012,6 +306,11 @@ function AppContent() {
       case "/auth/staff-portal-invite":
         title = "Enroll as Valley Reigns Recruiter | Candidate Routing";
         desc = "Sign up and register for our recruiter dashboard to start communicating with top-tier technical applicants.";
+        break;
+      case "/seeker/profile":
+      case "/profile":
+        title = "My Job Seeker Profile & CV | Valley Reigns Recruitment";
+        desc = "Manage your job seeker profile, edit your phone number, and upload your CV document.";
         break;
       default:
         break;
@@ -1115,14 +414,25 @@ function AppContent() {
 
   const noHeaderPaths = [
     "/admin/notifications",
-    "/admin/whatsapp-config",
     "/admin/contacts",
     "/admin/diagnostics",
     "/admin/employers",
     "/admin/staff-promotion",
     "/admin/users",
+    "/admin/settings",
+    "/seeker/profile",
+    "/profile",
   ];
-  const shouldHideHeader = (hideFloating && !isDesktop) || noHeaderPaths.includes(location.pathname);
+  const isExcludedView = 
+    location.pathname.startsWith("/admin/settings") ||
+    location.pathname.includes("office-chat") ||
+    location.pathname.includes("group-chat");
+  const shouldHideHeader = hideFloating || noHeaderPaths.includes(location.pathname) || isExcludedView;
+  const shouldHideBottomNav = hideFloating || shouldHideHeader || isExcludedView;
+  const isInboxRoute = location.pathname === "/seeker/messages" || 
+    (location.pathname === "/staff" && (!location.search || location.search.includes("tab=inbox") || location.search === "")) ||
+    location.pathname.includes("office-chat") ||
+    location.pathname.includes("group-chat");
 
   return (
     <>
@@ -1162,19 +472,26 @@ function AppContent() {
       </AnimatePresence>
 
       <div 
-        className={`bg-[#FAFCFD] flex flex-col font-sans select-text ${(hideFloating && !isDesktop) ? "overflow-hidden" : "min-h-screen"}`}
-        style={(hideFloating && !isDesktop) ? { height: "var(--visual-viewport-height, 100dvh)" } : undefined}
+        className={`bg-[#FAFCFD] flex flex-col font-sans select-text ${hideFloating ? "h-[100dvh] max-h-[100dvh] overflow-hidden fixed inset-0 z-30" : isInboxRoute ? "h-[100dvh] max-h-[100dvh] overflow-hidden" : "min-h-screen"}`}
+        style={hideFloating ? { height: "var(--visual-viewport-height, 100dvh)", maxHeight: "var(--visual-viewport-height, 100dvh)" } : isInboxRoute ? { height: "100dvh", maxHeight: "100dvh" } : undefined}
       >
-        {/* Main Navigation Header - Hidden in chat view or specific admin/management views */}
+        {/* Main Navigation Header - Hidden in active messaging view or specific admin/management views */}
         {!shouldHideHeader && <Header />}
 
         {/* Main Workspace Router Feed */}
-        <main className={`flex-grow ${(hideFloating && !isDesktop) ? "h-full min-h-0 flex flex-col" : "w-full min-h-[calc(100vh-80px)]"} ${(!shouldHideHeader && !isHomePage) ? "pb-24" : ""}`}>
-          <Routes>
-            {/* Public route */}
+        <main className={`flex-grow flex-1 min-h-0 ${hideFloating || isInboxRoute ? "h-full flex flex-col overflow-hidden p-0 m-0" : "w-full min-h-[calc(100vh-80px)]"} ${(!shouldHideHeader && !isHomePage && !hideFloating && !isInboxRoute) ? "pb-24" : ""}`}>
+          <Suspense fallback={<RouteLoadingFallback />}>
+            <Routes>
+            {/* Public routes */}
             <Route 
               path="/" 
               element={<JobSeekerDashboard />} 
+            />
+
+            {/* Public dedicated job view page with SEO and Google Rich Cards */}
+            <Route 
+              path="/jobs/:jobId" 
+              element={<PublicJobView />} 
             />
             
             {/* Staff invited route */}
@@ -1228,14 +545,6 @@ function AppContent() {
               element={
                 <ProtectedRoute allowedRoles={["admin"]}>
                   <AdminPostJobPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/admin/whatsapp-config"
-              element={
-                <ProtectedRoute allowedRoles={["admin"]}>
-                  <WhatsAppConfigPage />
                 </ProtectedRoute>
               }
             />
@@ -1298,6 +607,68 @@ function AppContent() {
               }
             />
 
+            {/* Office Chat (1-on-1 staff & admin messages) */}
+            <Route
+              path="/staff/office-chat"
+              element={
+                <ProtectedRoute allowedRoles={["staff", "admin"]}>
+                  <OfficeChatView />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/office-chat"
+              element={
+                <ProtectedRoute allowedRoles={["admin"]}>
+                  <OfficeChatView />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/office-chat"
+              element={
+                <ProtectedRoute allowedRoles={["staff", "admin"]}>
+                  <OfficeChatView />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Team Group Chat (All staff & admin) */}
+            <Route
+              path="/staff/group-chat"
+              element={
+                <ProtectedRoute allowedRoles={["staff", "admin"]}>
+                  <GroupChatView />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/group-chat"
+              element={
+                <ProtectedRoute allowedRoles={["admin"]}>
+                  <GroupChatView />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/group-chat"
+              element={
+                <ProtectedRoute allowedRoles={["staff", "admin"]}>
+                  <GroupChatView />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Admin App Settings & SLA Thresholds */}
+            <Route
+              path="/admin/settings"
+              element={
+                <ProtectedRoute allowedRoles={["admin"]}>
+                  <AppSettingsPage />
+                </ProtectedRoute>
+              }
+            />
+
             {/* Private Seeker Route Guard */}
             <Route
               path="/seeker"
@@ -1328,12 +699,48 @@ function AppContent() {
               }
             />
 
-            {/* Private Employer Dashboard Route Guard */}
+            {/* Private Staff Profile Route */}
+            <Route
+              path="/staff/profile"
+              element={
+                <ProtectedRoute allowedRoles={["staff", "admin"]}>
+                  <StaffProfileView />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/profile"
+              element={
+                <ProtectedRoute allowedRoles={["admin"]}>
+                  <StaffProfileView />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Private Seeker Profile Route */}
+            <Route
+              path="/seeker/profile"
+              element={
+                <ProtectedRoute allowedRoles={["seeker", "staff", "admin"]}>
+                  <JobSeekerProfileView />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/profile"
+              element={
+                <ProtectedRoute allowedRoles={["seeker", "staff", "admin"]}>
+                  <JobSeekerProfileView />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Private Employer Chat Route Guard */}
             <Route
               path="/employer"
               element={
                 <ProtectedRoute allowedRoles={["employer", "admin"]}>
-                  <EmployerDashboard />
+                  <EmployerMessagesView />
                 </ProtectedRoute>
               }
             />
@@ -1341,7 +748,15 @@ function AppContent() {
               path="/employer/dashboard"
               element={
                 <ProtectedRoute allowedRoles={["employer", "admin"]}>
-                  <EmployerDashboard />
+                  <EmployerMessagesView />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/employer/chat"
+              element={
+                <ProtectedRoute allowedRoles={["employer", "admin"]}>
+                  <EmployerMessagesView />
                 </ProtectedRoute>
               }
             />
@@ -1349,7 +764,8 @@ function AppContent() {
             {/* Catch-all */}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
-        </main>
+        </Suspense>
+      </main>
 
         {/* Annual Anniversary Graffiti Intro Screen (Feature preserved for next year) */}
         <AnimatePresence>
@@ -1364,1083 +780,84 @@ function AppContent() {
         </AnimatePresence>
 
         {/* Authentication Gateway Portal Popup */}
-        <AuthModal forcedOpen={false} />
+        <Suspense fallback={null}>
+          <AuthModal forcedOpen={false} />
+        </Suspense>
+
+        {/* Job Seeker Missing Phone Number Prompt Modal */}
+        <Suspense fallback={null}>
+          <SeekerPhonePromptModal
+            isOpen={showSeekerPhonePrompt}
+            onClose={() => setShowSeekerPhonePrompt(false)}
+          />
+        </Suspense>
 
         {/* Progressive Web App Install Banner Overlay */}
-        <PwaInstallPrompt />
+        <Suspense fallback={null}>
+          <PwaInstallPrompt />
+        </Suspense>
 
         {/* Real-time Network Connectivity Monitor Toast */}
         <NetworkStatusMonitor />
 
-        {/* Admin Sticky Fixed Bottom Navigation Pill */}
-        {currentUser && currentUser.role === "admin" && !shouldHideHeader && (
-          <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-40 w-full max-w-[260px] px-2 animate-none">
-            <div className="bg-[#0b1b3d]/85 backdrop-blur-lg border border-[#0084FF] shadow-[0_10px_30px_rgba(0,132,255,0.15)] rounded-full px-3 py-1.5 flex items-center justify-around transition-all duration-300">
-              {/* Search Icon Component (Left) */}
-              <button
-                onClick={() => {
-                  setIsAdminSettingsOpen(false);
-                  navigate("/seeker");
-                }}
-                className={`p-2 border cursor-pointer transition-all duration-200 hover:scale-110 active:scale-95 flex items-center justify-center ${
-                  location.pathname === "/seeker"
-                    ? "bg-[#0084FF]/30 border-[#0084FF]/25 text-white rounded-full"
-                    : "bg-transparent border-transparent text-blue-300 hover:text-white rounded-full"
-                }`}
-                title="Search Jobs"
-              >
-                <Search className="w-5 h-5" />
-              </button>
-
-              {/* Home Icon Component */}
-              <button
-                onClick={() => {
-                  setIsAdminSettingsOpen(false);
-                  navigate("/admin/dashboard?view=overview");
-                  window.dispatchEvent(new CustomEvent("admin-home-click"));
-                }}
-                className={`p-2 border cursor-pointer transition-all duration-200 hover:scale-110 active:scale-95 flex items-center justify-center ${
-                  location.pathname.startsWith("/admin")
-                    ? "bg-[#0084FF]/30 border-[#0084FF]/25 text-white rounded-full"
-                    : "bg-transparent border-transparent text-blue-300 hover:text-white rounded-full"
-                }`}
-                title="Admin Dashboard"
-              >
-                <Home className="w-5 h-5" />
-              </button>
-
-              {/* Chat Inbox Button */}
-              <button
-                onClick={() => {
-                  setIsAdminSettingsOpen(false);
-                  navigate("/staff?tab=inbox");
-                }}
-                className={`p-2 border cursor-pointer transition-all duration-200 hover:scale-110 active:scale-95 flex items-center justify-center ${
-                  location.pathname === "/staff" && (new URLSearchParams(location.search).get("tab") === "inbox" || !new URLSearchParams(location.search).get("tab"))
-                    ? "bg-[#0084FF]/30 border-[#0084FF]/25 text-white rounded-full"
-                    : "bg-transparent border-transparent text-blue-300 hover:text-white rounded-full"
-                }`}
-                title="Live Chat Inbox"
-              >
-                <MessageSquare className="w-5 h-5" />
-              </button>
-
-              {/* Settings Icon Component (Right) */}
-              <button
-                onClick={() => {
-                  setIsAdminSettingsOpen(!isAdminSettingsOpen);
-                }}
-                className={`p-2 border cursor-pointer transition-all duration-200 hover:scale-110 active:scale-95 flex items-center justify-center ${
-                  isAdminSettingsOpen
-                    ? "bg-[#0084FF]/30 border-[#0084FF]/25 text-white rounded-full"
-                    : "bg-transparent border-transparent text-blue-300 hover:text-white rounded-full"
-                }`}
-                title="Admin Settings"
-              >
-                <Settings className={`w-5 h-5 transition-transform duration-500 ${isAdminSettingsOpen ? "rotate-90" : ""}`} />
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Staff Sticky Fixed Bottom Navigation Pill */}
-        {currentUser && currentUser.role === "staff" && !shouldHideHeader && (
-          <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-40 w-full max-w-[300px] px-2 animate-none">
-            <div className="bg-[#0b1b3d]/85 backdrop-blur-lg border border-[#0084FF] shadow-[0_10px_30px_rgba(0,132,255,0.15)] rounded-full px-3 py-1.5 flex items-center justify-around transition-all duration-300">
-              {/* Search Jobs (Seeker View) */}
-              <button
-                onClick={() => {
-                  setIsStaffSettingsOpen(false);
-                  navigate("/seeker");
-                }}
-                className={`p-2 border cursor-pointer transition-all duration-200 hover:scale-110 active:scale-95 flex items-center justify-center ${
-                  location.pathname === "/seeker"
-                    ? "bg-[#0084FF]/30 border-[#0084FF]/25 text-white rounded-full"
-                    : "bg-transparent border-transparent text-blue-300 hover:text-white rounded-full"
-                }`}
-                title="Find Jobs"
-              >
-                <Search className="w-5 h-5" />
-              </button>
-
-              {/* Chat Inbox */}
-              <button
-                onClick={() => {
-                  setIsStaffSettingsOpen(false);
-                  navigate("/staff?tab=inbox");
-                }}
-                className={`p-2 border cursor-pointer transition-all duration-200 hover:scale-110 active:scale-95 flex items-center justify-center ${
-                  location.pathname === "/staff" && (new URLSearchParams(location.search).get("tab") === "inbox" || !new URLSearchParams(location.search).get("tab"))
-                    ? "bg-[#0084FF]/30 border-[#0084FF]/25 text-white rounded-full"
-                    : "bg-transparent border-transparent text-blue-300 hover:text-white rounded-full"
-                }`}
-                title="Chat Inbox"
-              >
-                <MessageSquare className="w-5 h-5" />
-              </button>
-
-              {/* Job Management (Plus Icon) */}
-              <button
-                onClick={() => {
-                  setIsStaffSettingsOpen(false);
-                  navigate("/staff/manage-jobs");
-                }}
-                className={`p-2 border cursor-pointer transition-all duration-200 hover:scale-110 active:scale-95 flex items-center justify-center ${
-                  location.pathname === "/staff/manage-jobs"
-                    ? "bg-[#0084FF]/30 border-[#0084FF]/25 text-white rounded-full"
-                    : "bg-transparent border-transparent text-blue-300 hover:text-white rounded-full"
-                }`}
-                title="Manage Jobs"
-              >
-                <Plus className="w-5 h-5" />
-              </button>
-
-              {/* Daily Report */}
-              <button
-                onClick={() => {
-                  setIsStaffSettingsOpen(false);
-                  navigate("/staff?tab=report");
-                }}
-                className={`p-2 border cursor-pointer transition-all duration-200 hover:scale-110 active:scale-95 flex items-center justify-center ${
-                  location.pathname === "/staff" && new URLSearchParams(location.search).get("tab") === "report"
-                    ? "bg-[#0084FF]/30 border-[#0084FF]/25 text-white rounded-full"
-                    : "bg-transparent border-transparent text-blue-300 hover:text-white rounded-full"
-                }`}
-                title="Daily Staff Report"
-              >
-                <ClipboardList className="w-5 h-5" />
-              </button>
-
-              {/* Settings */}
-              <button
-                onClick={() => {
-                  setIsStaffSettingsOpen(!isStaffSettingsOpen);
-                }}
-                className={`p-2 border cursor-pointer transition-all duration-200 hover:scale-110 active:scale-95 flex items-center justify-center ${
-                  isStaffSettingsOpen
-                    ? "bg-[#0084FF]/30 border-[#0084FF]/25 text-white rounded-full"
-                    : "bg-transparent border-transparent text-blue-300 hover:text-white rounded-full"
-                }`}
-                title="Recruiter Settings"
-              >
-                <Settings className={`w-5 h-5 transition-transform duration-500 ${isStaffSettingsOpen ? "rotate-90" : ""}`} />
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Seeker/User Sticky Fixed Bottom Navigation Pill */}
-        {(currentUser && currentUser.role === "seeker") && !shouldHideHeader && (
-          <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-40 w-full max-w-[200px] px-2 animate-none">
-            <div className="bg-[#0b1b3d]/85 backdrop-blur-lg border border-[#0084FF] shadow-[0_10px_30px_rgba(0,132,255,0.15)] rounded-full px-4 py-1.5 flex items-center justify-around transition-all duration-300">
-              {/* Find Jobs / Search */}
-              <button
-                onClick={() => {
-                  setIsSeekerSettingsOpen(false);
-                  navigate(currentUser ? "/seeker" : "/");
-                }}
-                className={`p-2 border cursor-pointer transition-all duration-200 hover:scale-110 active:scale-95 flex items-center justify-center ${
-                  location.pathname === "/" || location.pathname === "/seeker"
-                    ? "bg-[#0084FF]/30 border-[#0084FF]/25 text-white rounded-full"
-                    : "bg-transparent border-transparent text-blue-300 hover:text-white rounded-full"
-                }`}
-                title="Find Jobs"
-              >
-                <Search className="w-5 h-5" />
-              </button>
-
-              {/* Messages */}
-              <button
-                onClick={() => {
-                  setIsSeekerSettingsOpen(false);
-                  navigate("/seeker/messages");
-                }}
-                className={`p-2 border cursor-pointer transition-all duration-200 hover:scale-110 active:scale-95 flex items-center justify-center relative ${
-                  location.pathname === "/seeker/messages"
-                    ? "bg-[#0084FF]/30 border-[#0084FF]/25 text-white rounded-full"
-                    : "bg-transparent border-transparent text-blue-300 hover:text-white rounded-full"
-                }`}
-                title="My Chats"
-              >
-                <MessageSquare className="w-5 h-5" />
-              </button>
-
-              {/* Settings */}
-              <button
-                onClick={() => {
-                  setIsSeekerSettingsOpen(!isSeekerSettingsOpen);
-                }}
-                className={`p-2 border cursor-pointer transition-all duration-200 hover:scale-110 active:scale-95 flex items-center justify-center ${
-                  isSeekerSettingsOpen
-                    ? "bg-[#0084FF]/30 border-[#0084FF]/25 text-white rounded-full"
-                    : "bg-transparent border-transparent text-blue-300 hover:text-white rounded-full"
-                }`}
-                title="Account Settings"
-              >
-                <Settings className={`w-5 h-5 transition-transform duration-500 ${isSeekerSettingsOpen ? "rotate-90" : ""}`} />
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Employer Sticky Fixed Bottom Navigation Pill */}
-        {currentUser && currentUser.role === "employer" && !shouldHideHeader && (
-          <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-40 w-full max-w-[280px] px-2 animate-none">
-            <div className="bg-[#0b1b3d]/85 backdrop-blur-lg border border-[#0084FF] shadow-[0_10px_30px_rgba(0,132,255,0.15)] rounded-full px-3 py-1.5 flex items-center justify-around transition-all duration-300">
-              {/* Find Talent / Search */}
-              <button
-                onClick={() => {
-                  setIsEmployerSettingsOpen(false);
-                  navigate("/seeker");
-                }}
-                className={`p-2 border cursor-pointer transition-all duration-200 hover:scale-110 active:scale-95 flex items-center justify-center ${
-                  location.pathname === "/seeker"
-                    ? "bg-[#0084FF]/30 border-[#0084FF]/25 text-white rounded-full"
-                    : "bg-transparent border-transparent text-blue-300 hover:text-white rounded-full"
-                }`}
-                title="Browse Market / Talent"
-              >
-                <Search className="w-5 h-5" />
-              </button>
-
-              {/* Employer Console / Home */}
-              <button
-                onClick={() => {
-                  setIsEmployerSettingsOpen(false);
-                  navigate("/employer/dashboard?view=overview");
-                  window.dispatchEvent(new CustomEvent("employer-home-click"));
-                }}
-                className={`p-2 border cursor-pointer transition-all duration-200 hover:scale-110 active:scale-95 flex items-center justify-center ${
-                  location.pathname.startsWith("/employer") && (!new URLSearchParams(location.search).get("view") || new URLSearchParams(location.search).get("view") === "overview")
-                    ? "bg-[#0084FF]/30 border-[#0084FF]/25 text-white rounded-full"
-                    : "bg-transparent border-transparent text-blue-300 hover:text-white rounded-full"
-                }`}
-                title="Employer Console"
-              >
-                <Home className="w-5 h-5" />
-              </button>
-
-              {/* Vacancies / Jobs */}
-              <button
-                onClick={() => {
-                  setIsEmployerSettingsOpen(false);
-                  navigate("/employer/dashboard?view=jobs");
-                }}
-                className={`p-2 border cursor-pointer transition-all duration-200 hover:scale-110 active:scale-95 flex items-center justify-center ${
-                  location.pathname.startsWith("/employer") && new URLSearchParams(location.search).get("view") === "jobs"
-                    ? "bg-[#0084FF]/30 border-[#0084FF]/25 text-white rounded-full"
-                    : "bg-transparent border-transparent text-blue-300 hover:text-white rounded-full"
-                }`}
-                title="Manage Vacancies"
-              >
-                <Briefcase className="w-5 h-5" />
-              </button>
-
-              {/* Messages */}
-              <button
-                onClick={() => {
-                  setIsEmployerSettingsOpen(false);
-                  navigate("/employer/dashboard?view=messages");
-                }}
-                className={`p-2 border cursor-pointer transition-all duration-200 hover:scale-110 active:scale-95 flex items-center justify-center relative ${
-                  location.pathname.startsWith("/employer") && new URLSearchParams(location.search).get("view") === "messages"
-                    ? "bg-[#0084FF]/30 border-[#0084FF]/25 text-white rounded-full"
-                    : "bg-transparent border-transparent text-blue-300 hover:text-white rounded-full"
-                }`}
-                title="Recruiter Messages"
-              >
-                <MessageSquare className="w-5 h-5" />
-              </button>
-
-              {/* Settings */}
-              <button
-                onClick={() => {
-                  setIsEmployerSettingsOpen(!isEmployerSettingsOpen);
-                }}
-                className={`p-2 border cursor-pointer transition-all duration-200 hover:scale-110 active:scale-95 flex items-center justify-center ${
-                  isEmployerSettingsOpen
-                    ? "bg-[#0084FF]/30 border-[#0084FF]/25 text-white rounded-full"
-                    : "bg-transparent border-transparent text-blue-300 hover:text-white rounded-full"
-                }`}
-                title="Employer Settings"
-              >
-                <Settings className={`w-5 h-5 transition-transform duration-500 ${isEmployerSettingsOpen ? "rotate-90" : ""}`} />
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Admin Bottom Settings Sheet Modal */}
-        <AnimatePresence>
-          {currentUser && currentUser.role === "admin" && !shouldHideHeader && isAdminSettingsOpen && (
-            <>
-              {/* Backdrop */}
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                onClick={() => setIsAdminSettingsOpen(false)}
-                className="fixed inset-0 z-[45] bg-slate-950/60 backdrop-blur-xs cursor-pointer"
-              />
-
-              {/* Bottom Sheet */}
-              <motion.div
-                initial={{ y: "100%" }}
-                animate={{ y: 0 }}
-                exit={{ y: "100%" }}
-                transition={{ type: "spring", damping: 25, stiffness: 220 }}
-                className="fixed bottom-0 left-0 right-0 z-50 w-full max-w-lg mx-auto bg-white text-[#0B1B3D] rounded-t-[32px] border-t border-blue-200/50 shadow-2xl overflow-hidden pb-8 flex flex-col animate-none"
-              >
-                {/* Vector graphic design background pattern matching admin dashboard chats card */}
-                <div className="absolute inset-0 pointer-events-none opacity-[0.03] text-blue-600">
-                  <svg width="100%" height="100%" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <circle cx="85%" cy="15%" r="50" stroke="currentColor" strokeWidth="1.2" />
-                    <circle cx="90%" cy="20%" r="80" stroke="currentColor" strokeWidth="1" strokeDasharray="3 3" />
-                    <path d="M-10,80 C30,40 80,100 150,60" stroke="currentColor" strokeWidth="1.2" />
-                  </svg>
-                </div>
-
-                {/* Handle bar */}
-                <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto my-3" />
-
-                {/* Profile Summary Section */}
-                <div className="px-6 pb-5 flex items-center gap-4 relative z-10 border-b border-slate-100">
-                  {firebaseUser?.photoURL || currentUser?.photoURL ? (
-                    <img 
-                      src={firebaseUser?.photoURL || currentUser?.photoURL} 
-                      alt={currentUser?.displayName || "User"} 
-                      className="w-14 h-14 rounded-full object-cover border-2 border-blue-500/20 shadow-sm select-none"
-                      referrerPolicy="no-referrer"
-                    />
-                  ) : (
-                    <div className="w-14 h-14 rounded-full bg-blue-50 border-2 border-blue-100 flex items-center justify-center text-blue-600 font-bold text-lg font-mono shadow-sm">
-                      {currentUser?.displayName ? (
-                        currentUser.displayName.split(" ").map(n => n[0]).join("").substring(0, 2).toUpperCase()
-                      ) : (
-                        "AD"
-                      )}
-                    </div>
-                  )}
-                  <div className="space-y-0.5 text-left">
-                    <h4 className="text-base font-sans font-extrabold text-[#0B1B3D] tracking-tight">
-                      {currentUser?.displayName || "System Administrator"}
-                    </h4>
-                    <p className="text-xs font-mono text-slate-500 font-medium">
-                      {currentUser?.email}
-                    </p>
-                    <span className="inline-block text-[9px] font-mono font-bold bg-blue-50 text-blue-600 border border-blue-100 px-2 py-0.5 rounded-md uppercase tracking-wider mt-1">
-                      {currentUser?.role || "ADMIN"}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Bottom Navigation List Buttons */}
-                <div className="px-6 py-4 space-y-1 relative z-10 text-left">
-                  {/* My Account Row */}
-                  <button
-                    onClick={() => {
-                      setShowAdminAccountModal(true);
-                    }}
-                    className="w-full flex items-center justify-between py-3.5 px-2.5 hover:bg-blue-50/55 rounded-xl transition-all duration-200 group border-0 bg-transparent cursor-pointer"
-                  >
-                    <span className="text-sm font-bold text-slate-700 group-hover:text-blue-600 transition-colors">My Account</span>
-                    <User className="w-4 h-4 text-blue-500 group-hover:scale-110 transition-transform" />
-                  </button>
-                  
-                  <div className="border-t border-slate-100 my-1" />
-
-                  {/* WhatsApp Config Row */}
-                  <button
-                    onClick={() => {
-                      setIsAdminSettingsOpen(false);
-                      navigate("/admin/whatsapp-config");
-                    }}
-                    className="w-full flex items-center justify-between py-3.5 px-2.5 hover:bg-blue-50/55 rounded-xl transition-all duration-200 group border-0 bg-transparent cursor-pointer"
-                  >
-                    <span className="text-sm font-bold text-slate-700 group-hover:text-blue-600 transition-colors">WhatsApp Config</span>
-                    <MessageCircle className="w-4 h-4 text-blue-500 group-hover:scale-110 transition-transform" />
-                  </button>
-
-                  <div className="border-t border-slate-100 my-1" />
-
-                  {/* Saved Customer Contacts Row */}
-                  <button
-                    onClick={() => {
-                      setIsAdminSettingsOpen(false);
-                      navigate("/admin/contacts");
-                    }}
-                    className="w-full flex items-center justify-between py-3.5 px-2.5 hover:bg-blue-50/55 rounded-xl transition-all duration-200 group border-0 bg-transparent cursor-pointer"
-                  >
-                    <span className="text-sm font-bold text-slate-700 group-hover:text-blue-600 transition-colors">Saved Contacts</span>
-                    <BookUser className="w-4 h-4 text-blue-500 group-hover:scale-110 transition-transform" />
-                  </button>
-
-                  <div className="border-t border-slate-100 my-1" />
-
-                  {/* Employer Management Row */}
-                  <button
-                    onClick={() => {
-                      setIsAdminSettingsOpen(false);
-                      navigate("/admin/employers");
-                    }}
-                    className="w-full flex items-center justify-between py-3.5 px-2.5 hover:bg-blue-50/55 rounded-xl transition-all duration-200 group border-0 bg-transparent cursor-pointer"
-                  >
-                    <span className="text-sm font-bold text-slate-700 group-hover:text-blue-600 transition-colors">Employer Management</span>
-                    <Building2 className="w-4 h-4 text-blue-500 group-hover:scale-110 transition-transform" />
-                  </button>
-
-                  <div className="border-t border-slate-100 my-1" />
-
-                  {/* User Management Row */}
-                  <button
-                    onClick={() => {
-                      setIsAdminSettingsOpen(false);
-                      navigate("/admin/staff-promotion");
-                    }}
-                    className="w-full flex items-center justify-between py-3.5 px-2.5 hover:bg-blue-50/55 rounded-xl transition-all duration-200 group border-0 bg-transparent cursor-pointer"
-                  >
-                    <span className="text-sm font-bold text-slate-700 group-hover:text-blue-600 transition-colors">User Management</span>
-                    <UserCheck className="w-4 h-4 text-blue-500 group-hover:scale-110 transition-transform" />
-                  </button>
-
-                  <div className="border-t border-slate-100 my-1" />
-
-                  {/* Dev & Diagnostics Center Row */}
-                  <button
-                    onClick={() => {
-                      setIsAdminSettingsOpen(false);
-                      navigate("/admin/diagnostics");
-                    }}
-                    className="w-full flex items-center justify-between py-3.5 px-2.5 hover:bg-blue-50/55 rounded-xl transition-all duration-200 group border-0 bg-transparent cursor-pointer"
-                  >
-                    <span className="text-sm font-bold text-slate-700 group-hover:text-blue-600 transition-colors">Dev & Diagnostics Center</span>
-                    <Cpu className="w-4 h-4 text-blue-500 group-hover:scale-110 transition-transform" />
-                  </button>
-
-                  <div className="border-t border-slate-100 my-1" />
-
-                  {/* About Valley Reigns Row */}
-                  <button
-                    onClick={() => {
-                      setShowAdminAboutModal(true);
-                    }}
-                    className="w-full flex items-center justify-between py-3.5 px-2.5 hover:bg-blue-50/55 rounded-xl transition-all duration-200 group border-0 bg-transparent cursor-pointer"
-                  >
-                    <span className="text-sm font-bold text-slate-700 group-hover:text-blue-600 transition-colors">About Valley Reigns</span>
-                    <Info className="w-4 h-4 text-blue-500 group-hover:scale-110 transition-transform" />
-                  </button>
-
-                  <div className="border-t border-slate-100 my-1" />
-
-                  {/* Install App Row */}
-                  {!isAppInstalled && (
-                    <>
-                      <button
-                        onClick={() => {
-                          setIsAdminSettingsOpen(false);
-                          window.dispatchEvent(new CustomEvent("trigger-pwa-install"));
-                        }}
-                        className="w-full flex items-center justify-between py-3.5 px-2.5 hover:bg-blue-50/55 rounded-xl transition-all duration-200 group border-0 bg-transparent cursor-pointer"
-                      >
-                        <span className="text-sm font-bold text-slate-700 group-hover:text-blue-600 transition-colors">Install App</span>
-                        <Download className="w-4 h-4 text-blue-500 group-hover:scale-110 transition-transform" />
-                      </button>
-                      <div className="border-t border-slate-100 my-1" />
-                    </>
-                  )}
-
-                  {/* Sign Out Row */}
-                  <button
-                    onClick={async () => {
-                      setIsAdminSettingsOpen(false);
-                      await logout();
-                      navigate("/");
-                    }}
-                    className="w-full flex items-center justify-between py-3.5 px-2.5 hover:bg-rose-50 rounded-xl transition-all duration-200 group border-0 bg-transparent cursor-pointer"
-                  >
-                    <span className="text-sm font-bold text-rose-600 group-hover:text-rose-700 transition-colors">Sign Out</span>
-                    <LogOut className="w-4 h-4 text-rose-500 group-hover:scale-110 transition-transform" />
-                  </button>
-                </div>
-              </motion.div>
-            </>
-          )}
-        </AnimatePresence>
-
-        {/* Staff Bottom Settings Sheet Modal */}
-        <AnimatePresence>
-          {currentUser && currentUser.role === "staff" && !shouldHideHeader && isStaffSettingsOpen && (
-            <>
-              {/* Backdrop */}
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                onClick={() => setIsStaffSettingsOpen(false)}
-                className="fixed inset-0 z-[45] bg-slate-950/60 backdrop-blur-xs cursor-pointer"
-              />
-
-              {/* Bottom Sheet */}
-              <motion.div
-                initial={{ y: "100%" }}
-                animate={{ y: 0 }}
-                exit={{ y: "100%" }}
-                transition={{ type: "spring", damping: 25, stiffness: 220 }}
-                className="fixed bottom-0 left-0 right-0 z-50 w-full max-w-lg mx-auto bg-white text-[#0B1B3D] rounded-t-[32px] border-t border-blue-200/50 shadow-2xl overflow-hidden pb-8 flex flex-col animate-none"
-              >
-                {/* Vector graphic design background pattern matching admin dashboard chats card */}
-                <div className="absolute inset-0 pointer-events-none opacity-[0.03] text-blue-600">
-                  <svg width="100%" height="100%" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <circle cx="85%" cy="15%" r="50" stroke="currentColor" strokeWidth="1.2" />
-                    <circle cx="90%" cy="20%" r="80" stroke="currentColor" strokeWidth="1" strokeDasharray="3 3" />
-                    <path d="M-10,80 C30,40 80,100 150,60" stroke="currentColor" strokeWidth="1.2" />
-                  </svg>
-                </div>
-
-                {/* Handle bar */}
-                <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto my-3" />
-
-                {/* Profile Summary Section */}
-                <div className="px-6 pb-5 flex items-center gap-4 relative z-10 border-b border-slate-100">
-                  {firebaseUser?.photoURL || currentUser?.photoURL ? (
-                    <img 
-                      src={firebaseUser?.photoURL || currentUser?.photoURL} 
-                      alt={currentUser?.displayName || "User"} 
-                      className="w-14 h-14 rounded-full object-cover border-2 border-blue-500/20 shadow-sm select-none"
-                      referrerPolicy="no-referrer"
-                    />
-                  ) : (
-                    <div className="w-14 h-14 rounded-full bg-blue-50 border-2 border-blue-100 flex items-center justify-center text-blue-600 font-bold text-lg font-mono shadow-sm">
-                      {currentUser?.displayName ? (
-                        currentUser.displayName.split(" ").map(n => n[0]).join("").substring(0, 2).toUpperCase()
-                      ) : (
-                        "ST"
-                      )}
-                    </div>
-                  )}
-                  <div className="space-y-0.5 text-left">
-                    <h4 className="text-base font-sans font-extrabold text-[#0B1B3D] tracking-tight">
-                      {currentUser?.displayName || "Valley Recruiter"}
-                    </h4>
-                    <p className="text-xs font-mono text-slate-500 font-medium">
-                      {currentUser?.email}
-                    </p>
-                    <span className="inline-block text-[9px] font-mono font-bold bg-blue-50 text-blue-600 border border-blue-100 px-2 py-0.5 rounded-md uppercase tracking-wider mt-1">
-                      {currentUser?.role || "STAFF"}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Bottom Navigation List Buttons */}
-                <div className="px-6 py-4 space-y-1 relative z-10 text-left">
-                  {/* My Account Row */}
-                  <button
-                    onClick={() => {
-                      setIsStaffSettingsOpen(false);
-                      setShowAdminAccountModal(true);
-                    }}
-                    className="w-full flex items-center justify-between py-3.5 px-2.5 hover:bg-blue-50/55 rounded-xl transition-all duration-200 group border-0 bg-transparent cursor-pointer"
-                  >
-                    <span className="text-sm font-bold text-slate-700 group-hover:text-blue-600 transition-colors">My Account</span>
-                    <User className="w-4 h-4 text-blue-500 group-hover:scale-110 transition-transform" />
-                  </button>
-                  
-                  <div className="border-t border-slate-100 my-1" />
-
-                  {/* About Valley Reigns Row */}
-                  <button
-                    onClick={() => {
-                      setIsStaffSettingsOpen(false);
-                      setShowAdminAboutModal(true);
-                    }}
-                    className="w-full flex items-center justify-between py-3.5 px-2.5 hover:bg-blue-50/55 rounded-xl transition-all duration-200 group border-0 bg-transparent cursor-pointer"
-                  >
-                    <span className="text-sm font-bold text-slate-700 group-hover:text-blue-600 transition-colors">About Valley Reigns</span>
-                    <Info className="w-4 h-4 text-blue-500 group-hover:scale-110 transition-transform" />
-                  </button>
-
-                  <div className="border-t border-slate-100 my-1" />
-
-                  {/* Install App Row */}
-                  {!isAppInstalled && (
-                    <>
-                      <button
-                        onClick={() => {
-                          setIsStaffSettingsOpen(false);
-                          window.dispatchEvent(new CustomEvent("trigger-pwa-install"));
-                        }}
-                        className="w-full flex items-center justify-between py-3.5 px-2.5 hover:bg-blue-50/55 rounded-xl transition-all duration-200 group border-0 bg-transparent cursor-pointer"
-                      >
-                        <span className="text-sm font-bold text-slate-700 group-hover:text-blue-600 transition-colors">Install App</span>
-                        <Download className="w-4 h-4 text-blue-500 group-hover:scale-110 transition-transform" />
-                      </button>
-                      <div className="border-t border-slate-100 my-1" />
-                    </>
-                  )}
-
-                  {/* Sign Out Row */}
-                  <button
-                    onClick={async () => {
-                      setIsStaffSettingsOpen(false);
-                      await logout();
-                      navigate("/");
-                    }}
-                    className="w-full flex items-center justify-between py-3.5 px-2.5 hover:bg-rose-50 rounded-xl transition-all duration-200 group border-0 bg-transparent cursor-pointer"
-                  >
-                    <span className="text-sm font-bold text-rose-600 group-hover:text-rose-700 transition-colors">Sign Out</span>
-                    <LogOut className="w-4 h-4 text-rose-500 group-hover:scale-110 transition-transform" />
-                  </button>
-                </div>
-              </motion.div>
-            </>
-          )}
-        </AnimatePresence>
-
-        {/* Employer Bottom Settings Sheet Modal */}
-        <AnimatePresence>
-          {currentUser && currentUser.role === "employer" && !shouldHideHeader && isEmployerSettingsOpen && (
-            <>
-              {/* Backdrop */}
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                onClick={() => setIsEmployerSettingsOpen(false)}
-                className="fixed inset-0 z-[45] bg-slate-950/60 backdrop-blur-xs cursor-pointer"
-              />
-
-              {/* Bottom Sheet */}
-              <motion.div
-                initial={{ y: "100%" }}
-                animate={{ y: 0 }}
-                exit={{ y: "100%" }}
-                transition={{ type: "spring", damping: 25, stiffness: 220 }}
-                className="fixed bottom-0 left-0 right-0 z-50 w-full max-w-lg mx-auto bg-white text-[#0B1B3D] rounded-t-[32px] border-t border-blue-200/50 shadow-2xl overflow-hidden pb-8 flex flex-col animate-none"
-              >
-                {/* Vector graphic design background pattern */}
-                <div className="absolute inset-0 pointer-events-none opacity-[0.03] text-blue-600">
-                  <svg width="100%" height="100%" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <circle cx="85%" cy="15%" r="50" stroke="currentColor" strokeWidth="1.2" />
-                    <circle cx="90%" cy="20%" r="80" stroke="currentColor" strokeWidth="1" strokeDasharray="3 3" />
-                    <path d="M-10,80 C30,40 80,100 150,60" stroke="currentColor" strokeWidth="1.2" />
-                  </svg>
-                </div>
-
-                {/* Handle bar */}
-                <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto my-3" />
-
-                {/* Profile Summary Section */}
-                <div className="px-6 pb-5 flex items-center gap-4 relative z-10 border-b border-slate-100">
-                  {firebaseUser?.photoURL || currentUser?.photoURL ? (
-                    <img 
-                      src={firebaseUser?.photoURL || currentUser?.photoURL} 
-                      alt={currentUser?.displayName || "User"} 
-                      className="w-14 h-14 rounded-full object-cover border-2 border-blue-500/20 shadow-sm select-none"
-                      referrerPolicy="no-referrer"
-                    />
-                  ) : (
-                    <div className="w-14 h-14 rounded-full bg-blue-50 border-2 border-blue-100 flex items-center justify-center text-blue-600 font-bold text-lg font-mono shadow-sm">
-                      <Building2 className="w-6 h-6" />
-                    </div>
-                  )}
-                  <div className="space-y-0.5 text-left">
-                    <h4 className="text-base font-sans font-extrabold text-[#0B1B3D] tracking-tight">
-                      {currentUser?.companyName || currentUser?.displayName || "Corporate Employer"}
-                    </h4>
-                    <p className="text-xs font-mono text-slate-500 font-medium">
-                      {currentUser?.email}
-                    </p>
-                    <span className="inline-block text-[9px] font-mono font-bold bg-blue-50 text-blue-600 border border-blue-100 px-2 py-0.5 rounded-md uppercase tracking-wider mt-1">
-                      EMPLOYER • {currentUser?.rcNumber || "VERIFIED PARTNER"}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Bottom Navigation List Buttons */}
-                <div className="px-6 py-4 space-y-1 relative z-10 text-left">
-                  {/* Corporate Profile Row */}
-                  <button
-                    onClick={() => {
-                      setIsEmployerSettingsOpen(false);
-                      navigate("/employer?view=profile");
-                    }}
-                    className="w-full flex items-center justify-between py-3.5 px-2.5 hover:bg-blue-50/55 rounded-xl transition-all duration-200 group border-0 bg-transparent cursor-pointer"
-                  >
-                    <span className="text-sm font-bold text-slate-700 group-hover:text-blue-600 transition-colors">Company Profile & Verification</span>
-                    <Building2 className="w-4 h-4 text-blue-500 group-hover:scale-110 transition-transform" />
-                  </button>
-                  
-                  <div className="border-t border-slate-100 my-1" />
-
-                  {/* Post Vacancy Row */}
-                  <button
-                    onClick={() => {
-                      setIsEmployerSettingsOpen(false);
-                      navigate("/employer?view=jobs");
-                    }}
-                    className="w-full flex items-center justify-between py-3.5 px-2.5 hover:bg-blue-50/55 rounded-xl transition-all duration-200 group border-0 bg-transparent cursor-pointer"
-                  >
-                    <span className="text-sm font-bold text-slate-700 group-hover:text-blue-600 transition-colors">Manage Vacancies</span>
-                    <Briefcase className="w-4 h-4 text-blue-500 group-hover:scale-110 transition-transform" />
-                  </button>
-
-                  <div className="border-t border-slate-100 my-1" />
-
-                  {/* Recruitment Requests Row */}
-                  <button
-                    onClick={() => {
-                      setIsEmployerSettingsOpen(false);
-                      navigate("/employer?view=recruitment");
-                    }}
-                    className="w-full flex items-center justify-between py-3.5 px-2.5 hover:bg-blue-50/55 rounded-xl transition-all duration-200 group border-0 bg-transparent cursor-pointer"
-                  >
-                    <span className="text-sm font-bold text-slate-700 group-hover:text-blue-600 transition-colors">Staffing Tickets</span>
-                    <FileText className="w-4 h-4 text-blue-500 group-hover:scale-110 transition-transform" />
-                  </button>
-
-                  <div className="border-t border-slate-100 my-1" />
-
-                  {/* Candidate Pipeline Row */}
-                  <button
-                    onClick={() => {
-                      setIsEmployerSettingsOpen(false);
-                      navigate("/employer?view=applicants");
-                    }}
-                    className="w-full flex items-center justify-between py-3.5 px-2.5 hover:bg-blue-50/55 rounded-xl transition-all duration-200 group border-0 bg-transparent cursor-pointer"
-                  >
-                    <span className="text-sm font-bold text-slate-700 group-hover:text-blue-600 transition-colors">Candidate Pipeline</span>
-                    <Users className="w-4 h-4 text-blue-500 group-hover:scale-110 transition-transform" />
-                  </button>
-
-                  <div className="border-t border-slate-100 my-1" />
-
-                  {/* About Valley Reigns Row */}
-                  <button
-                    onClick={() => {
-                      setIsEmployerSettingsOpen(false);
-                      setShowAdminAboutModal(true);
-                    }}
-                    className="w-full flex items-center justify-between py-3.5 px-2.5 hover:bg-blue-50/55 rounded-xl transition-all duration-200 group border-0 bg-transparent cursor-pointer"
-                  >
-                    <span className="text-sm font-bold text-slate-700 group-hover:text-blue-600 transition-colors">About Valley Reigns</span>
-                    <Info className="w-4 h-4 text-blue-500 group-hover:scale-110 transition-transform" />
-                  </button>
-
-                  <div className="border-t border-slate-100 my-1" />
-
-                  {/* Install App Row */}
-                  {!isAppInstalled && (
-                    <>
-                      <button
-                        onClick={() => {
-                          setIsEmployerSettingsOpen(false);
-                          window.dispatchEvent(new CustomEvent("trigger-pwa-install"));
-                        }}
-                        className="w-full flex items-center justify-between py-3.5 px-2.5 hover:bg-blue-50/55 rounded-xl transition-all duration-200 group border-0 bg-transparent cursor-pointer"
-                      >
-                        <span className="text-sm font-bold text-slate-700 group-hover:text-blue-600 transition-colors">Install App</span>
-                        <Download className="w-4 h-4 text-blue-500 group-hover:scale-110 transition-transform" />
-                      </button>
-                      <div className="border-t border-slate-100 my-1" />
-                    </>
-                  )}
-
-                  {/* Sign Out Row */}
-                  <button
-                    onClick={async () => {
-                      setIsEmployerSettingsOpen(false);
-                      await logout();
-                      navigate("/");
-                    }}
-                    className="w-full flex items-center justify-between py-3.5 px-2.5 hover:bg-rose-50 rounded-xl transition-all duration-200 group border-0 bg-transparent cursor-pointer"
-                  >
-                    <span className="text-sm font-bold text-rose-600 group-hover:text-rose-700 transition-colors">Sign Out</span>
-                    <LogOut className="w-4 h-4 text-rose-500 group-hover:scale-110 transition-transform" />
-                  </button>
-                </div>
-              </motion.div>
-            </>
-          )}
-        </AnimatePresence>
-
-        {/* Seeker/User Bottom Settings Sheet Modal */}
-        <AnimatePresence>
-          {(!currentUser || currentUser.role === "seeker") && !shouldHideHeader && isSeekerSettingsOpen && (
-            <>
-              {/* Backdrop */}
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                onClick={() => setIsSeekerSettingsOpen(false)}
-                className="fixed inset-0 z-[45] bg-slate-950/60 backdrop-blur-xs cursor-pointer"
-              />
-
-              {/* Bottom Sheet */}
-              <motion.div
-                initial={{ y: "100%" }}
-                animate={{ y: 0 }}
-                exit={{ y: "100%" }}
-                transition={{ type: "spring", damping: 25, stiffness: 220 }}
-                className="fixed bottom-0 left-0 right-0 z-50 w-full max-w-lg mx-auto bg-white text-[#0B1B3D] rounded-t-[32px] border-t border-blue-200/50 shadow-2xl overflow-hidden pb-8 flex flex-col animate-none"
-              >
-                {/* Vector graphic design background pattern matching other sheets */}
-                <div className="absolute inset-0 pointer-events-none opacity-[0.03] text-blue-600">
-                  <svg width="100%" height="100%" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <circle cx="85%" cy="15%" r="50" stroke="currentColor" strokeWidth="1.2" />
-                    <circle cx="90%" cy="20%" r="80" stroke="currentColor" strokeWidth="1" strokeDasharray="3 3" />
-                    <path d="M-10,80 C30,40 80,100 150,60" stroke="currentColor" strokeWidth="1.2" />
-                  </svg>
-                </div>
-
-                {/* Handle bar */}
-                <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto my-3" />
-
-                {/* Profile Summary Section */}
-                <div className="px-6 pb-5 flex items-center gap-4 relative z-10 border-b border-slate-100">
-                  {firebaseUser?.photoURL || currentUser?.photoURL ? (
-                    <img 
-                      src={firebaseUser?.photoURL || currentUser?.photoURL} 
-                      alt={currentUser?.displayName || "User"} 
-                      className="w-14 h-14 rounded-full object-cover border-2 border-blue-500/20 shadow-sm select-none"
-                      referrerPolicy="no-referrer"
-                    />
-                  ) : (
-                    <div className="w-14 h-14 rounded-full bg-blue-50 border-2 border-blue-100 flex items-center justify-center text-blue-600 font-bold text-lg font-mono shadow-sm">
-                      {currentUser?.displayName ? (
-                        currentUser.displayName.split(" ").map(n => n[0]).join("").substring(0, 2).toUpperCase()
-                      ) : (
-                        "GU"
-                      )}
-                    </div>
-                  )}
-                  <div className="space-y-0.5 text-left">
-                    <h4 className="text-base font-sans font-extrabold text-[#0B1B3D] tracking-tight">
-                      {currentUser?.displayName || "Guest User"}
-                    </h4>
-                    <p className="text-xs font-mono text-slate-500 font-medium">
-                      {currentUser?.email || "Browse job postings in real-time"}
-                    </p>
-                    <span className="inline-block text-[9px] font-mono font-bold bg-blue-50 text-blue-600 border border-blue-100 px-2 py-0.5 rounded-md uppercase tracking-wider mt-1">
-                      {currentUser?.role ? currentUser.role.toUpperCase() : "GUEST"}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Bottom Navigation List Buttons */}
-                <div className="px-6 py-4 space-y-1 relative z-10 text-left">
-                  {/* My Account Row (Only when logged in) */}
-                  {currentUser && (
-                    <>
-                      <button
-                        onClick={() => {
-                          setIsSeekerSettingsOpen(false);
-                          setShowAdminAccountModal(true);
-                        }}
-                        className="w-full flex items-center justify-between py-3.5 px-2.5 hover:bg-blue-50/55 rounded-xl transition-all duration-200 group border-0 bg-transparent cursor-pointer"
-                      >
-                        <span className="text-sm font-bold text-slate-700 group-hover:text-blue-600 transition-colors">My Account</span>
-                        <User className="w-4 h-4 text-blue-500 group-hover:scale-110 transition-transform" />
-                      </button>
-                      <div className="border-t border-slate-100 my-1" />
-                    </>
-                  )}
-
-                  {/* About Valley Reigns Row */}
-                  <button
-                    onClick={() => {
-                      setIsSeekerSettingsOpen(false);
-                      setShowAdminAboutModal(true);
-                    }}
-                    className="w-full flex items-center justify-between py-3.5 px-2.5 hover:bg-blue-50/55 rounded-xl transition-all duration-200 group border-0 bg-transparent cursor-pointer"
-                  >
-                    <span className="text-sm font-bold text-slate-700 group-hover:text-blue-600 transition-colors">About Valley Reigns</span>
-                    <Info className="w-4 h-4 text-blue-500 group-hover:scale-110 transition-transform" />
-                  </button>
-
-                  <div className="border-t border-slate-100 my-1" />
-
-                  {/* Install App Row */}
-                  {!isAppInstalled && (
-                    <>
-                      <button
-                        onClick={() => {
-                          setIsSeekerSettingsOpen(false);
-                          window.dispatchEvent(new CustomEvent("trigger-pwa-install"));
-                        }}
-                        className="w-full flex items-center justify-between py-3.5 px-2.5 hover:bg-blue-50/55 rounded-xl transition-all duration-200 group border-0 bg-transparent cursor-pointer"
-                      >
-                        <span className="text-sm font-bold text-slate-700 group-hover:text-blue-600 transition-colors">Install App</span>
-                        <Download className="w-4 h-4 text-blue-500 group-hover:scale-110 transition-transform" />
-                      </button>
-                      <div className="border-t border-slate-100 my-1" />
-                    </>
-                  )}
-
-                  {/* Sign Out or Log In Row */}
-                  {currentUser ? (
-                    <button
-                      onClick={async () => {
-                        setIsSeekerSettingsOpen(false);
-                        await logout();
-                        navigate("/");
-                      }}
-                      className="w-full flex items-center justify-between py-3.5 px-2.5 hover:bg-rose-50 rounded-xl transition-all duration-200 group border-0 bg-transparent cursor-pointer"
-                    >
-                      <span className="text-sm font-bold text-rose-600 group-hover:text-rose-700 transition-colors">Sign Out</span>
-                      <LogOut className="w-4 h-4 text-rose-500 group-hover:scale-110 transition-transform" />
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => {
-                        setIsSeekerSettingsOpen(false);
-                        // Trigger auth modal (auth modal checks if user is logged out and opens modal)
-                        window.dispatchEvent(new CustomEvent("open-auth-modal"));
-                      }}
-                      className="w-full flex items-center justify-between py-3.5 px-2.5 hover:bg-blue-50/55 rounded-xl transition-all duration-200 group border-0 bg-transparent cursor-pointer"
-                    >
-                      <span className="text-sm font-bold text-slate-700 group-hover:text-blue-600 transition-colors">Sign In / Join</span>
-                      <UserPlus className="w-4 h-4 text-blue-500 group-hover:scale-110 transition-transform" />
-                    </button>
-                  )}
-                </div>
-              </motion.div>
-            </>
-          )}
-        </AnimatePresence>
-
-        {/* Custom Admin Account Details Modal */}
-        <AnimatePresence>
-          {showAdminAccountModal && (
-            <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                onClick={() => setShowAdminAccountModal(false)}
-                className="absolute inset-0 bg-slate-950/60 backdrop-blur-xs cursor-pointer"
-              />
-              <motion.div
-                initial={{ opacity: 0, scale: 0.95, y: 15 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.95, y: 15 }}
-                className="relative bg-[#111827] text-white border border-blue-800/40 rounded-[24px] shadow-2xl p-6 w-full max-w-sm z-[70] space-y-4 text-left overflow-hidden"
-              >
-                {/* Cool vector background */}
-                <div className="absolute inset-0 pointer-events-none opacity-[0.05] text-blue-400">
-                  <svg width="100%" height="100%" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <circle cx="85%" cy="15%" r="50" stroke="currentColor" strokeWidth="1.2" />
-                    <circle cx="90%" cy="20%" r="80" stroke="currentColor" strokeWidth="1" strokeDasharray="3 3" />
-                    <path d="M-10,80 C30,40 80,100 150,60" stroke="currentColor" strokeWidth="1.2" />
-                  </svg>
-                </div>
-
-                <div className="flex justify-between items-center pb-2 border-b border-slate-800/10 relative z-10">
-                  <h3 className="text-sm font-bold text-blue-300 uppercase tracking-wider">Account Details</h3>
-                  <button 
-                    onClick={() => setShowAdminAccountModal(false)} 
-                    className="text-slate-400 hover:text-white font-bold text-sm cursor-pointer border-0 bg-transparent"
-                  >
-                    ✕
-                  </button>
-                </div>
-                
-                <div className="space-y-3 font-sans text-xs relative z-10">
-                  <div>
-                    <span className="text-blue-500/80 font-mono text-[9px] block uppercase">User ID</span>
-                    <span className="text-blue-100 font-mono text-[10px] bg-slate-900/40 border border-slate-800/30 px-2 py-1 rounded block truncate">{currentUser?.uid}</span>
-                  </div>
-                  <div>
-                    <span className="text-blue-500/80 font-mono text-[9px] block uppercase">Display Name</span>
-                    <span className="text-blue-300 font-bold text-sm">{currentUser?.displayName}</span>
-                  </div>
-                  <div>
-                    <span className="text-blue-500/80 font-mono text-[9px] block uppercase">Email Address</span>
-                    <span className="text-blue-100 font-medium">{currentUser?.email}</span>
-                  </div>
-                  <div>
-                    <span className="text-blue-500/80 font-mono text-[9px] block uppercase">Access Role</span>
-                    <span className="inline-block bg-blue-500/20 text-blue-300 font-mono px-2 py-0.5 rounded font-bold border border-blue-500/30">{currentUser?.role?.toUpperCase()}</span>
-                  </div>
-                </div>
-                
-                <div className="flex items-center gap-2 mt-2 relative z-10">
-                  <button
-                    onClick={async () => {
-                      setShowAdminAccountModal(false);
-                      await logout();
-                      navigate("/");
-                    }}
-                    className="flex-1 py-2.5 bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 text-xs font-bold rounded-xl cursor-pointer transition-colors border border-rose-500/30 flex items-center justify-center gap-1.5"
-                  >
-                    <LogOut className="w-3.5 h-3.5" />
-                    <span>Sign Out</span>
-                  </button>
-                  <button
-                    onClick={() => setShowAdminAccountModal(false)}
-                    className="flex-1 py-2.5 bg-[#1E88E5] hover:bg-blue-700 text-white text-xs font-bold rounded-xl cursor-pointer transition-colors border-0"
-                  >
-                    Close
-                  </button>
-                </div>
-              </motion.div>
-            </div>
-          )}
-        </AnimatePresence>
-
-        {/* Custom Admin About Modal */}
-        <AnimatePresence>
-          {showAdminAboutModal && (
-            <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                onClick={() => setShowAdminAboutModal(false)}
-                className="absolute inset-0 bg-slate-950/60 backdrop-blur-xs cursor-pointer"
-              />
-              <motion.div
-                initial={{ opacity: 0, scale: 0.95, y: 15 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.95, y: 15 }}
-                className="relative bg-[#111827] text-white border border-blue-800/40 rounded-[24px] shadow-2xl p-6 w-full max-w-sm z-[70] space-y-3 text-left overflow-hidden"
-              >
-                {/* Cool vector background */}
-                <div className="absolute inset-0 pointer-events-none opacity-[0.05] text-blue-400">
-                  <svg width="100%" height="100%" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <circle cx="85%" cy="15%" r="50" stroke="currentColor" strokeWidth="1.2" />
-                    <circle cx="90%" cy="20%" r="80" stroke="currentColor" strokeWidth="1" strokeDasharray="3 3" />
-                    <path d="M-10,80 C30,40 80,100 150,60" stroke="currentColor" strokeWidth="1.2" />
-                  </svg>
-                </div>
-
-                <div className="flex justify-between items-center pb-2 border-b border-slate-800/10 relative z-10">
-                  <h3 className="text-sm font-bold text-blue-300 uppercase tracking-wider">About Our Workspace</h3>
-                  <button 
-                    onClick={() => setShowAdminAboutModal(false)} 
-                    className="text-slate-400 hover:text-white font-bold text-sm cursor-pointer border-0 bg-transparent"
-                  >
-                    ✕
-                  </button>
-                </div>
-                
-                <p className="text-[11px] leading-relaxed font-sans text-blue-100 relative z-10">
-                  Valley Reigns is a full-cycle recruitment management workspace designed to unite ambitious talent with forward-thinking organizations.
-                </p>
-                <p className="text-[11px] leading-relaxed font-sans font-semibold text-blue-400 relative z-10">
-                  Recruitment for everyone — streamlined, collaborative, and secure.
-                </p>
-                
-                <button
-                  onClick={() => setShowAdminAboutModal(false)}
-                  className="w-full py-2.5 bg-[#1E88E5] hover:bg-blue-700 text-white text-xs font-bold rounded-xl cursor-pointer mt-2 relative z-10 transition-colors border-0"
-                >
-                  Confirm
-                </button>
-              </motion.div>
-            </div>
-          )}
-        </AnimatePresence>
+        {/* Role-based Sticky Bottom Navigation Pills */}
+        <RoleBottomNavigation
+          currentUser={currentUser}
+          shouldHideHeader={shouldHideHeader}
+          locationPathname={location.pathname}
+          locationSearch={location.search}
+          isAdminSettingsOpen={isAdminSettingsOpen}
+          setIsAdminSettingsOpen={setIsAdminSettingsOpen}
+          isStaffSettingsOpen={isStaffSettingsOpen}
+          setIsStaffSettingsOpen={setIsStaffSettingsOpen}
+          isSeekerSettingsOpen={isSeekerSettingsOpen}
+          setIsSeekerSettingsOpen={setIsSeekerSettingsOpen}
+          isEmployerSettingsOpen={isEmployerSettingsOpen}
+          setIsEmployerSettingsOpen={setIsEmployerSettingsOpen}
+          isEmployerTicketOpen={isEmployerTicketOpen}
+          setIsEmployerTicketOpen={setIsEmployerTicketOpen}
+          onNavigate={(to) => navigate(to)}
+        />
+
+        {/* Role-based Bottom Settings Sheets */}
+        <RoleSettingsSheets
+          currentUser={currentUser}
+          firebaseUser={firebaseUser}
+          shouldHideHeader={shouldHideHeader}
+          isAppInstalled={isAppInstalled}
+          isAdminSettingsOpen={isAdminSettingsOpen}
+          setIsAdminSettingsOpen={setIsAdminSettingsOpen}
+          isStaffSettingsOpen={isStaffSettingsOpen}
+          setIsStaffSettingsOpen={setIsStaffSettingsOpen}
+          isSeekerSettingsOpen={isSeekerSettingsOpen}
+          setIsSeekerSettingsOpen={setIsSeekerSettingsOpen}
+          isEmployerSettingsOpen={isEmployerSettingsOpen}
+          setIsEmployerSettingsOpen={setIsEmployerSettingsOpen}
+          isEmployerTicketOpen={isEmployerTicketOpen}
+          setIsEmployerTicketOpen={setIsEmployerTicketOpen}
+          setShowAdminAccountModal={setShowAdminAccountModal}
+          setShowAdminAboutModal={setShowAdminAboutModal}
+          logout={logout}
+          onNavigate={(to) => navigate(to)}
+        />
+
+        {/* Custom Admin Account & About Modals */}
+        <AdminModals
+          showAdminAccountModal={showAdminAccountModal}
+          setShowAdminAccountModal={setShowAdminAccountModal}
+          showAdminAboutModal={showAdminAboutModal}
+          setShowAdminAboutModal={setShowAdminAboutModal}
+          currentUser={currentUser}
+          logout={logout}
+          onNavigate={(to) => navigate(to)}
+        />
+
+        {/* Preparing Message Overlay */}
+        <PreparingMessageOverlay
+          isVisible={isPreparingDm}
+          title="Preparing Message..."
+          subtitle="Connecting you directly with your recruiter & opening your conversation..."
+        />
       </div>
     </>
   );

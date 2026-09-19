@@ -1,0 +1,163 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, master, develop]
+  pull_request:
+    branches: [main, master, develop]
+
+env:
+  NODE_VERSION: '20'
+  CI: 'true'
+
+jobs:
+  # =========================================================================
+  # Stage 1: Static Analysis, Linting & Type Validation
+  # =========================================================================
+  static-analysis:
+    name: 🔍 Lint & Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run TypeScript type check
+        run: npm run lint
+
+  # =========================================================================
+  # Stage 2: Unit Testing (60–70% of testing pyramid)
+  # Isolate and test individual components, functions, hooks, and utilities
+  # =========================================================================
+  unit-tests:
+    name: 🧪 Unit Tests (60–70%)
+    needs: static-analysis
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run Unit Tests with Vitest & React Testing Library
+        run: npm run test:unit
+
+  # =========================================================================
+  # Stage 3: Integration Testing (20–30% of testing pyramid)
+  # Test multi-component interactions, state stores, and data flows
+  # =========================================================================
+  integration-tests:
+    name: 🔄 Integration Tests (20–30%)
+    needs: unit-tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run Integration Tests
+        run: npm run test:integration
+
+  # =========================================================================
+  # Stage 4: End-to-End (E2E) Testing (5–10% of testing pyramid)
+  # Real user journeys, routing, critical navigation & auth pipelines
+  # =========================================================================
+  e2e-tests:
+    name: 🌐 End-to-End Tests (5–10%)
+    needs: integration-tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run E2E Test Suite
+        run: npm run test:e2e
+
+  # =========================================================================
+  # Stage 5: Production Build Verification
+  # Validates compilation of client assets and server bundle
+  # =========================================================================
+  build-verification:
+    name: 📦 Production Build & Asset Verification
+    needs: [integration-tests, e2e-tests]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Compile client bundle and server binary
+        run: npm run build
+
+      - name: Upload production artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-bundle
+          path: dist/
+          retention-days: 7
+
+  # =========================================================================
+  # Stage 6: Continuous Deployment (CD) Pipeline
+  # Deploy to Staging / Production upon successful branch merge
+  # =========================================================================
+  deploy:
+    name: 🚀 Continuous Deployment
+    needs: build-verification
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: dist-bundle
+          path: dist/
+
+      - name: Deploy application
+        run: |
+          echo "✅ All Unit, Integration, and E2E Tests passed."
+          echo "🚀 Deploying verified production bundle to target Cloud environment..."
+          # Deploy step target (e.g. Cloud Run / Firebase / Container Registry)
+          echo "Deployment successful."

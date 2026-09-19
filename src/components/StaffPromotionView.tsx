@@ -7,8 +7,7 @@ import {
   batchUpdateUserRoles, 
   batchDeleteUserProfiles,
   toggleStaffJobPosting,
-  getStaffStatuses,
-  seedWhatsAppSessionsInitialData
+  getStaffStatuses
 } from "../lib/services";
 import { 
   Shield, 
@@ -64,13 +63,17 @@ export const StaffPromotionView: React.FC<StaffPromotionViewProps> = ({ onBack, 
   const loadData = async () => {
     try {
       setLoading(true);
-      // Also ensure WhatsApp sessions metadata is primed
-      seedWhatsAppSessionsInitialData().catch(() => {});
       const [allUsers, statuses] = await Promise.all([
         getAllUserProfiles(),
         getStaffStatuses()
       ]);
-      setUsers(allUsers);
+      const userMap = new Map<string, UserProfile>();
+      allUsers.forEach(u => {
+        if (u && u.uid && !userMap.has(u.uid)) {
+          userMap.set(u.uid, u);
+        }
+      });
+      setUsers(Array.from(userMap.values()));
       setStaffStatuses(statuses);
     } catch (err) {
       console.warn("Failed to load user profiles:", err);
@@ -200,25 +203,38 @@ export const StaffPromotionView: React.FC<StaffPromotionViewProps> = ({ onBack, 
   };
 
   // Filter and Search Logic
-  const filteredUsers = users.filter(u => {
-    // Role filter
-    if (roleFilter !== "all" && u.role !== roleFilter) {
+  const filteredUsers = React.useMemo(() => {
+    const seen = new Set<string>();
+    return users.filter(u => {
+      if (!u || !u.uid || seen.has(u.uid)) return false;
+      
+      // Role filter
+      if (roleFilter !== "all" && u.role !== roleFilter) {
+        return false;
+      }
+
+      // Search query
+      const q = searchQuery.toLowerCase().trim();
+      if (!q) {
+        seen.add(u.uid);
+        return true;
+      }
+
+      const nameMatch = (u.displayName || "").toLowerCase().includes(q);
+      const emailMatch = (u.email || "").toLowerCase().includes(q);
+      const phoneMatch = (u.phoneNumber || "").toLowerCase().includes(q) || (u.companyPhone || "").toLowerCase().includes(q);
+      const roleMatch = (u.role || "").toLowerCase().includes(q);
+      const jobTitleMatch = (u.jobTitle || "").toLowerCase().includes(q);
+      const companyMatch = (u.companyName || "").toLowerCase().includes(q);
+
+      const matches = nameMatch || emailMatch || phoneMatch || roleMatch || jobTitleMatch || companyMatch;
+      if (matches) {
+        seen.add(u.uid);
+        return true;
+      }
       return false;
-    }
-
-    // Search query
-    const q = searchQuery.toLowerCase().trim();
-    if (!q) return true;
-
-    const nameMatch = (u.displayName || "").toLowerCase().includes(q);
-    const emailMatch = (u.email || "").toLowerCase().includes(q);
-    const phoneMatch = (u.phoneNumber || "").toLowerCase().includes(q) || (u.companyPhone || "").toLowerCase().includes(q);
-    const roleMatch = (u.role || "").toLowerCase().includes(q);
-    const jobTitleMatch = (u.jobTitle || "").toLowerCase().includes(q);
-    const companyMatch = (u.companyName || "").toLowerCase().includes(q);
-
-    return nameMatch || emailMatch || phoneMatch || roleMatch || jobTitleMatch || companyMatch;
-  });
+    });
+  }, [users, roleFilter, searchQuery]);
 
   // Calculate Metrics
   const metrics = {
@@ -1014,7 +1030,7 @@ export const StaffPromotionView: React.FC<StaffPromotionViewProps> = ({ onBack, 
               <div>
                 <h3 className="text-base font-extrabold text-[#0B1B3D]">Grant System Administrator Privileges?</h3>
                 <p className="text-xs text-slate-600 mt-1">
-                  You are promoting <strong className="text-slate-900">{pendingRoleChange.user.displayName || pendingRoleChange.user.email}</strong> to a full <strong>System Administrator</strong>. They will gain unrestricted access to global WhatsApp configuration, user management, and developer settings.
+                  You are promoting <strong className="text-slate-900">{pendingRoleChange.user.displayName || pendingRoleChange.user.email}</strong> to a full <strong>System Administrator</strong>. They will gain unrestricted access to user management, job moderation, and developer settings.
                 </p>
               </div>
 

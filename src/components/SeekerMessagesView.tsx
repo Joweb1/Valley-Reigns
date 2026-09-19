@@ -7,38 +7,38 @@ import { uploadToImageKit } from "../lib/imagekit";
 import { ChatMessageContent } from "./ChatMessageContent";
 import { 
   subscribeToConversations, 
+  subscribeToConversationMessages,
+  markConversationMessagesAsRead,
+  loadOlderMessages,
   sendChatMessage, 
   getJobs,
-  updateConversationStatus,
   clearConversationMessages,
-  reportConversation,
-  updateTypingStatus
+  reportConversation
 } from "../lib/services";
 import { 
   Clock, 
   MessageCircle, 
-  Smartphone, 
-  Check, 
-  X, 
   Send, 
-  AlertCircle, 
   ArrowLeft, 
-  ChevronRight, 
-  Sparkles, 
-  ChevronDown, 
-  ChevronUp, 
-  MoreHorizontal, 
   MoreVertical, 
   Trash2, 
   Flag, 
   Loader2,
+  Check,
   CheckCheck,
+  AlertCircle,
   Building,
-  LogOut,
-  MessageSquare,
-  Paperclip
+  Paperclip,
+  Briefcase,
+  Smile,
+  Camera,
+  Search,
+  X,
+  Plus
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
+
+const CHAT_VECTOR_WALLPAPER = `url("data:image/svg+xml,%3Csvg width='80' height='80' viewBox='0 0 80 80' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' stroke='%230B1B3D' stroke-width='1.1' stroke-linecap='round' stroke-linejoin='round' opacity='0.05'%3E%3Cpath d='M10 14h18a3 3 0 0 1 3 3v10a3 3 0 0 1-3 3h-10l-6 5v-5h-2a3 3 0 0 1-3-3V17a3 3 0 0 1 3-3z'/%3E%3Cpath d='M52 48l18-8-8 18-4-6-6-4z'/%3E%3Cpath d='M58 18l2.5 5 5 2.5-5 2.5-2.5 5-2.5-5-5-2.5 5-2.5z'/%3E%3Ccircle cx='24' cy='60' r='5'/%3E%3Cpath d='M21.5 60l2 2 4-4'/%3E%3Cpath d='M56 64h10'/%3E%3Cpath d='M61 59v10'/%3E%3Cpath d='M14 36h6'/%3E%3C/g%3E%3C/svg%3E")`;
 
 export const SeekerMessagesView: React.FC = () => {
   const { currentUser } = useAuth();
@@ -53,36 +53,51 @@ export const SeekerMessagesView: React.FC = () => {
   const [isSending, setIsSending] = useState(false);
   const [currentSystemTime, setCurrentSystemTime] = useState(Date.now());
   const [jobsList, setJobsList] = useState<Job[]>([]);
-  const [jobExpanded, setJobExpanded] = useState<Record<string, boolean>>({});
   const [popupJob, setPopupJob] = useState<Job | null>(null);
   const [headerMenuOpen, setHeaderMenuOpen] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [showReportDialog, setShowReportDialog] = useState(false);
   const [reportReason, setReportReason] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const [isUploadingAttachment, setIsUploadingAttachment] = useState(false);
   const attachmentInputRef = useRef<HTMLInputElement>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
 
-  const handleSeekerFileAttachment = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Active subcollection messages state and pagination
+  const [activeMessages, setActiveMessages] = useState<ChatMessage[]>([]);
+  const [isLoadingOlder, setIsLoadingOlder] = useState(false);
+  const [hasOlderMessages, setHasOlderMessages] = useState(true);
+
+  // File/Photo attachment upload
+  const handleSeekerFileAttachment = async (e: React.ChangeEvent<HTMLInputElement>, forcedType?: "image" | "file") => {
     const file = e.target.files?.[0];
     if (!file || !activeChatId) return;
 
     try {
       setIsUploadingAttachment(true);
+      setSendError(null);
       const res = await uploadToImageKit(file, "/seeker_cvs_and_files");
-      const fileNotice = res.fileType === "image"
+      const isImg = forcedType === "image" || res.fileType === "image";
+      const fileNotice = isImg 
         ? `[Attached Photo]: ${res.url}`
-        : `[Attached CV/Document]: ${res.name}\n${res.url}`;
+        : `[Attached CV/Document]: ${res.name || file.name}\n${res.url}`;
 
-      setMessageInput(prev => prev ? `${prev}\n${fileNotice}` : fileNotice);
+      await handleSendDirectMessage(fileNotice, {
+        attachmentUrl: res.url,
+        fileType: isImg ? "image" : "file"
+      });
     } catch (err: any) {
       console.error("[CV/File Upload Error]", err);
-      alert(err.message || "Failed to upload file to ImageKit");
+      setSendError(err.message || "Failed to upload file attachment");
     } finally {
       setIsUploadingAttachment(false);
       if (attachmentInputRef.current) attachmentInputRef.current.value = "";
+      if (photoInputRef.current) photoInputRef.current.value = "";
     }
   };
 
@@ -95,7 +110,56 @@ export const SeekerMessagesView: React.FC = () => {
     }
   }, [activeChatId]);
 
-  // Poll system time every 10 seconds for precise countdown calculations
+  // Subscribe to scoped subcollection messages for active conversation
+  useEffect(() => {
+    if (!activeChatId) {
+      setActiveMessages([]);
+      setHasOlderMessages(false);
+      return;
+    }
+
+    setHasOlderMessages(true);
+    const unsubscribe = subscribeToConversationMessages(activeChatId, 50, (serverMsgs) => {
+      setActiveMessages(prev => {
+        const pendingOptimistic = prev.filter(
+          m => m.deliveryStatus === "sending" && !serverMsgs.some(sm => sm.id === m.id)
+        );
+        const combined = [...serverMsgs, ...pendingOptimistic];
+        return combined.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+      });
+      if (serverMsgs.length < 50) {
+        setHasOlderMessages(false);
+      }
+      markConversationMessagesAsRead(activeChatId, currentUser?.uid, "customer");
+    });
+
+    return () => {
+      if (typeof unsubscribe === "function") {
+        unsubscribe();
+      }
+    };
+  }, [activeChatId]);
+
+  const handleLoadOlderMessages = async () => {
+    if (!activeChatId || activeMessages.length === 0 || isLoadingOlder) return;
+    setIsLoadingOlder(true);
+    try {
+      const oldestTime = activeMessages[0].timestamp;
+      const older = await loadOlderMessages(activeChatId, oldestTime, 50);
+      if (older.length < 50) {
+        setHasOlderMessages(false);
+      }
+      if (older.length > 0) {
+        setActiveMessages((prev) => [...older, ...prev]);
+      }
+    } catch (err) {
+      console.warn("[SeekerMessagesView] Failed to load older messages:", err);
+    } finally {
+      setIsLoadingOlder(false);
+    }
+  };
+
+  // Poll system time
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentSystemTime(Date.now());
@@ -116,7 +180,7 @@ export const SeekerMessagesView: React.FC = () => {
     };
   }, []);
 
-  // Load jobs list for reference job cards lookup
+  // Load jobs list
   useEffect(() => {
     async function loadJobs() {
       const list = await getJobs();
@@ -125,22 +189,33 @@ export const SeekerMessagesView: React.FC = () => {
     loadJobs();
   }, []);
 
-  // Dispatch custom event to let AppContent know if a conversation is active (and thus hide the main header)
-  useEffect(() => {
-    window.dispatchEvent(new CustomEvent("toggle-chat-view", { detail: { active: !!activeChatId } }));
-    return () => {
-      window.dispatchEvent(new CustomEvent("toggle-chat-view", { detail: { active: false } }));
-    };
-  }, [activeChatId]);
+  // Helper to extract the most recent message timestamp
+  const getLatestMessageTime = (c: Conversation): number => {
+    let latest = c.lastMessageAt || c.createdAt || 0;
+    if (c.messages) {
+      const msgList = Array.isArray(c.messages) ? c.messages : Object.values(c.messages);
+      for (const m of msgList) {
+        if (m && typeof m.timestamp === "number" && m.timestamp > latest) {
+          latest = m.timestamp;
+        }
+      }
+    }
+    return latest;
+  };
 
   // Filter conversations belonging to this seeker
   const seekerPhoneIdentifier = currentUser?.displayName || currentUser?.email || "Unknown Seeker";
-  const myConversations = (Object.values(conversations) as Conversation[]).filter(c => 
-    (c.seekerUid && currentUser?.uid && c.seekerUid === currentUser.uid) ||
-    c.customerPhone === seekerPhoneIdentifier || 
-    c.customerPhone === currentUser?.email ||
-    c.customerPhone === currentUser?.displayName
-  ).sort((a, b) => b.lastMessageAt - a.lastMessageAt);
+  const myConversations = (Object.values(conversations) as Conversation[]).filter(c => {
+    if (!c) return false;
+    if (currentUser?.uid && c.seekerUid === currentUser.uid) return true;
+    if (currentUser?.email && (c.customerPhone === currentUser.email || c.seekerUid === currentUser.email)) return true;
+    if (currentUser?.displayName && c.customerPhone === currentUser.displayName) return true;
+    if (c.customerPhone === seekerPhoneIdentifier) return true;
+    if (currentUser?.uid && c.messages && Array.isArray(c.messages)) {
+      return c.messages.some(m => (m.sender === "customer" || m.sender === "guest") && m.senderUid === currentUser.uid);
+    }
+    return false;
+  }).sort((a, b) => getLatestMessageTime(b) - getLatestMessageTime(a));
 
   // Auto-select chat if query param jobId is specified
   useEffect(() => {
@@ -148,11 +223,9 @@ export const SeekerMessagesView: React.FC = () => {
       const match = myConversations.find(c => c.jobId === initialJobId);
       if (match) {
         setActiveChatId(match.chatId);
-        // Clear query param to avoid sticky navigation state
         setSearchParams({});
       }
     } else if (!activeChatId && myConversations.length > 0) {
-      // Default to first active chat on desktop
       if (window.innerWidth >= 768) {
         setActiveChatId(myConversations[0].chatId);
       }
@@ -161,239 +234,257 @@ export const SeekerMessagesView: React.FC = () => {
 
   const activeConversation = activeChatId ? conversations[activeChatId] : null;
 
-  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  // Clear typing state on active chat change or unmount
   useEffect(() => {
+    window.dispatchEvent(new CustomEvent("toggle-chat-view", { detail: { active: !!activeChatId } }));
     return () => {
-      if (typingTimeoutRef.current) {
-        clearTimeout(typingTimeoutRef.current);
-      }
-      if (activeChatId && currentUser) {
-        updateTypingStatus(activeChatId, currentUser.uid, false, currentUser.displayName || currentUser.email);
-      }
+      window.dispatchEvent(new CustomEvent("toggle-chat-view", { detail: { active: false } }));
     };
-  }, [activeChatId, currentUser]);
+  }, [activeChatId]);
 
-  const handleInputChange = (val: string) => {
-    setMessageInput(val);
-    if (!activeChatId || !currentUser) return;
-    updateTypingStatus(activeChatId, currentUser.uid, true, currentUser.displayName || currentUser.email);
-
-    if (typingTimeoutRef.current) {
-      clearTimeout(typingTimeoutRef.current);
-    }
-
-    typingTimeoutRef.current = setTimeout(() => {
-      updateTypingStatus(activeChatId, currentUser.uid, false, currentUser.displayName || currentUser.email);
-    }, 3000);
-  };
-
-  const getTypingStatusText = () => {
-    if (!activeConversation || !activeConversation.typing || !currentUser) return null;
-    const now = Date.now();
-    const activeTypers = Object.entries(activeConversation.typing)
-      .filter(([uid, info]) => {
-        const typingInfo = info as { isTyping: boolean; name: string; updatedAt: number };
-        return uid !== currentUser.uid && typingInfo.isTyping && (now - (typingInfo.updatedAt || 0) < 6000);
-      })
-      .map(([_, info]) => {
-        const typingInfo = info as { isTyping: boolean; name: string; updatedAt: number };
-        return typingInfo.name || "Staff";
-      });
-    
-    if (activeTypers.length === 0) return null;
-    if (activeTypers.length === 1) return `${activeTypers[0]} is typing...`;
-    return `${activeTypers.join(", ")} are typing...`;
-  };
-
-  const typingText = getTypingStatusText();
-
-  // Auto-scroll messages to bottom
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [activeConversation?.messages]);
+  }, [activeMessages, activeConversation?.messages]);
 
-  // Send Message
-  const handleSendMessage = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    if (!activeChatId || !messageInput.trim() || !currentUser || isSending) return;
-
-    if (typingTimeoutRef.current) {
-      clearTimeout(typingTimeoutRef.current);
-    }
-    updateTypingStatus(activeChatId, currentUser.uid, false, currentUser.displayName || currentUser.email);
+  // Direct send message
+  const handleSendDirectMessage = async (
+    textToSend: string, 
+    options?: { attachmentUrl?: string; fileType?: "image" | "pdf" | "file" }
+  ) => {
+    if (!activeChatId || !textToSend.trim() || !currentUser || isSending) return;
 
     setIsSending(true);
+    setSendError(null);
+
+    const now = Date.now();
+    const tempId = `msg_${now}_${Math.random().toString(36).substring(2, 7)}`;
+    const optimisticMessage: ChatMessage = {
+      id: tempId,
+      chatId: activeChatId,
+      sender: "customer",
+      text: textToSend,
+      timestamp: now,
+      senderUid: currentUser.uid,
+      senderName: currentUser.displayName || "Applicant",
+      attachmentUrl: options?.attachmentUrl,
+      fileType: options?.fileType,
+      deliveryStatus: "sending"
+    };
+
+    // 1. Optimistically append
+    setActiveMessages(prev => [...prev, optimisticMessage]);
+
     try {
-      await sendChatMessage(activeChatId, "customer", messageInput.trim());
-      setMessageInput("");
+      const sentMsg = await sendChatMessage(activeChatId, "customer", textToSend, {
+        messageId: tempId,
+        senderUid: currentUser.uid,
+        senderName: currentUser.displayName || "Applicant",
+        senderRole: "seeker",
+        attachmentUrl: options?.attachmentUrl,
+        fileType: options?.fileType
+      });
+
+      // 2. Immediately transition optimistic message to "sent" (single tick)
+      setActiveMessages(prev =>
+        prev.map(m => (m.id === tempId ? { ...m, ...sentMsg, deliveryStatus: "sent" } : m))
+      );
+      setConversations(prev => {
+        const conv = prev[activeChatId];
+        if (!conv) return prev;
+        const msgs = conv.messages || [];
+        const msgList = Array.isArray(msgs) ? msgs : Object.values(msgs);
+        const updated = msgList.map((m: any) =>
+          m.id === tempId ? { ...m, ...sentMsg, deliveryStatus: "sent" } : m
+        );
+        return {
+          ...prev,
+          [activeChatId]: {
+            ...conv,
+            messages: updated
+          }
+        };
+      });
+    } catch (err: any) {
+      console.error("Failed to deliver message:", err);
+      setActiveMessages(prev =>
+        prev.map(m => (m.id === tempId ? { ...m, deliveryStatus: "failed" } : m))
+      );
+      setSendError(err?.message || "Failed to deliver message.");
     } finally {
       setIsSending(false);
     }
   };
 
-  // Seeker communications templates (when 24h Meta window expires for standard WA chats)
-  const APPROVED_TEMPLATES_SEEKER = [
-    "Hello! I am still highly interested in this position. Can you connect me with the next step?",
-    "Yes, I confirm my availability for an interview call. Please let me know what times work best.",
-    "Thank you for reaching out. Here is my updated profile and portfolio details to proceed with the application."
-  ];
-
-  const handleSendTemplate = async (templateText: string) => {
-    if (!activeChatId || !currentUser) return;
-    if (typingTimeoutRef.current) {
-      clearTimeout(typingTimeoutRef.current);
-    }
-    updateTypingStatus(activeChatId, currentUser.uid, false, currentUser.displayName || currentUser.email);
-    await sendChatMessage(activeChatId, "customer", templateText);
+  const handleSendMessage = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const textToSend = messageInput.trim();
+    if (!textToSend) return;
+    setMessageInput("");
+    setShowEmojiPicker(false);
+    await handleSendDirectMessage(textToSend);
   };
 
-  // Helper to safely format timestamps
-  const formatTime = (timestamp: number) => {
-    return new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const formatMessageTime = (timestamp: number) => {
+    if (!timestamp) return "";
+    const date = new Date(timestamp);
+    return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
   };
 
-  // Expiration Clock Calculations (24-Hour window based on arrival timestamp vs current time)
-  const getExpirationState = (conv: Conversation) => {
-    // Check if conversation is an in-app conversation (not standard WhatsApp)
-    const isInApp = conv?.isInApp || (conv?.customerPhone ? !conv.customerPhone.startsWith("+") : true);
-    if (isInApp) {
-      return { isExpired: false, text: "In-App Chat", hoursLeft: 999, isUrgent: false, isInApp: true };
-    }
-
-    const windowMs = 24 * 60 * 60 * 1000; // 24 hours
-    const ageMs = currentSystemTime - conv.createdAt;
-    const timeRemainingMs = windowMs - ageMs;
-
-    if (timeRemainingMs <= 0) {
-      return { isExpired: true, text: "Expired", hoursLeft: 0, isUrgent: false, isInApp: false };
-    }
-
-    const hoursLeft = Math.floor(timeRemainingMs / (1000 * 60 * 60));
-    const minutesLeft = Math.floor((timeRemainingMs % (1000 * 60 * 60)) / (1000 * 60));
-
-    const isUrgent = hoursLeft < 1; // Less than an hour
-    const textStr = hoursLeft > 0 
-      ? `${hoursLeft} hr${hoursLeft > 1 ? "s" : ""} left` 
-      : `${minutesLeft} min${minutesLeft > 1 ? "s" : ""} left`;
-
-    return {
-      isExpired: false,
-      text: textStr,
-      hoursLeft,
-      isUrgent,
-      isInApp: false
-    };
+  const formatThreadDate = (timestamp: number) => {
+    if (!timestamp) return "";
+    const now = new Date();
+    const date = new Date(timestamp);
+    if (now.toDateString() === date.toDateString()) return formatMessageTime(timestamp);
+    return date.toLocaleDateString([], { month: "numeric", day: "numeric", year: "2-digit" });
   };
 
-  const isChatActive = !!activeConversation;
+  const filteredConversations = myConversations.filter(c => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase();
+    return (
+      (c.jobTitle || "").toLowerCase().includes(q) ||
+      (c.text || "").toLowerCase().includes(q)
+    );
+  });
+
+  // Merged messages for rendering
+  const displayedMessages = React.useMemo(() => {
+    if (!activeConversation) return [];
+    const fromActive = activeMessages || [];
+    const fromConv = activeConversation.messages 
+      ? (Array.isArray(activeConversation.messages) ? activeConversation.messages : Object.values(activeConversation.messages))
+      : [];
+
+    const map = new Map<string, ChatMessage>();
+    [...fromActive, ...fromConv].forEach(m => {
+      if (m && (m.id || m.timestamp)) {
+        const key = m.id || `${m.timestamp}_${m.sender}_${m.text}`;
+        if (!map.has(key)) {
+          map.set(key, m);
+        } else {
+          const existing = map.get(key)!;
+          if (existing.deliveryStatus === "sending" && m.deliveryStatus && m.deliveryStatus !== "sending") {
+            map.set(key, m);
+          }
+        }
+      }
+    });
+
+    return Array.from(map.values()).sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+  }, [activeMessages, activeConversation]);
+
+  const associatedJob = jobsList.find(j => 
+    j.id === activeConversation?.jobId || 
+    (activeConversation?.text && activeConversation.text.toLowerCase().includes(j.id.toLowerCase()))
+  );
 
   return (
-    <div className={isChatActive ? "w-full h-full md:h-auto md:max-w-7xl md:mx-auto md:px-4 sm:md:px-6 lg:md:px-8 md:pt-8 md:pb-10 flex flex-col bg-white min-h-0" : "max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 pt-8 pb-10 flex flex-col"}>
-      {/* Main Split-Pane Workspace Frame */}
-      <div className={isChatActive ? "bg-white flex-grow flex flex-row relative overflow-hidden min-h-0 md:border md:border-slate-200/80 md:rounded-3xl md:shadow-sm md:h-[700px]" : "bg-white border border-slate-200/80 rounded-3xl shadow-sm h-[700px] flex flex-row relative overflow-hidden"}>
+    <div className="w-full flex-1 h-full min-h-0 flex flex-col p-0 m-0 overflow-hidden">
+      {/* Hidden File Attachment Inputs */}
+      <input
+        type="file"
+        ref={attachmentInputRef}
+        onChange={(e) => handleSeekerFileAttachment(e, "file")}
+        className="hidden"
+        accept=".pdf,.doc,.docx,.txt,.xls,.xlsx"
+      />
+      <input
+        type="file"
+        ref={photoInputRef}
+        onChange={(e) => handleSeekerFileAttachment(e, "image")}
+        className="hidden"
+        accept="image/*"
+      />
+
+      <div className="w-full flex-1 h-full min-h-0 flex bg-[#F0F2F5] md:bg-white overflow-hidden font-sans">
         
         {/* ========================================== */}
-        {/* LEFT PANEL: Messaging Threads & Lists */}
+        {/* LEFT PANEL: THREADS / CONVERSATIONS LIST   */}
         {/* ========================================== */}
-        <div className={`w-full md:w-96 border-0 shadow-none rounded-none bg-white flex flex-col shrink-0 border-r border-slate-100/80 absolute md:relative inset-y-0 left-0 transform transition-transform duration-300 ease-out z-10 ${
-          activeConversation ? "-translate-x-full md:translate-x-0" : "translate-x-0"
-        }`}>
-          {/* Custom Navigation Header block */}
-          <div className="border-b border-slate-50 shrink-0 flex items-center justify-between px-4 py-3.5 bg-white">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-blue-50 rounded-xl flex items-center justify-center text-[#1E88E5]">
-                <MessageCircle className="w-4 h-4" />
-              </div>
-              <div className="text-left">
-                <h3 className="text-sm font-sans font-black text-slate-800 tracking-tight leading-none">
-                  My Live Chats
-                </h3>
-                <span className="text-[9px] font-mono font-bold text-[#1E88E5] uppercase tracking-wider block mt-1">
-                  Active Applications ({myConversations.length})
-                </span>
-              </div>
+        <div className={`w-full md:w-[360px] lg:w-[400px] bg-white border-r border-slate-100 flex flex-col shrink-0 h-full min-h-0 pt-4 sm:pt-5 md:pt-6 ${activeChatId ? "hidden md:flex" : "flex"}`}>
+          
+          {/* Top Search & Filter Bar */}
+          <div className="px-3.5 pt-1 pb-3 bg-white border-b border-slate-100/90 shrink-0">
+            <div className="relative flex items-center">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 pointer-events-none" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search conversations..."
+                className="w-full pl-9.5 pr-8 py-2 bg-slate-50 hover:bg-slate-100/80 focus:bg-white text-xs text-slate-800 placeholder-slate-400 rounded-full border border-slate-200/80 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 transition-all font-medium"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-3 p-0.5 text-slate-400 hover:text-slate-600 rounded-full cursor-pointer"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
             </div>
           </div>
 
-          {/* List Scroll Container */}
-          <div className="flex-1 overflow-y-auto p-3 space-y-2.5">
+          {/* Conversations Scroll Feed with Bottom Padding */}
+          <div className="flex-1 min-h-0 overflow-y-auto divide-y divide-slate-100 bg-white pb-12 md:pb-10">
             {loading ? (
-              <div className="space-y-3">
-                {[1, 2, 3].map((n) => (
-                  <ThreadCardSkeleton key={n} showClaimButton={false} />
-                ))}
+              <div className="divide-y divide-slate-100">
+                {[1, 2, 3].map(n => <ThreadCardSkeleton key={n} />)}
               </div>
-            ) : myConversations.length === 0 ? (
-              <div className="h-48 flex flex-col items-center justify-center text-center p-4">
-                <div className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center text-slate-300 mb-2">
-                  <MessageSquare className="w-5 h-5" />
+            ) : filteredConversations.length === 0 ? (
+              <div className="h-64 flex flex-col items-center justify-center text-center p-6">
+                <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mb-3">
+                  <MessageCircle className="w-6 h-6" />
                 </div>
-                <p className="text-xs font-sans font-semibold text-slate-400 leading-snug">
-                  No chat threads active yet.
+                <h3 className="text-sm font-bold text-slate-800 mb-1">
+                  No active chats
+                </h3>
+                <p className="text-xs text-slate-500 max-w-xs mb-4">
+                  Browse open job listings on the homepage to start chatting with recruiters.
                 </p>
-                <p className="text-[10px] font-sans text-slate-300 max-w-xs mt-1 leading-normal">
-                  Go back to your dashboard, select an open job role, and click "Send Message" to start a live recruiter conversation!
-                </p>
+                <Link
+                  to="/"
+                  className="px-4 py-2 bg-[#0B1B3D] text-white rounded-full text-xs font-bold shadow-sm inline-flex items-center gap-1.5"
+                >
+                  <Briefcase className="w-3.5 h-3.5" />
+                  <span>Browse Jobs</span>
+                </Link>
               </div>
             ) : (
-              myConversations.map((conv) => {
+              filteredConversations.map((conv) => {
                 const isSelected = activeChatId === conv.chatId;
-                const exp = getExpirationState(conv);
-                const rawMessages = conv.messages;
-                const messagesArray: ChatMessage[] = [];
-
-                if (rawMessages) {
-                  if (Array.isArray(rawMessages)) {
-                    messagesArray.push(...rawMessages);
-                  } else {
-                    Object.entries(rawMessages).forEach(([id, msg]) => {
-                      const typedMsg = msg as ChatMessage;
-                      messagesArray.push({ id, ...typedMsg });
-                    });
-                  }
-                }
-                messagesArray.sort((a, b) => a.timestamp - b.timestamp);
-                const latestMsg = messagesArray[messagesArray.length - 1];
+                const lastTime = conv.lastMessageAt || conv.createdAt || 0;
+                const latestMsgSnippet = conv.text || "Tap to view conversation";
 
                 return (
                   <div
                     key={conv.chatId}
                     onClick={() => setActiveChatId(conv.chatId)}
-                    className={`w-full text-left p-4 rounded-2xl transition-all duration-300 border cursor-pointer ${
-                      isSelected
-                        ? "bg-blue-50 border-blue-200 shadow-md shadow-blue-900/5 scale-[1.02]"
-                        : "bg-white border-slate-100 hover:border-slate-200 hover:shadow-sm"
+                    className={`w-full p-3.5 flex items-start gap-3 transition-colors cursor-pointer ${
+                      isSelected ? "bg-blue-50/70" : "hover:bg-slate-50 bg-white"
                     }`}
                   >
-                    <div className="flex items-center justify-between gap-2 mb-1.5">
-                      <span className="text-[14px] sm:text-[15px] font-normal text-slate-950 flex items-center gap-1 max-w-[70%] truncate font-['Roboto',sans-serif]">
-                        <Building className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                        {conv.jobTitle}
-                      </span>
-                      {exp.isInApp ? (
-                        <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-blue-50 text-[#1E88E5] shrink-0">
-                          In-App
-                        </span>
-                      ) : (
-                        <span className={`text-[9px] font-mono font-bold px-1.5 py-0.5 rounded flex items-center gap-0.5 shrink-0 ${exp.isUrgent ? "bg-red-50 text-red-600 animate-pulse" : "bg-blue-50 text-[#1E88E5]"}`}>
-                          <Clock className="w-2.5 h-2.5" />
-                          {exp.hoursLeft}h left
-                        </span>
-                      )}
+                    <div className="w-11 h-11 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center font-bold text-sm shadow-xs shrink-0 mt-0.5">
+                      VR
                     </div>
-
-                    <div className="space-y-1">
-                      <p className="text-xs font-normal text-[#1E88E5] font-['Roboto',sans-serif]">
-                        Hiring Team • {conv.assignedToName || "Unassigned Agent"}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-1 mb-1">
+                        <span className="text-[14px] font-bold text-slate-900 truncate">
+                          {(() => {
+                            const title = conv.jobTitle || "";
+                            const isGenericOrWhatsapp = !title || 
+                              title.toLowerCase().includes("whatsapp") || 
+                              title.toLowerCase().includes("inquiry");
+                            return isGenericOrWhatsapp ? "Reach Out" : title;
+                          })()}
+                        </span>
+                        <span className="text-[11px] font-medium text-slate-400 shrink-0">
+                          {formatThreadDate(lastTime)}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-500 truncate leading-relaxed">
+                        {latestMsgSnippet}
                       </p>
-                      {latestMsg && (
-                        <p className="text-xs sm:text-sm text-slate-500 line-clamp-1 italic font-['Roboto',sans-serif]">
-                          {latestMsg.sender === "customer" || latestMsg.sender === "guest" ? "You: " : "Recruiter: "}
-                          "{latestMsg.text}"
-                        </p>
-                      )}
                     </div>
                   </div>
                 );
@@ -403,129 +494,108 @@ export const SeekerMessagesView: React.FC = () => {
         </div>
 
         {/* ========================================== */}
-        {/* RIGHT PANEL: Messaging Active Workspace */}
+        {/* RIGHT PANEL: WHATSAPP-STYLE MESSAGING PAGE */}
         {/* ========================================== */}
-        <div className={`flex-grow flex flex-col bg-slate-50 min-w-0 border-0 shadow-none rounded-none ml-0 overflow-hidden absolute md:relative inset-y-0 right-0 w-full md:w-auto transform transition-transform duration-300 ease-out z-20 md:z-10 ${
-          activeConversation ? "translate-x-0 md:translate-x-0" : "translate-x-full md:translate-x-0"
-        }`}>
+        <div className={`flex-1 flex flex-col h-full min-h-0 min-w-0 bg-[#F0F4F8] relative ${!activeChatId ? "hidden md:flex items-center justify-center bg-[#F8FAFC]" : "flex"}`}>
+          
           {activeConversation ? (
-            <div
-              key={activeConversation.chatId}
-              className="flex-grow flex flex-col overflow-y-auto h-full relative pt-16 pb-48 md:overflow-y-hidden md:h-auto md:min-h-0 md:pt-0 md:pb-0 text-left"
+            <motion.div
+              key={activeChatId}
+              initial={{ opacity: 0, x: 8 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -8 }}
+              transition={{ duration: 0.18, ease: "easeOut" }}
+              className="flex-1 flex flex-col h-full min-h-0 min-w-0"
             >
-              {/* Active Conversation Metadata Header */}
-              <div className="bg-white px-5 py-3 border-b border-slate-100 flex items-center justify-between shrink-0 fixed top-0 left-0 right-0 z-40 w-full md:relative md:top-auto md:left-auto md:right-auto md:z-auto">
-                <div className="flex items-center gap-3 min-w-0">
-                  {/* Return button on mobile */}
+              {/* Soft Refined Chat Header Bar */}
+              <div className="px-3.5 sm:px-4 py-2.5 bg-white/95 backdrop-blur-md border-0 flex items-center justify-between gap-3 shrink-0 z-10 shadow-[0_2px_12px_rgba(0,0,0,0.03)]">
+                <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
                   <button
+                    type="button"
                     onClick={() => setActiveChatId(null)}
-                    className="md:hidden p-1.5 -ml-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition-all mr-1 shrink-0 cursor-pointer"
-                    title="Back to threads"
+                    className="p-2 -ml-1 text-slate-500 hover:text-slate-900 hover:bg-slate-100/80 active:scale-95 rounded-full md:hidden cursor-pointer transition-all flex items-center justify-center shrink-0"
+                    title="Back to Conversations"
                   >
                     <ArrowLeft className="w-5 h-5" />
                   </button>
 
-                  <div className="w-10 h-10 bg-blue-50 rounded-full flex items-center justify-center text-[#1E88E5] font-mono text-xs font-black shrink-0 border border-blue-100 shadow-sm">
-                    VR
+                  {/* Avatar profile - perfectly rounded circle */}
+                  <div className="relative shrink-0">
+                    <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-gradient-to-tr from-[#0B1B3D] to-[#1E88E5] text-white flex items-center justify-center font-bold text-xs sm:text-sm shadow-[0_2px_8px_rgba(11,27,61,0.14)]">
+                      VR
+                    </div>
+                    <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 border-2 border-white rounded-full shadow-xs" />
                   </div>
-                  <div className="min-w-0 leading-tight">
-                    <h4 className="text-sm font-sans font-black text-slate-800 tracking-tight truncate">
-                      {activeConversation.jobTitle}
-                    </h4>
-                    <p className="text-[10px] font-mono font-bold text-[#1E88E5] uppercase tracking-wider mt-0.5 truncate">
-                      {activeConversation.assignedToName ? `Claimed by ${activeConversation.assignedToName}` : "Waiting for Recruiter Claim..."}
+
+                  <div className="min-w-0">
+                    <h3 className="text-[13px] sm:text-[14px] font-bold text-slate-900 truncate leading-tight tracking-tight">
+                      Valley Reigns Support
+                    </h3>
+                    <p className="text-[11px] text-emerald-600 font-medium truncate mt-0.5 flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block animate-pulse" />
+                      <span>online • {activeConversation.jobTitle || "Career Specialist"}</span>
                     </p>
                   </div>
                 </div>
 
-                {/* Expiration Clock / In-App Badge */}
-                <div className="flex items-center gap-2 shrink-0">
-                  {(() => {
-                    const exp = getExpirationState(activeConversation);
-                    if (exp.isInApp) {
-                      return (
-                        <div className="px-3 py-1.5 rounded-xl text-xs font-mono font-extrabold bg-blue-50 border border-blue-100 text-[#1E88E5]">
-                          In-App Chat
-                        </div>
-                      );
-                    }
-                    return (
-                      <div className={`px-3 py-1.5 rounded-xl text-xs font-mono font-extrabold flex items-center gap-1.5 border ${
-                        exp.isExpired 
-                          ? "bg-slate-100 border-slate-200 text-slate-400" 
-                          : exp.isUrgent 
-                          ? "bg-red-50 border-red-100 text-red-600 animate-[pulse_1.5s_infinite]" 
-                          : "bg-blue-50 border-blue-100 text-[#1E88E5]"
-                      }`}>
-                        <Clock className="w-3.5 h-3.5" />
-                        {exp.text}
-                      </div>
-                    );
-                  })()}
+                {/* Right Top Header Actions */}
+                <div className="flex items-center gap-1 shrink-0">
+                  {associatedJob && (
+                    <button
+                      type="button"
+                      onClick={() => setPopupJob(associatedJob)}
+                      className="p-2 text-slate-500 hover:text-blue-600 hover:bg-blue-50/70 active:scale-95 rounded-full transition-all cursor-pointer"
+                      title="View Job Details"
+                    >
+                      <Briefcase className="w-4 h-4" />
+                    </button>
+                  )}
 
-                  {/* More Actions Dropdown Menu */}
                   <div className="relative">
                     <button
+                      type="button"
                       onClick={() => setHeaderMenuOpen(!headerMenuOpen)}
-                      className={`p-2.5 hover:bg-slate-100 text-slate-500 hover:text-slate-800 rounded-xl border border-slate-100 transition-all cursor-pointer flex items-center justify-center ${headerMenuOpen ? "bg-slate-100 border-slate-200 text-slate-800" : ""}`}
-                      title="More chat actions"
+                      className="p-2 text-slate-500 hover:text-slate-900 hover:bg-slate-100/80 active:scale-95 rounded-full transition-all cursor-pointer"
                     >
-                      <MoreVertical className="w-4.5 h-4.5" />
+                      <MoreVertical className="w-4 h-4" />
                     </button>
 
-                    {/* Dropdown Menu Overlay */}
                     <AnimatePresence>
                       {headerMenuOpen && (
                         <>
                           <div 
-                            className="fixed inset-0 z-40" 
+                            className="fixed inset-0 z-40"
                             onClick={() => setHeaderMenuOpen(false)}
                           />
                           <motion.div
-                            initial={{ opacity: 0, scale: 0.95, y: -10 }}
+                            initial={{ opacity: 0, scale: 0.95, y: -4 }}
                             animate={{ opacity: 1, scale: 1, y: 0 }}
-                            exit={{ opacity: 0, scale: 0.95, y: -10 }}
-                            transition={{ duration: 0.12 }}
-                            className="absolute right-0 mt-2 w-48 bg-white border border-slate-100 rounded-2xl shadow-xl z-50 overflow-hidden divide-y divide-slate-50"
+                            exit={{ opacity: 0, scale: 0.95, y: -4 }}
+                            transition={{ duration: 0.15 }}
+                            className="absolute right-0 top-11 w-48 bg-white/98 backdrop-blur-md rounded-2xl shadow-[0_10px_30px_rgba(0,0,0,0.08)] border border-slate-100 py-1.5 z-50 overflow-hidden"
                           >
-                            <div className="py-1">
-                              {/* Close Chat */}
-                              <button
-                                onClick={() => {
-                                  updateConversationStatus(activeConversation.chatId, "finished");
-                                  setHeaderMenuOpen(false);
-                                }}
-                                className="w-full px-4 py-2.5 text-left text-xs font-semibold text-slate-700 hover:text-red-700 hover:bg-red-50 flex items-center gap-2 transition-colors cursor-pointer"
-                              >
-                                <LogOut className="w-3.5 h-3.5 text-slate-400" />
-                                Close Chat
-                              </button>
-
-                              {/* Clear Chat */}
-                              <button
-                                onClick={() => {
-                                  setShowClearConfirm(true);
-                                  setHeaderMenuOpen(false);
-                                }}
-                                className="w-full px-4 py-2.5 text-left text-xs font-semibold text-slate-700 hover:text-slate-900 hover:bg-slate-50 flex items-center gap-2 transition-colors cursor-pointer"
-                              >
-                                <Trash2 className="w-3.5 h-3.5 text-slate-400" />
-                                Clear Chat
-                              </button>
-
-                              {/* Report Chat */}
-                              <button
-                                onClick={() => {
-                                  setReportReason("");
-                                  setShowReportDialog(true);
-                                  setHeaderMenuOpen(false);
-                                }}
-                                className="w-full px-4 py-2.5 text-left text-xs font-semibold text-slate-700 hover:text-amber-700 hover:bg-amber-50 flex items-center gap-2 transition-colors cursor-pointer"
-                              >
-                                <Flag className="w-3.5 h-3.5 text-slate-400" />
-                                Report Chat
-                              </button>
-                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setHeaderMenuOpen(false);
+                                setShowClearConfirm(true);
+                              }}
+                              className="w-full px-4 py-2 text-left text-xs font-semibold text-slate-700 hover:bg-slate-50/80 flex items-center gap-2 cursor-pointer transition-colors"
+                            >
+                              <Trash2 className="w-4 h-4 text-slate-400" />
+                              <span>Clear Chat</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setHeaderMenuOpen(false);
+                                setShowReportDialog(true);
+                              }}
+                              className="w-full px-4 py-2 text-left text-xs font-semibold text-amber-700 hover:bg-amber-50/80 flex items-center gap-2 cursor-pointer transition-colors"
+                            >
+                              <Flag className="w-4 h-4 text-amber-500" />
+                              <span>Report Chat</span>
+                            </button>
                           </motion.div>
                         </>
                       )}
@@ -534,601 +604,386 @@ export const SeekerMessagesView: React.FC = () => {
                 </div>
               </div>
 
-              {/* Chat Messages Feed logs */}
-              <div className="flex-1 md:overflow-y-auto overflow-y-visible p-6 space-y-4 h-auto md:h-full">
-                {(() => {
-                  const rawMessages = activeConversation.messages;
-                  const messagesArray: ChatMessage[] = [];
+              {/* Collapsible Job Overview Strip */}
+              {associatedJob && (
+                <div className="bg-blue-50/90 border-b border-blue-100 px-4 py-2 flex items-center justify-between text-xs text-blue-900 shrink-0">
+                  <div className="flex items-center gap-2 truncate">
+                    <span className="font-bold truncate">{associatedJob.title}</span>
+                    <span className="text-blue-600 font-mono text-[11px] shrink-0">({associatedJob.salary})</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setPopupJob(associatedJob)}
+                    className="text-[11px] font-bold text-blue-700 hover:underline shrink-0 ml-2"
+                  >
+                    View Details
+                  </button>
+                </div>
+              )}
 
-                  if (rawMessages) {
-                    if (Array.isArray(rawMessages)) {
-                      messagesArray.push(...rawMessages);
-                    } else {
-                      Object.entries(rawMessages).forEach(([id, msg]) => {
-                        const typedMsg = msg as ChatMessage;
-                        messagesArray.push({ id, ...typedMsg });
-                      });
-                    }
-                  }
-
-                  messagesArray.sort((a, b) => a.timestamp - b.timestamp);
-
-                  if (messagesArray.length === 0) {
-                    return (
-                      <div className="text-center p-4 text-xs font-mono text-slate-400 italic">
-                        Empty conversation history log
-                      </div>
-                    );
-                  }
-
-                  const firstCustomerMsg = messagesArray.find(m => m.sender === "customer" || m.sender === "guest");
-
-                  return messagesArray.map((msg, index) => {
-                    if (msg.sender === "system") {
-                      return (
-                        <div key={msg.id || index} className="flex justify-center">
-                          <div className="bg-slate-100 text-slate-500 rounded-full px-4 py-1.5 text-[10px] font-sans font-semibold tracking-wide flex items-center gap-1.5 shadow-sm border border-slate-200/50">
-                            <Sparkles className="w-3 h-3 text-[#1E88E5]" />
-                            {msg.text}
-                          </div>
-                        </div>
-                      );
-                    }
-
-                    // Seeker is customer or guest (current sender)
-                    const isSeeker = msg.sender === "customer" || msg.sender === "guest";
-                    const isFirstCustomerMessage = isSeeker && firstCustomerMsg && msg === firstCustomerMsg;
-                    let matchedJob: Job | null = null;
-                    if (isFirstCustomerMessage) {
-                      const jobIdMatch = msg.text.match(/job-\w+/i);
-                      const parsedId = jobIdMatch ? jobIdMatch[0] : null;
-                      const finalJobId = parsedId || activeConversation.jobId;
-                      if (finalJobId) {
-                        matchedJob = jobsList.find(j => j.id.toLowerCase() === finalJobId.toLowerCase()) || null;
-                      }
-                      if (!matchedJob && activeConversation.jobTitle) {
-                        matchedJob = jobsList.find(j => j.title.toLowerCase() === activeConversation.jobTitle.toLowerCase()) || null;
-                      }
-                    }
-
-                    return (
-                      <div
-                        key={msg.id || index}
-                        className={`flex ${isSeeker ? "justify-end" : "justify-start"}`}
-                      >
-                        <div className={`max-w-[80%] rounded-2xl p-4 shadow-sm border ${
-                          isSeeker
-                            ? "bg-[#1E88E5] text-white border-blue-700 rounded-tr-none text-right"
-                            : "bg-white text-slate-800 border-slate-100 rounded-tl-none text-left"
-                        }`}>
-                          <ChatMessageContent msg={msg} isSelf={isSeeker} />
-
-                          {/* Beautiful Job Card Dropdown Embedded in First Message */}
-                          {matchedJob && (
-                            <div className={`mt-3 border rounded-xl p-3 text-left transition-all ${
-                              isSeeker 
-                                ? "bg-slate-900/40 border-blue-800 text-white" 
-                                : "bg-slate-50 border-slate-100 text-slate-800"
-                            }`}>
-                              <div className="flex items-start justify-between gap-2">
-                                <div className="min-w-0">
-                                  <span className={`text-[8px] font-mono uppercase tracking-wider block mb-0.5 ${
-                                    isSeeker ? "text-blue-300" : "text-blue-700"
-                                  }`}>
-                                    Referenced Job Opportunity
-                                  </span>
-                                  <h5 className={`text-xs font-bold leading-tight truncate ${
-                                    isSeeker ? "text-white" : "text-slate-900"
-                                  }`}>
-                                    {matchedJob.title}
-                                  </h5>
-                                  <p className={`text-[10px] font-medium ${
-                                    isSeeker ? "text-blue-200/80" : "text-slate-500"
-                                  }`}>
-                                    {matchedJob.company} • {matchedJob.location}
-                                  </p>
-                                  <div className="flex items-center gap-1.5 mt-1.5">
-                                    <span className={`text-[9px] font-mono font-bold px-1.5 py-0.5 rounded ${
-                                      isSeeker ? "bg-blue-800/60 text-blue-200" : "bg-[#1E88E5]/10 text-[#1E88E5]"
-                                    }`}>
-                                      {matchedJob.salary}
-                                    </span>
-                                    <span className={`text-[9px] font-sans font-semibold px-1.5 py-0.5 rounded ${
-                                      isSeeker ? "bg-blue-800/40 text-blue-300" : "bg-slate-200/60 text-slate-600"
-                                    }`}>
-                                      {matchedJob.type}
-                                    </span>
-                                  </div>
-                                </div>
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setJobExpanded(prev => ({
-                                      ...prev,
-                                      [activeConversation.chatId]: !prev[activeConversation.chatId]
-                                    }));
-                                  }}
-                                  className={`p-1.5 rounded-lg transition-all shrink-0 cursor-pointer ${
-                                    isSeeker 
-                                      ? "hover:bg-blue-800/40 text-blue-300 hover:text-white" 
-                                      : "hover:bg-slate-200/60 text-slate-500 hover:text-slate-800"
-                                  }`}
-                                  title={jobExpanded[activeConversation.chatId] ? "Hide details" : "Show details"}
-                                >
-                                  {jobExpanded[activeConversation.chatId] ? (
-                                    <ChevronUp className="w-4 h-4" />
-                                  ) : (
-                                    <ChevronDown className="w-4 h-4" />
-                                  )}
-                                </button>
-                              </div>
-
-                              {jobExpanded[activeConversation.chatId] && (
-                                <div
-                                  className={`mt-2.5 pt-2.5 border-t text-[10px] font-sans leading-relaxed space-y-2 ${
-                                    isSeeker 
-                                      ? "border-blue-800/60 text-blue-100" 
-                                      : "border-slate-200/60 text-slate-600"
-                                  }`}
-                                >
-                                  <div>
-                                    <p className={`font-bold ${isSeeker ? "text-blue-200" : "text-slate-700"}`}>Description:</p>
-                                    <p className="mt-0.5 whitespace-pre-line">{matchedJob.description}</p>
-                                  </div>
-                                  {matchedJob.requirements && matchedJob.requirements.length > 0 && (
-                                    <div className="pt-1.5">
-                                      <p className={`font-bold ${isSeeker ? "text-blue-200" : "text-slate-700"}`}>Requirements:</p>
-                                      <ul className="list-disc pl-3.5 space-y-1 mt-1">
-                                        {matchedJob.requirements.map((req, i) => (
-                                          <li key={i}>{req}</li>
-                                        ))}
-                                      </ul>
-                                    </div>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                          )}
-
-                          <div className={`text-[9px] font-mono mt-1.5 flex items-center gap-1.5 ${
-                            isSeeker ? "text-blue-200/80 justify-end" : "text-slate-400 justify-start"
-                          }`}>
-                            {!isSeeker && (
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  const jobIdMatch = msg.text.match(/job-\w+/i);
-                                  const parsedId = jobIdMatch ? jobIdMatch[0] : null;
-                                  const finalJobId = parsedId || activeConversation.jobId;
-                                  let job = jobsList.find(j => j.id.toLowerCase() === finalJobId?.toLowerCase()) || null;
-                                  if (!job && activeConversation.jobTitle) {
-                                    job = jobsList.find(j => j.title.toLowerCase() === activeConversation.jobTitle.toLowerCase()) || null;
-                                  }
-                                  if (job) {
-                                    setPopupJob(job);
-                                  }
-                                }}
-                                className="p-1 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-700 transition-colors inline-flex items-center cursor-pointer"
-                                title="View reference job details"
-                              >
-                                <MoreHorizontal className="w-3.5 h-3.5" />
-                              </button>
-                            )}
-                            {formatTime(msg.timestamp)}
-                            {isSeeker && <CheckCheck className="w-3.5 h-3.5 text-blue-300" />}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  });
-                })()}
-                {typingText && (
-                  <div className="flex items-center gap-2 text-xs text-slate-400 italic px-4 py-2 mt-2 bg-slate-50/50 rounded-lg animate-pulse w-fit">
-                    <div className="flex gap-1">
-                      <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: "0ms" }}></span>
-                      <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: "150ms" }}></span>
-                      <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }}></span>
-                    </div>
-                    <span>{typingText}</span>
+              {/* Messages Feed with Cool Vector Background */}
+              <div 
+                className="flex-1 overflow-y-auto p-4 md:p-6 space-y-3 relative bg-[#F0F4F8]"
+                style={{
+                  backgroundImage: CHAT_VECTOR_WALLPAPER,
+                  backgroundRepeat: "repeat",
+                  backgroundSize: "80px 80px"
+                }}
+              >
+                {/* Pagination */}
+                {hasOlderMessages && displayedMessages.length >= 50 && (
+                  <div className="flex justify-center mb-2">
+                    <button
+                      type="button"
+                      onClick={handleLoadOlderMessages}
+                      disabled={isLoadingOlder}
+                      className="px-3.5 py-1.5 bg-white hover:bg-slate-50 text-slate-700 rounded-full text-[11px] font-semibold flex items-center gap-1.5 shadow-2xs border border-slate-200 cursor-pointer disabled:opacity-50"
+                    >
+                      {isLoadingOlder ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          <span>Loading earlier messages...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Clock className="w-3.5 h-3.5" />
+                          <span>Load earlier messages</span>
+                        </>
+                      )}
+                    </button>
                   </div>
                 )}
-                <div ref={messagesEndRef} />
-              </div>
 
-              {/* Chat Input / Expired Template Selection */}
-              <div className="bg-white p-4 border-t border-slate-200 shrink-0 fixed bottom-[10px] left-0 right-0 z-40 w-full rounded-none md:relative md:bottom-auto md:left-auto md:right-auto md:p-4 md:border-t md:rounded-none md:mx-0">
-                {(() => {
-                  const exp = getExpirationState(activeConversation);
-                  
-                  if (exp.isExpired) {
+                {/* Floating Date Separator Pill */}
+                <div className="flex justify-center my-2 sticky top-2 z-10">
+                  <span className="px-3 py-1 bg-white/90 backdrop-blur-xs text-slate-600 text-[11px] font-semibold rounded-full shadow-2xs border border-black/5">
+                    Today
+                  </span>
+                </div>
+
+                {/* Message Bubbles (WhatsApp Geometry with Soft Shadow) */}
+                {displayedMessages.map((msg, idx) => {
+                  const isSeekerMe = msg.sender === "seeker" || msg.sender === "customer" || (msg.senderUid && currentUser && msg.senderUid === currentUser.uid);
+                  const isSystem = msg.sender === "system";
+
+                  if (isSystem) {
                     return (
-                      <div className="space-y-3">
-                        <div className="flex items-start gap-2.5 p-3.5 bg-amber-50 border border-amber-200 rounded-2xl text-amber-800">
-                          <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
-                          <div>
-                            <p className="text-xs font-sans font-bold leading-tight">
-                              Meta 24-Hour Communication Window Expired
-                            </p>
-                            <p className="text-[10px] font-sans text-amber-700 leading-snug mt-1">
-                              Custom typing has been disabled in compliance with Meta's customer protection guidelines. Select an approved template reply below to re-initiate routing conversations.
-                            </p>
-                          </div>
-                        </div>
-
-                        {/* Approved Seeker Templates list */}
-                        <div className="space-y-2">
-                          {APPROVED_TEMPLATES_SEEKER.map((tmpl, idx) => (
-                            <button
-                              key={idx}
-                              onClick={() => handleSendTemplate(tmpl)}
-                              className="w-full text-left p-3 hover:bg-blue-50 hover:border-blue-200 border border-slate-100 rounded-xl text-xs font-sans font-semibold text-slate-700 hover:text-[#1E88E5] transition-all cursor-pointer flex items-center justify-between gap-2"
-                            >
-                              <span>{tmpl}</span>
-                              <ChevronRight className="w-4 h-4 shrink-0 text-slate-300" />
-                            </button>
-                          ))}
-                        </div>
+                      <div key={msg.id || idx} className="flex justify-center my-2">
+                        <span className="px-3 py-1 bg-slate-200/90 text-slate-700 text-[11px] font-medium rounded-full shadow-2xs text-center max-w-sm">
+                          {msg.text}
+                        </span>
                       </div>
                     );
                   }
 
                   return (
-                    <form onSubmit={handleSendMessage} className="flex gap-2 items-center">
-                      <input 
-                        ref={attachmentInputRef}
-                        type="file"
-                        accept="image/*,application/pdf,.doc,.docx"
-                        onChange={handleSeekerFileAttachment}
-                        className="hidden"
-                      />
-                      <input
-                        ref={inputRef}
-                        type="text"
-                        required
-                        value={messageInput}
-                        onChange={(e) => handleInputChange(e.target.value)}
-                        placeholder={exp.isInApp ? "Type in-app message or attach CV/file..." : "Type WhatsApp application message..."}
-                        className={`w-full px-4 py-3 rounded-xl border text-xs font-sans font-medium focus:outline-none focus:border-[#1E88E5] ${
-                          exp.isUrgent 
-                            ? "border-red-300 bg-red-50/10 focus:border-red-500 animate-[pulse_2s_infinite]" 
-                            : "border-slate-200"
+                    <div
+                      key={msg.id || idx}
+                      className={`flex w-full ${isSeekerMe ? "justify-end" : "justify-start"}`}
+                    >
+                      <div
+                        className={`relative max-w-[85%] sm:max-w-[70%] md:max-w-[65%] px-3.5 py-2 ${
+                          isSeekerMe
+                            ? "bg-[#DCF8C6] text-slate-900 rounded-2xl rounded-tr-xs shadow-[0_1px_2px_rgba(0,0,0,0.04)]"
+                            : "bg-white text-slate-900 rounded-2xl rounded-tl-xs shadow-[0_1px_2px_rgba(0,0,0,0.04)]"
                         }`}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => attachmentInputRef.current?.click()}
-                        disabled={isUploadingAttachment || isSending}
-                        className="p-2.5 rounded-full bg-transparent hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors cursor-pointer border-none shadow-none shrink-0 flex items-center justify-center disabled:opacity-50"
-                        title="Attach CV, Image, or Document (ImageKit)"
                       >
-                        {isUploadingAttachment ? (
-                          <Loader2 className="w-5 h-5 animate-spin text-[#1E88E5]" />
-                        ) : (
-                          <Paperclip className="w-5 h-5" />
+                        {!isSeekerMe && (
+                          <p className="text-[11px] font-bold text-blue-600 mb-0.5">
+                            {msg.senderName || "Valley Reigns Specialist"}
+                          </p>
                         )}
-                      </button>
-                      <button
-                        type="submit"
-                        disabled={isSending || isUploadingAttachment}
-                        className="w-10 h-10 rounded-full bg-[#1E88E5] hover:bg-[#1565C0] text-white flex items-center justify-center transition-colors cursor-pointer shadow-none shrink-0 disabled:opacity-75 disabled:cursor-not-allowed"
-                        title="Send message"
-                      >
-                        {isSending ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                          <Send className="w-4 h-4" />
-                        )}
-                      </button>
-                    </form>
+
+                        <div className="text-[13.5px] leading-relaxed">
+                          <ChatMessageContent msg={msg} isSelf={isSeekerMe} />
+                        </div>
+
+                        <div className="flex items-center justify-end gap-1.5 mt-1 -mb-0.5 select-none">
+                          <span className="text-[10px] text-slate-500 font-medium">
+                            {formatMessageTime(msg.timestamp)}
+                          </span>
+                          {isSeekerMe && (
+                            <>
+                              {msg.deliveryStatus === "sending" && (
+                                <Clock className="w-3.5 h-3.5 text-slate-400 animate-pulse" title="Sending to Firestore..." />
+                              )}
+                              {msg.deliveryStatus === "failed" && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleSendDirectMessage(msg.text, { attachmentUrl: msg.attachmentUrl, fileType: msg.fileType })}
+                                  className="inline-flex items-center gap-0.5 text-rose-600 hover:text-rose-700 text-[10px] font-bold cursor-pointer"
+                                  title="Failed to deliver. Click to retry"
+                                >
+                                  <AlertCircle className="w-3.5 h-3.5" />
+                                  <span>Retry</span>
+                                </button>
+                              )}
+                              {(msg.deliveryStatus === "sent" || (!msg.deliveryStatus && !msg.read)) && !msg.read && (
+                                <Check className="w-3.5 h-3.5 text-slate-400" title="Sent to server" />
+                              )}
+                              {(msg.read || msg.deliveryStatus === "delivered") && (
+                                <CheckCheck className="w-3.5 h-3.5 text-[#34B7F1]" title="Read by recipient" />
+                              )}
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
                   );
-                })()}
+                })}
+
+                <div ref={messagesEndRef} />
               </div>
-            </div>
+
+              {/* Send Error Toast */}
+              {sendError && (
+                <div className="px-4 py-2 bg-rose-50 border-t border-rose-200 text-rose-700 text-xs flex items-center justify-between">
+                  <span>{sendError}</span>
+                  <button onClick={() => setSendError(null)} className="text-rose-500 hover:text-rose-700">
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
+
+              {/* WhatsApp Style Bottom Input Bar (Transparent, No Border, No Box Shadow) */}
+              <div className="p-3 bg-transparent border-0 shadow-none shrink-0 mt-auto">
+                <form onSubmit={handleSendMessage} className="flex items-center gap-2">
+                  <div className="flex-1 bg-white/95 backdrop-blur-md rounded-full border-0 shadow-none flex items-center px-3.5 py-1.5 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                      className="text-slate-400 hover:text-slate-700 transition-colors p-1 cursor-pointer"
+                      title="Emojis"
+                    >
+                      <Smile className="w-5 h-5" />
+                    </button>
+
+                    <input
+                      ref={inputRef}
+                      type="text"
+                      value={messageInput}
+                      onChange={(e) => setMessageInput(e.target.value)}
+                      placeholder="Type a message..."
+                      disabled={isSending}
+                      className="flex-1 bg-transparent text-sm text-slate-900 placeholder-slate-400 focus:outline-none py-1"
+                    />
+
+                    <button
+                      type="button"
+                      onClick={() => attachmentInputRef.current?.click()}
+                      disabled={isUploadingAttachment}
+                      className="text-slate-400 hover:text-slate-700 transition-colors p-1 cursor-pointer"
+                      title="Attach Resume / CV"
+                    >
+                      {isUploadingAttachment ? (
+                        <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
+                      ) : (
+                        <Paperclip className="w-5 h-5 -rotate-45" />
+                      )}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => photoInputRef.current?.click()}
+                      className="text-slate-400 hover:text-slate-700 transition-colors p-1 cursor-pointer"
+                      title="Send Photo"
+                    >
+                      <Camera className="w-5 h-5" />
+                    </button>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={!messageInput.trim() || isSending}
+                    className="w-11 h-11 bg-[#0B1B3D] hover:bg-blue-700 disabled:opacity-50 text-white rounded-full flex items-center justify-center shadow-none border-0 transition-all active:scale-95 shrink-0 cursor-pointer"
+                    title="Send Message"
+                  >
+                    {isSending ? (
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                    ) : (
+                      <Send className="w-5 h-5 ml-0.5" />
+                    )}
+                  </button>
+                </form>
+
+                {showEmojiPicker && (
+                  <div className="flex items-center gap-2 mt-2 p-2 bg-white rounded-xl shadow-xs border border-slate-200 overflow-x-auto">
+                    {["👍", "👋", "✅", "🎉", "💼", "📄", "🙏", "⭐", "🔥", "🤝"].map((emoji) => (
+                      <button
+                        key={emoji}
+                        type="button"
+                        onClick={() => {
+                          setMessageInput(prev => prev + emoji);
+                          setShowEmojiPicker(false);
+                          inputRef.current?.focus();
+                        }}
+                        className="text-lg hover:scale-125 transition-transform p-1 cursor-pointer"
+                      >
+                        {emoji}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </motion.div>
           ) : (
-            <div className="flex-grow flex flex-col items-center justify-center text-center p-8">
-              <div className="w-14 h-14 bg-slate-150 rounded-2xl flex items-center justify-center text-slate-400 mb-3 shadow-inner">
-                <MessageCircle className="w-7 h-7" />
+            <div className="flex flex-col items-center justify-center p-8 text-center max-w-sm">
+              <div className="w-16 h-16 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center mb-4 shadow-sm">
+                <MessageCircle className="w-8 h-8" />
               </div>
-              <h4 className="text-sm font-sans font-extrabold text-slate-800">
-                No Active Chat Session Selected
-              </h4>
-              <p className="text-xs font-sans text-slate-400 max-w-xs mt-1.5 leading-relaxed">
-                Choose an ongoing live message thread from the <strong>"Live Threads"</strong> list on the left to see live chat history and chat with recruiters.
+              <h3 className="text-lg font-bold text-slate-800 mb-1">
+                Your Job Communications
+              </h3>
+              <p className="text-xs text-slate-500 leading-relaxed mb-6">
+                Select a recruiter thread to chat directly, upload your CV, or discuss interview schedules.
               </p>
             </div>
           )}
         </div>
       </div>
 
-      {/* Nice cool popup showing reference job details with a transparent blur backdrop */}
-      <AnimatePresence>
-        {popupJob && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            {/* Backdrop */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setPopupJob(null)}
-              className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
-            />
-            
-            {/* Modal Card */}
-            <motion.div
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              className="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden border border-slate-100 flex flex-col max-h-[85vh] z-10 text-left"
-            >
-              {/* Header */}
-              <div className="bg-[#1E88E5] px-6 py-4 flex items-center justify-between text-white shrink-0">
-                <div>
-                  <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-blue-200">
-                    Referenced Job Specification
-                  </span>
-                  <h4 className="text-base font-sans font-extrabold tracking-tight mt-0.5">
-                    {popupJob.title}
-                  </h4>
-                </div>
-                <button
-                  onClick={() => setPopupJob(null)}
-                  className="p-1.5 hover:bg-blue-800/60 rounded-lg transition-colors cursor-pointer text-blue-100 hover:text-white"
-                  title="Close details"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              {/* Body */}
-              <div className="p-6 overflow-y-auto space-y-6 text-slate-800">
-                <div className="grid grid-cols-2 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-100">
-                  <div>
-                    <span className="text-[9px] font-mono text-slate-400 uppercase font-bold tracking-wider">
-                      Company
-                    </span>
-                    <p className="text-xs font-sans font-bold text-slate-900 mt-0.5">
-                      {popupJob.company}
-                    </p>
-                  </div>
-                  <div>
-                    <span className="text-[9px] font-mono text-slate-400 uppercase font-bold tracking-wider">
-                      Location
-                    </span>
-                    <p className="text-xs font-sans font-bold text-slate-900 mt-0.5 font-medium">
-                      📍 {popupJob.location}
-                    </p>
-                  </div>
-                  <div>
-                    <span className="text-[9px] font-mono text-slate-400 uppercase font-bold tracking-wider">
-                      Compensation
-                    </span>
-                    <p className="text-xs font-sans font-bold text-blue-700 mt-0.5">
-                      💰 {popupJob.salary}
-                    </p>
-                  </div>
-                  <div>
-                    <span className="text-[9px] font-mono text-slate-400 uppercase font-bold tracking-wider">
-                      Job Type
-                    </span>
-                    <p className="text-xs font-sans font-bold text-slate-600 mt-0.5 font-medium">
-                      💼 {popupJob.type}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="space-y-1.5">
-                  <span className="text-[9px] font-mono text-slate-400 uppercase block font-bold tracking-wider">
-                    Role Description
-                  </span>
-                  <p className="text-xs font-sans leading-relaxed text-slate-600 bg-slate-50/50 p-3.5 rounded-xl border border-slate-50 whitespace-pre-line">
-                    {popupJob.description}
-                  </p>
-                </div>
-
-                {popupJob.requirements && popupJob.requirements.length > 0 && (
-                  <div className="space-y-2">
-                    <span className="text-[9px] font-mono text-slate-400 uppercase block font-bold tracking-wider">
-                      Requirements & Qualifications
-                    </span>
-                    <ul className="grid grid-cols-1 gap-2">
-                      {popupJob.requirements.map((req, idx) => (
-                        <li key={idx} className="flex items-start gap-2 text-xs font-sans text-slate-600 bg-blue-50/30 px-3 py-2 rounded-lg border border-blue-50/50 leading-relaxed">
-                          <Check className="w-3.5 h-3.5 text-[#1E88E5] shrink-0 mt-0.5" />
-                          <span>{req}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </div>
-
-              {/* Footer */}
-              <div className="bg-slate-50 px-6 py-3.5 border-t border-slate-100 flex justify-end shrink-0">
-                <button
-                  onClick={() => setPopupJob(null)}
-                  className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-sans font-bold rounded-xl transition-colors cursor-pointer"
-                >
-                  Close
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-
-        {/* Clear Chat Confirm Modal */}
-        {showClearConfirm && activeConversation && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            {/* Backdrop */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setShowClearConfirm(false)}
-              className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
-            />
-            
-            {/* Modal Card */}
-            <motion.div
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden border border-slate-100 flex flex-col z-10 text-left"
-            >
-              {/* Header */}
-              <div className="bg-red-600 px-6 py-4 flex items-center justify-between text-white shrink-0">
-                <div>
-                  <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-red-200">
-                    Warning: Irreversible Action
-                  </span>
-                  <h4 className="text-base font-sans font-extrabold tracking-tight mt-0.5">
-                    Clear Chat History?
-                  </h4>
-                </div>
-                <button
-                  onClick={() => setShowClearConfirm(false)}
-                  className="p-1.5 hover:bg-red-700/60 rounded-lg transition-colors cursor-pointer text-red-100 hover:text-white"
-                  title="Cancel"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              {/* Body */}
-              <div className="p-6 text-slate-700 space-y-3 text-left">
-                <p className="text-xs font-sans leading-relaxed text-slate-500">
-                  Are you sure you want to delete all message logs for this conversation? This will reset the conversation feed back to a single system notice.
-                </p>
-                <p className="text-[10px] font-mono text-red-500 bg-red-50 p-2.5 rounded-lg border border-red-100">
-                  ⚠️ This cannot be undone and will update the remote database immediately.
-                </p>
-              </div>
-
-              {/* Footer */}
-              <div className="bg-slate-50 px-6 py-3.5 border-t border-slate-100 flex justify-end gap-2.5 shrink-0">
-                <button
-                  onClick={() => setShowClearConfirm(false)}
-                  className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-sans font-bold rounded-xl transition-colors cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={async () => {
-                    await clearConversationMessages(activeConversation.chatId);
+      {/* Clear Single Chat Confirmation Modal */}
+      {showClearConfirm && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl space-y-4">
+            <div className="w-12 h-12 bg-rose-50 text-rose-600 rounded-2xl flex items-center justify-center">
+              <Trash2 className="w-6 h-6" />
+            </div>
+            <div>
+              <h4 className="text-base font-bold text-slate-900">Clear this chat history?</h4>
+              <p className="text-xs text-slate-500 mt-1">
+                All messages in this thread will be permanently cleared.
+              </p>
+            </div>
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowClearConfirm(false)}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  if (activeChatId) {
+                    await clearConversationMessages(activeChatId);
+                    setActiveMessages([]);
                     setShowClearConfirm(false);
-                  }}
-                  className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-sans font-bold rounded-xl transition-colors cursor-pointer shadow-sm"
-                >
-                  Clear History
-                </button>
-              </div>
-            </motion.div>
+                  }
+                }}
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold shadow-sm"
+              >
+                Clear History
+              </button>
+            </div>
           </div>
-        )}
+        </div>
+      )}
 
-        {/* Report Chat Modal */}
-        {showReportDialog && activeConversation && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            {/* Backdrop */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setShowReportDialog(false)}
-              className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
-            />
-            
-            {/* Modal Card */}
-            <motion.div
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden border border-slate-100 flex flex-col z-10 text-left"
-            >
-              {/* Header */}
-              <div className="bg-amber-600 px-6 py-4 flex items-center justify-between text-white shrink-0">
+      {/* Job Details Popup */}
+      {popupJob && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-6 max-w-lg w-full shadow-2xl space-y-4 max-h-[85vh] overflow-y-auto">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                  <Briefcase className="w-5 h-5" />
+                </div>
                 <div>
-                  <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-amber-200">
-                    Administrative Action
-                  </span>
-                  <h4 className="text-base font-sans font-extrabold tracking-tight mt-0.5">
-                    Report Conversation
-                  </h4>
+                  <h4 className="text-base font-bold text-slate-900 leading-tight">{popupJob.title}</h4>
+                  <p className="text-xs text-slate-500 font-medium">{popupJob.company} • {popupJob.location}</p>
                 </div>
-                <button
-                  onClick={() => setShowReportDialog(false)}
-                  className="p-1.5 hover:bg-amber-700/60 rounded-lg transition-colors cursor-pointer text-amber-100 hover:text-white"
-                  title="Cancel"
-                >
-                  <X className="w-5 h-5" />
-                </button>
               </div>
+              <button
+                onClick={() => setPopupJob(null)}
+                className="p-1 text-slate-400 hover:text-slate-700 rounded-full"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
 
-              {/* Body */}
-              <div className="p-6 text-slate-700 space-y-4">
-                <p className="text-xs font-sans leading-relaxed text-slate-500">
-                  Please provide a reason for flagging this live conversation. A system log will be filed and flagged for compliance review.
+            <div className="p-3 bg-slate-50 rounded-2xl flex items-center justify-between text-xs">
+              <span className="text-slate-500 font-medium">Salary Range:</span>
+              <span className="font-bold text-emerald-700">{popupJob.salary}</span>
+            </div>
+
+            <div>
+              <h5 className="text-xs font-bold text-slate-700 mb-1">Job Description</h5>
+              <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-line">
+                {popupJob.description}
+              </p>
+            </div>
+
+            {popupJob.requirements && (
+              <div>
+                <h5 className="text-xs font-bold text-slate-700 mb-1">Requirements</h5>
+                <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-line">
+                  {popupJob.requirements}
                 </p>
-
-                <div className="space-y-1.5 text-left">
-                  <label className="text-[9px] font-mono font-bold text-slate-400 uppercase tracking-wider">
-                    Report Reason
-                  </label>
-                  <textarea
-                    value={reportReason}
-                    onChange={(e) => setReportReason(e.target.value)}
-                    placeholder="Describe the issue (e.g. offensive recruiter, spam, wrong routing)..."
-                    className="w-full text-xs font-sans p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-none h-24 resize-none transition-all"
-                  />
-                </div>
-
-                <div className="space-y-1.5 text-left">
-                  <label className="text-[9px] font-mono font-bold text-slate-400 uppercase block tracking-wider">
-                    Quick Suggestions
-                  </label>
-                  <div className="flex flex-wrap gap-1.5">
-                    {["Inappropriate Language", "Spam / Mismatch", "Recruiter Inactive", "Candidate Requested Exit"].map((tag) => (
-                      <button
-                        key={tag}
-                        type="button"
-                        onClick={() => setReportReason(tag)}
-                        className={`px-2.5 py-1 text-[10px] font-sans font-medium rounded-lg border transition-all cursor-pointer ${
-                          reportReason === tag 
-                            ? "bg-amber-50 border-amber-200 text-amber-800 shadow-sm font-semibold" 
-                            : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"
-                        }`}
-                      >
-                        {tag}
-                      </button>
-                    ))}
-                  </div>
-                </div>
               </div>
+            )}
 
-              {/* Footer */}
-              <div className="bg-slate-50 px-6 py-3.5 border-t border-slate-100 flex justify-end gap-2.5 shrink-0">
-                <button
-                  onClick={() => setShowReportDialog(false)}
-                  className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-sans font-bold rounded-xl transition-colors cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={async () => {
-                    const finalReason = reportReason.trim() || "Unspecified reason";
-                    await reportConversation(activeConversation.chatId, finalReason);
-                    setShowReportDialog(false);
-                  }}
-                  className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-sans font-bold rounded-xl transition-colors cursor-pointer shadow-sm"
-                >
-                  Submit Report
-                </button>
-              </div>
-            </motion.div>
+            <div className="pt-2 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setPopupJob(null)}
+                className="px-4 py-2 bg-[#0B1B3D] text-white rounded-xl text-xs font-bold"
+              >
+                Close
+              </button>
+            </div>
           </div>
-        )}
-      </AnimatePresence>
+        </div>
+      )}
+
+      {/* Report Dialog */}
+      {showReportDialog && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl space-y-4">
+            <div className="w-12 h-12 bg-amber-50 text-amber-600 rounded-2xl flex items-center justify-center">
+              <Flag className="w-6 h-6" />
+            </div>
+            <div>
+              <h4 className="text-base font-bold text-slate-900">Report Conversation</h4>
+              <p className="text-xs text-slate-500 mt-1">
+                Let us know what went wrong. We will review the message logs.
+              </p>
+            </div>
+            <textarea
+              rows={3}
+              value={reportReason}
+              onChange={(e) => setReportReason(e.target.value)}
+              placeholder="Enter reason..."
+              className="w-full p-3 rounded-xl border border-slate-200 text-xs text-slate-800 focus:outline-none focus:border-amber-500"
+            />
+            <div className="flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setShowReportDialog(false)}
+                className="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl text-xs font-bold"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  if (activeChatId && reportReason.trim()) {
+                    await reportConversation(activeChatId, reportReason.trim());
+                    setShowReportDialog(false);
+                    setReportReason("");
+                  }
+                }}
+                disabled={!reportReason.trim()}
+                className="px-4 py-2 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold"
+              >
+                Submit Report
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };

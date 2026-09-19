@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useAuth } from "../context/AuthContext";
-import { useWhatsAppConfig } from "../hooks/useWhatsAppConfig";
 import { 
   simulateIncomingChat, 
   sendChatMessage, 
-  subscribeToConversations 
+  subscribeToConversations,
+  subscribeToConversationMessages
 } from "../lib/services";
 import { Conversation, ChatMessage } from "../types";
 import { 
@@ -28,7 +28,6 @@ interface GuestSession {
 
 export const GuestChatWidget: React.FC = () => {
   const { currentUser } = useAuth();
-  const { getWhatsAppLink, formattedPhone, isConnected } = useWhatsAppConfig();
   const [isOpen, setIsOpen] = useState(false);
   const [session, setSession] = useState<GuestSession | null>(null);
 
@@ -60,21 +59,29 @@ export const GuestChatWidget: React.FC = () => {
     }
   }, []);
 
+  const [subMessages, setSubMessages] = useState<ChatMessage[]>([]);
+
   // Listen to live updates for the active guest conversation
   useEffect(() => {
-    if (!session?.chatId) return;
+    if (!session?.chatId) {
+      setSubMessages([]);
+      return;
+    }
 
-    const unsubscribe = subscribeToConversations((allConvs) => {
+    const unsubscribeConv = subscribeToConversations((allConvs) => {
       const current = allConvs[session.chatId];
       if (current) {
         setConversation(current);
       }
     });
 
+    const unsubscribeMsgs = subscribeToConversationMessages(session.chatId, 50, (msgs) => {
+      setSubMessages(msgs);
+    });
+
     return () => {
-      if (typeof unsubscribe === "function") {
-        unsubscribe();
-      }
+      if (typeof unsubscribeConv === "function") unsubscribeConv();
+      if (typeof unsubscribeMsgs === "function") unsubscribeMsgs();
     };
   }, [session?.chatId]);
 
@@ -83,7 +90,7 @@ export const GuestChatWidget: React.FC = () => {
     if (isOpen) {
       messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }
-  }, [isOpen, conversation?.messages]);
+  }, [isOpen, subMessages, conversation?.messages]);
 
   // Start new guest conversation
   const handleStartChat = async (e: React.FormEvent) => {
@@ -146,12 +153,15 @@ export const GuestChatWidget: React.FC = () => {
   };
 
   const messagesArray: ChatMessage[] = React.useMemo(() => {
+    if (subMessages.length > 0) {
+      return [...subMessages].sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+    }
     if (!conversation?.messages) return [];
     if (Array.isArray(conversation.messages)) {
       return conversation.messages;
     }
     return (Object.values(conversation.messages) as ChatMessage[]).sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
-  }, [conversation?.messages]);
+  }, [subMessages, conversation?.messages]);
 
   // Hide completely if logged in as a registered user (seeker, staff, or admin)
   if (currentUser) {
@@ -303,19 +313,8 @@ export const GuestChatWidget: React.FC = () => {
                   </form>
                 </div>
 
-                <div className="text-center pt-3 border-t border-slate-200/60 text-[10px] font-mono text-slate-400 space-y-2">
-                  <div className="flex items-center justify-center">
-                    <a
-                      href={getWhatsAppLink("Hello! I am reaching out to Valley Reigns recruitment support.")}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#00A884] hover:bg-[#008f70] text-white font-sans font-bold text-[10px] rounded-xl shadow-xs transition-all decoration-none"
-                    >
-                      <span>Chat via WhatsApp</span>
-                      {formattedPhone && <span className="opacity-90 font-mono">({formattedPhone})</span>}
-                    </a>
-                  </div>
-                  <div>⚡ Direct Company Support Line</div>
+                <div className="text-center pt-3 border-t border-slate-200/60 text-[10px] font-mono text-slate-400">
+                  <div>⚡ Direct In-App Support Line</div>
                 </div>
               </div>
             ) : (

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Job, UserProfile, Conversation, DailyStat, StaffDailyReport } from "../types";
+import { Job, UserProfile, Conversation, DailyStat, StaffDailyReport, AppSettings } from "../types";
 import { SLACountdownTimer } from "./SLACountdownTimer";
 import { 
   getStaffProfiles, 
@@ -8,6 +8,7 @@ import {
   forceReassignConversation,
   updateConversationStatus,
   getStaffStatuses,
+  subscribeToStaffStatuses,
   getDailyStats,
   subscribeToDailyReports,
   getAllUserProfiles,
@@ -19,7 +20,10 @@ import {
   subscribeToReportReopens,
   isDeadlinePassedForDate,
   getLocalTodayString,
-  memoryStore
+  memoryStore,
+  subscribeToAppSettings,
+  getCachedAppSettingsTimeout,
+  getStaffReportDeadlineConfig
 } from "../lib/services";
 import { 
   BarChart3, 
@@ -100,9 +104,17 @@ const RecruiterDropdown: React.FC<{
 }> = ({ currentOwnerId, staffList, getActiveChatsCount, onSelect, placeholder, label, onOpenChange }) => {
   const [isOpen, setIsOpen] = useState(false);
 
-  const filteredStaff = currentOwnerId 
-    ? staffList.filter(s => s.uid !== currentOwnerId)
-    : staffList;
+  const filteredStaff = React.useMemo(() => {
+    const seen = new Set<string>();
+    const baseList = currentOwnerId 
+      ? staffList.filter(s => s && s.uid && s.uid !== currentOwnerId)
+      : staffList;
+    return (baseList || []).filter(s => {
+      if (!s || !s.uid || seen.has(s.uid)) return false;
+      seen.add(s.uid);
+      return true;
+    });
+  }, [staffList, currentOwnerId]);
 
   const toggleDropdown = () => {
     const nextState = !isOpen;
@@ -215,6 +227,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ jobsList }) => {
   const [conversations, setConversations] = useState<Record<string, Conversation>>({});
   const [dailyStatsList, setDailyStatsList] = useState<DailyStat[]>([]);
   const [dailyReports, setDailyReports] = useState<StaffDailyReport[]>([]);
+  const [appSettings, setAppSettings] = useState<AppSettings>(() => ({
+    unclaimedChatTimeoutHours: getCachedAppSettingsTimeout()
+  }));
 
   // Responsive state for mobile chart abbreviations
   const [isMobile, setIsMobile] = useState(false);
@@ -268,6 +283,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ jobsList }) => {
   const [reportsSearchQuery, setReportsSearchQuery] = useState("");
   const [showMissingStaffModal, setShowMissingStaffModal] = useState(false);
   const [selectedReopenStaffUids, setSelectedReopenStaffUids] = useState<Set<string>>(new Set());
+  const [slaDeadlineConfig, setSlaDeadlineConfig] = useState(() => getStaffReportDeadlineConfig());
+
+  useEffect(() => {
+    const unsub = subscribeToAppSettings(() => {
+      setSlaDeadlineConfig(getStaffReportDeadlineConfig());
+    });
+    return () => unsub();
+  }, []);
   const [reopenFeedbackMsg, setReopenFeedbackMsg] = useState<string | null>(null);
   const [reopenModalData, setReopenModalData] = useState<{
     isOpen: boolean;
@@ -502,14 +525,80 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ jobsList }) => {
     };
   }, []);
 
+  // Subscribe to staff online/offline statuses in real-time
+  useEffect(() => {
+    const unsubscribe = subscribeToStaffStatuses((statuses) => {
+      setStaffStatuses(statuses);
+    });
+    return () => {
+      if (typeof unsubscribe === "function") {
+        unsubscribe();
+      }
+    };
+  }, []);
+
+  // Subscribe to app settings (claim countdown timeout, etc.) in real-time
+  useEffect(() => {
+    const unsubscribe = subscribeToAppSettings((settings) => {
+      if (settings?.unclaimedChatTimeoutHours && Number(settings.unclaimedChatTimeoutHours) > 0) {
+        setAppSettings(settings);
+      }
+    });
+    return () => {
+      if (typeof unsubscribe === "function") {
+        unsubscribe();
+      }
+    };
+  }, []);
+
+  // Helper to determine which staff and admins can see pending broadcasted chats
+  const getStaffWhoCanSee = (c: Conversation): UserProfile[] => {
+    // Pending chats are broadcasted to all active staff and admins
+    const eligibleStaff = staffList.filter(s => s.role === "staff" || s.role === "admin");
+    if (eligibleStaff.length > 0) return eligibleStaff;
+
+    // Fallback if staffList is not yet loaded
+    if (c.sharedWith && c.sharedWith.length > 0) {
+      return c.sharedWith.map(uid => ({
+        uid,
+        displayName: `Staff (${uid.substring(0, 8)})`,
+        email: "",
+        role: "staff" as const,
+        canPostJobs: true
+      }));
+    }
+
+    const memoryStaff = Object.values(memoryStore.users || {}).filter(
+      u => u.role === "staff" || u.role === "admin"
+    );
+    if (memoryStaff.length > 0) return memoryStaff;
+
+    return [];
+  };
+
   // Total calculations
   const totalImpressions = jobsList.reduce((acc, job) => acc + job.impressions, 0);
   
-  const conversationsList = Object.values(conversations) as Conversation[];
-  const pendingChats = conversationsList.filter(c => c.status === "pending");
-  const ongoingChats = conversationsList.filter(c => c.status === "ongoing");
-  const finishedChats = conversationsList.filter(c => c.status === "finished");
-  const abandonedChats = conversationsList.filter(c => c.status === "abandoned");
+  // Sort helper for most recently added
+  const sortByRecentlyAdded = (a: Conversation, b: Conversation) => {
+    const timeA = a.createdAt ? Number(a.createdAt) : (a.lastMessageAt ? Number(a.lastMessageAt) : 0);
+    const timeB = b.createdAt ? Number(b.createdAt) : (b.lastMessageAt ? Number(b.lastMessageAt) : 0);
+    return timeB - timeA;
+  };
+
+  const isEmployerConv = (c: Conversation) => Boolean(
+    c.isEmployer ||
+    c.userRole === "employer" ||
+    c.seekerRole === "employer" ||
+    c.companyName ||
+    (c.chatId && c.chatId.startsWith("employer_"))
+  );
+  
+  const conversationsList = (Object.values(conversations) as Conversation[]).sort(sortByRecentlyAdded);
+  const pendingChats = conversationsList.filter(c => c.status === "pending" && !isEmployerConv(c)).sort(sortByRecentlyAdded);
+  const ongoingChats = conversationsList.filter(c => c.status === "ongoing" || (isEmployerConv(c) && c.status !== "finished" && c.status !== "abandoned")).sort(sortByRecentlyAdded);
+  const finishedChats = conversationsList.filter(c => c.status === "finished").sort(sortByRecentlyAdded);
+  const abandonedChats = conversationsList.filter(c => c.status === "abandoned" && !isEmployerConv(c)).sort(sortByRecentlyAdded);
 
   const todayDateStr = (() => {
     const d = new Date();
@@ -731,31 +820,46 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ jobsList }) => {
     return null;
   };
 
-  const filteredStaffList = staffList.filter((staff) => {
-    const matchesSearch = 
-      (staff.displayName || "").toLowerCase().includes(staffSearchQuery.toLowerCase()) ||
-      (staff.email || "").toLowerCase().includes(staffSearchQuery.toLowerCase());
-    
-    if (!matchesSearch) return false;
+  const filteredStaffList = React.useMemo(() => {
+    const seen = new Set<string>();
+    return (staffList || []).filter((staff) => {
+      if (!staff || !staff.uid || seen.has(staff.uid)) return false;
+      
+      const matchesSearch = 
+        (staff.displayName || "").toLowerCase().includes(staffSearchQuery.toLowerCase()) ||
+        (staff.email || "").toLowerCase().includes(staffSearchQuery.toLowerCase());
+      
+      if (!matchesSearch) return false;
 
-    const isOnline = isStaffOnline(staff.uid);
-    const activeChats = getActiveChatsCount(staff.uid);
-    const isBusy = activeChats >= 2;
-    const isAvailable = isOnline && activeChats < 2;
+      const isOnline = isStaffOnline(staff.uid);
+      const activeChats = getActiveChatsCount(staff.uid);
+      const isBusy = activeChats >= 2;
+      const isAvailable = isOnline && activeChats < 2;
 
-    switch (staffStatusFilter) {
-      case "online":
-        return isOnline;
-      case "offline":
-        return !isOnline;
-      case "busy":
-        return isBusy;
-      case "available":
-        return isAvailable;
-      default:
+      let passes = true;
+      switch (staffStatusFilter) {
+        case "online":
+          passes = isOnline;
+          break;
+        case "offline":
+          passes = !isOnline;
+          break;
+        case "busy":
+          passes = isBusy;
+          break;
+        case "available":
+          passes = isAvailable;
+          break;
+        default:
+          passes = true;
+      }
+      if (passes) {
+        seen.add(staff.uid);
         return true;
-    }
-  });
+      }
+      return false;
+    });
+  }, [staffList, staffSearchQuery, staffStatusFilter, staffStatuses, conversations]);
 
   return (
     <div className={`space-y-8 select-text ${activeView === "overview" ? "pt-6 sm:pt-8" : "pt-1"}`}>
@@ -1564,6 +1668,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ jobsList }) => {
                         pendingChats.map((c) => {
                           const isExpanded = expandedPendingChatId === c.chatId;
                           const isDropdownActive = activeDropdownChatId === c.chatId;
+                          const staffWhoCanSee = getStaffWhoCanSee(c);
+                          const canSeeCount = staffWhoCanSee.length;
+                          const onlineCount = staffWhoCanSee.filter(s => isStaffOnline(s.uid)).length;
                           return (
                             <div 
                               key={c.chatId} 
@@ -1588,14 +1695,17 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ jobsList }) => {
                               <div 
                                 onClick={() => setExpandedPendingChatId(isExpanded ? null : c.chatId)}
                                 className="cursor-pointer space-y-2.5 select-none hover:opacity-90 relative z-10"
-                                title="Click to view assigned recruiters"
+                                title="Click to view staff & admins who can see and claim this pending chat"
                               >
                                 <div className="flex items-center justify-between gap-1">
                                   <span className="text-xs font-mono font-bold text-slate-800">
                                     {c.customerPhone}
                                   </span>
-                                  <span className="text-[9px] font-mono font-bold px-2.5 py-1 bg-amber-950 text-amber-200 rounded-lg border border-amber-900/40 shrink-0 shadow-sm">
-                                    {c.sharedWith?.length || 0} routed
+                                  <span 
+                                    className="text-[9px] font-mono font-bold px-2.5 py-1 bg-amber-950 text-amber-200 rounded-lg border border-amber-900/40 shrink-0 shadow-sm"
+                                    title={`Broadcasted to all active staff & admins (${onlineCount} online). Any staff or admin can claim by sending a reply.`}
+                                  >
+                                    {canSeeCount} staff can see
                                   </span>
                                 </div>
                                 <div className="flex items-center justify-between">
@@ -1608,31 +1718,43 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ jobsList }) => {
                                 </div>
                               </div>
 
-                              {/* SLA 24-hour Countdown Timer */}
+                              {/* SLA Claim Countdown Timer configured via App Settings */}
                               <div className="relative z-10 pt-1">
                                 <SLACountdownTimer 
                                   createdAt={c.createdAt} 
                                   label="Claim Countdown" 
                                   isInApp={c.isInApp || (c.customerPhone ? !c.customerPhone.startsWith("+") : true)}
                                   customerPhone={c.customerPhone}
+                                  timeoutHours={appSettings.unclaimedChatTimeoutHours}
                                 />
                               </div>
 
                               {isExpanded && (
                                 <div className="pt-2.5 border-t border-dashed border-slate-100 space-y-2 relative z-10">
-                                  <span className="text-[9px] font-mono text-slate-400 font-bold uppercase tracking-wider block text-left">
-                                    Routed recruiters:
-                                  </span>
-                                  <div className="space-y-1.5 bg-slate-50 p-2.5 rounded-xl border border-slate-200/60">
-                                    {c.sharedWith && c.sharedWith.length > 0 ? (
-                                      c.sharedWith.map((uid) => {
-                                        const staffMember = staffList.find(s => s.uid === uid);
-                                        const isOnline = isStaffOnline(uid);
+                                  <div className="flex items-center justify-between gap-2">
+                                    <span className="text-[9px] font-mono text-slate-500 font-bold uppercase tracking-wider block text-left">
+                                      Staff who can see ({canSeeCount}):
+                                    </span>
+                                    <span className="text-[8px] font-mono text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 shrink-0">
+                                      Broadcasted • Claim on Reply
+                                    </span>
+                                  </div>
+                                  <div className="space-y-1.5 bg-slate-50 p-2.5 rounded-xl border border-slate-200/60 max-h-48 overflow-y-auto">
+                                    {staffWhoCanSee.length > 0 ? (
+                                      staffWhoCanSee.map((staffMember, idx) => {
+                                        const isOnline = isStaffOnline(staffMember.uid);
                                         return (
-                                          <div key={uid} className="flex items-center justify-between text-[10px] text-slate-600 font-sans font-bold">
-                                            <span className="truncate max-w-[130px]">
-                                              {staffMember ? staffMember.displayName : `Recruiter (${uid.substring(0, 8)})`}
-                                            </span>
+                                          <div key={`${c.chatId}-${staffMember.uid}-${idx}`} className="flex items-center justify-between text-[10px] text-slate-600 font-sans font-bold">
+                                            <div className="flex items-center gap-1.5 truncate max-w-[150px]">
+                                              <span className="truncate">
+                                                {staffMember.displayName || `Staff (${staffMember.uid.substring(0, 8)})`}
+                                              </span>
+                                              {staffMember.role === "admin" && (
+                                                <span className="text-[7px] font-mono px-1 py-0.2 bg-purple-100 text-purple-700 rounded font-bold uppercase shrink-0">
+                                                  Admin
+                                                </span>
+                                              )}
+                                            </div>
                                             <span className={`text-[8px] font-mono font-bold uppercase px-1.5 py-0.5 rounded shrink-0 ${isOnline ? "bg-blue-50 text-[#1E88E5] border border-[#1E88E5]/20" : "bg-slate-100 text-slate-500 border border-slate-200"}`}>
                                               {isOnline ? "Online" : "Offline"}
                                             </span>
@@ -1640,7 +1762,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ jobsList }) => {
                                         );
                                       })
                                     ) : (
-                                      <span className="text-[9px] font-mono text-slate-400 italic">No recruiters assigned</span>
+                                      <span className="text-[9px] font-mono text-slate-400 italic">No staff available</span>
                                     )}
                                   </div>
                                 </div>
@@ -1715,13 +1837,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ jobsList }) => {
                                 {c.jobTitle}
                               </p>
 
-                              {/* SLA 24-hour Countdown Timer */}
+                              {/* SLA Ongoing Countdown Timer configured via App Settings */}
                               <div className="relative z-10 pt-1">
                                 <SLACountdownTimer 
-                                  createdAt={c.createdAt} 
+                                  createdAt={c.claimedAt || c.createdAt} 
                                   label="Ongoing SLA Timer" 
                                   isInApp={c.isInApp || (c.customerPhone ? !c.customerPhone.startsWith("+") : true)}
                                   customerPhone={c.customerPhone}
+                                  timeoutHours={appSettings.unclaimedChatTimeoutHours}
+                                  lastMessageAt={c.lastMessageAt}
+                                  status={c.status}
                                 />
                               </div>
 
@@ -2141,7 +2266,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ jobsList }) => {
                   <p className="text-3xl font-mono font-black text-[#111827] leading-none mt-2">
                     {onTimeMetPercent}%
                   </p>
-                  <p className="text-[10px] text-blue-800/80 font-sans font-bold mt-2">Before 9:00 PM</p>
+                  <p className="text-[10px] text-blue-800/80 font-sans font-bold mt-2">Before {slaDeadlineConfig.time12}</p>
                 </div>
               </div>
 
@@ -2551,7 +2676,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ jobsList }) => {
                       <div className="bg-amber-50/80 border border-amber-200 text-amber-900 p-3.5 rounded-2xl text-xs font-bold flex items-center gap-2.5 shadow-2xs">
                         <Clock className="w-4 h-4 text-amber-600 shrink-0" />
                         <span>
-                          Today's 9:00 PM deadline has not been reached yet. Staff can submit natively for this date. Reopening is available once 9:00 PM passes or when choosing a previous date.
+                          Today's {slaDeadlineConfig.time12} deadline has not been reached yet. Staff can submit natively for this date. Reopening is available once {slaDeadlineConfig.time12} passes or when choosing a previous date.
                         </span>
                       </div>
                     )}
@@ -2596,7 +2721,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ jobsList }) => {
                         title={
                           isDeadlinePassedForDate(selectedReportsDate)
                             ? "Select Date to Reopen Submission"
-                            : "Reopening is inactive because the 9:00 PM deadline for today has not been reached yet."
+                            : `Reopening is inactive because the ${slaDeadlineConfig.time12} deadline for today has not been reached yet.`
                         }
                       >
                         <Unlock className="w-4 h-4" />
@@ -2605,14 +2730,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ jobsList }) => {
                     </div>
 
                     <div className="divide-y divide-slate-200/70">
-                      {missingStaffList.map((staff) => {
+                      {missingStaffList.map((staff, idx) => {
                         const isReopened = isReportSubmissionReopened(staff.uid, selectedReportsDate).isReopened;
                         const isSelected = selectedReopenStaffUids.has(staff.uid);
                         const isDatePassed = isDeadlinePassedForDate(selectedReportsDate);
 
                         return (
                           <div 
-                            key={staff.uid}
+                            key={staff.uid ? `${staff.uid}-${idx}` : `missing-${idx}`}
                             className={`py-3.5 flex items-center justify-between gap-3 ${isSelected ? "bg-amber-50/40 px-2 rounded-xl" : ""}`}
                           >
                             <div className="flex items-center gap-3 min-w-0">
@@ -2666,7 +2791,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ jobsList }) => {
                                 }`}
                                 title={
                                   !isDatePassed
-                                    ? "Reopening is inactive because today's 9:00 PM deadline has not been reached yet."
+                                    ? `Reopening is inactive because today's ${slaDeadlineConfig.time12} deadline has not been reached yet.`
                                     : isReopened
                                       ? "Extend Reopen Window for 6 Hours"
                                       : "Reopen Report Submission for 6 Hours"
@@ -2742,11 +2867,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ jobsList }) => {
                     Target Staff ({reopenModalData.uids.length})
                   </span>
                   <div className="flex flex-wrap items-center gap-1.5 max-h-28 overflow-y-auto pr-1">
-                    {reopenModalData.uids.map((uid) => {
+                    {Array.from<string>(new Set((reopenModalData.uids || []).filter(Boolean))).map((uid: string, idx: number) => {
                       const staffObj = staffList.find(s => s.uid === uid);
                       const name = staffObj?.displayName || memoryStore.users[uid]?.displayName || "Staff Member";
                       return (
-                        <span key={uid} className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 border border-slate-200 rounded-lg text-xs font-bold text-slate-800">
+                        <span key={`${uid}-${idx}`} className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 border border-slate-200 rounded-lg text-xs font-bold text-slate-800">
                           <span className="w-4 h-4 rounded-full bg-[#111827] text-white text-[9px] font-black flex items-center justify-center uppercase">
                             {name.charAt(0)}
                           </span>
@@ -2782,14 +2907,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ jobsList }) => {
                       return (
                         <div className="bg-emerald-50 border border-emerald-200 text-emerald-900 p-2.5 rounded-xl text-xs font-extrabold flex items-center gap-2">
                           <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                          <span>9:00 PM Deadline Passed — Eligible for Reopen</span>
+                          <span>{slaDeadlineConfig.time12} Deadline Passed — Eligible for Reopen</span>
                         </div>
                       );
                     } else {
                       return (
                         <div className="bg-amber-50 border border-amber-200 text-amber-900 p-2.5 rounded-xl text-xs font-bold flex items-center gap-2">
                           <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
-                          <span>Today's 9:00 PM deadline has not been reached yet. Reports are open natively.</span>
+                          <span>Today's {slaDeadlineConfig.time12} deadline has not been reached yet. Reports are open natively.</span>
                         </div>
                       );
                     }

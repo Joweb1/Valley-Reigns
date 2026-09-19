@@ -2,8 +2,9 @@ import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "motion/react";
 import { useAuth } from "../context/AuthContext";
-import { memoryStore } from "../lib/services";
+import { memoryStore, simulateIncomingChat } from "../lib/services";
 import { X, LogIn, Phone, ArrowLeft, Shield, UserPlus, CheckCircle, Mail, Key, Eye, EyeOff, Building2, Briefcase } from "lucide-react";
+import { PreparingMessageOverlay } from "./PreparingMessageOverlay";
 
 interface AuthModalProps {
   forcedOpen?: boolean;
@@ -86,6 +87,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({ forcedOpen = false, onClos
 
   // Processing state for beautiful blur overlay
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isPreparingMessage, setIsPreparingMessage] = useState(false);
+  const [preparingJobTitle, setPreparingJobTitle] = useState<string | undefined>(undefined);
+  const [preparingSubtitle, setPreparingSubtitle] = useState<string | undefined>(undefined);
 
   // Gesture refs
   const headerHoldTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -211,12 +215,95 @@ export const AuthModal: React.FC<AuthModalProps> = ({ forcedOpen = false, onClos
   };
 
   // Central Role-based Redirection Router
-  const handleRedirect = (role: string) => {
+  const handleRedirect = async (role: string) => {
     setShowDemoPortals(false);
+
+    // Check if user was attempting to apply to a job before signing in or signing up
+    const pendingApplyRaw = sessionStorage.getItem("vr_pending_job_apply");
+    if (pendingApplyRaw) {
+      try {
+        const pending = JSON.parse(pendingApplyRaw);
+        sessionStorage.removeItem("vr_pending_job_apply");
+        if (pending?.jobId && pending?.jobTitle) {
+          const user = memoryStore.currentUser || currentUser;
+          const seekerPhoneIdentifier = user?.displayName || user?.email || "Candidate";
+          const initialMsg = `Hello! I'm interested in applying for the ${pending.jobTitle} position${pending.company ? ` at ${pending.company}` : ""}. Reference ID: ${pending.jobId}`;
+          
+          setPreparingJobTitle(pending.jobTitle);
+          setPreparingSubtitle(`Submitting direct application for ${pending.jobTitle} and assigning your conversation...`);
+          setIsPreparingMessage(true);
+          setIsProcessing(false);
+
+          try {
+            await Promise.all([
+              simulateIncomingChat(
+                seekerPhoneIdentifier, 
+                initialMsg, 
+                pending.jobId, 
+                pending.jobTitle, 
+                user?.uid,
+                pending.refStaffId || undefined
+              ),
+              new Promise((resolve) => setTimeout(resolve, 1100))
+            ]);
+          } catch (chatErr) {
+            console.warn("Auto-send pending job message notice:", chatErr);
+          }
+          setIsOpen(false);
+          setIsPreparingMessage(false);
+          navigate(`/seeker/messages?jobId=${pending.jobId}`);
+          return;
+        }
+      } catch (err) {
+        console.error("Error processing pending job apply on redirect:", err);
+      }
+    }
+
+    // Check if user followed a staff direct DM link
+    const pendingDmRaw = sessionStorage.getItem("vr_pending_dm_inquiry");
+    if (pendingDmRaw) {
+      try {
+        const pendingDm = JSON.parse(pendingDmRaw);
+        sessionStorage.removeItem("vr_pending_dm_inquiry");
+        if (pendingDm?.staffId) {
+          const user = memoryStore.currentUser || currentUser;
+          const seekerPhoneIdentifier = user?.displayName || user?.email || "Candidate";
+          const initialMsg = "I want to make inquiries";
+
+          setPreparingJobTitle("Direct Inquiry Channel");
+          setPreparingSubtitle("Connecting you directly to your assigned recruiter & preparing message channel...");
+          setIsPreparingMessage(true);
+          setIsProcessing(false);
+
+          try {
+            await Promise.all([
+              simulateIncomingChat(
+                seekerPhoneIdentifier,
+                initialMsg,
+                "general-inquiry",
+                "General Inquiry",
+                user?.uid,
+                pendingDm.staffId
+              ),
+              new Promise((resolve) => setTimeout(resolve, 1100))
+            ]);
+          } catch (dmErr) {
+            console.warn("Auto-send DM inquiry message notice:", dmErr);
+          }
+          setIsOpen(false);
+          setIsPreparingMessage(false);
+          navigate("/seeker/messages");
+          return;
+        }
+      } catch (dmErr) {
+        console.error("Error processing pending DM inquiry on redirect:", dmErr);
+      }
+    }
+
     if (role === "admin") {
       navigate("/admin/dashboard");
     } else if (role === "employer") {
-      navigate("/employer/dashboard");
+      navigate("/employer/chat");
     } else if (role === "staff") {
       // Staff directed to the job seeker page
       navigate("/seeker");
@@ -359,7 +446,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ forcedOpen = false, onClos
       return;
     }
     if (isEmployerMode && !companyName.trim()) {
-      setSignupError("Please enter your company name.");
+      setSignupError("Please enter your business name.");
       return;
     }
     if (!signupEmail.trim() || !signupEmail.includes("@")) {
@@ -393,7 +480,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ forcedOpen = false, onClos
         companyName: companyName.trim(),
         companyIndustry: companyIndustry.trim() || "Corporate Recruitment",
         companyPhone: companyPhone.trim() || undefined,
-        canPostJobs: true, // Auto grant trial post permission on signup for seamless evaluation
+        canPostJobs: false, // Default is OFF per policy
         canMessageSeekers: false,
         isVerifiedEmployer: false,
         maxJobPosts: 5
@@ -908,12 +995,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({ forcedOpen = false, onClos
                       {isEmployerMode && (
                         <>
                           <div className="space-y-1">
-                            <label className="text-[10px] font-mono font-bold text-slate-400 uppercase block">
-                              Company / Organization Name *
+                            <label className="text-[10px] font-mono font-bold text-slate-500 uppercase block">
+                              Business Name
                             </label>
                             <input
                               type="text"
-                              placeholder="e.g. Apex Systems Global"
+                              placeholder="e.g. Apex Systems"
                               value={companyName}
                               onChange={(e) => setCompanyName(e.target.value)}
                               required
@@ -923,20 +1010,20 @@ export const AuthModal: React.FC<AuthModalProps> = ({ forcedOpen = false, onClos
 
                           <div className="grid grid-cols-2 gap-2">
                             <div className="space-y-1">
-                              <label className="text-[10px] font-mono font-bold text-slate-400 uppercase block">
-                                Industry
+                              <label className="text-[10px] font-mono font-bold text-slate-500 uppercase block">
+                                Type of Business
                               </label>
                               <input
                                 type="text"
-                                placeholder="e.g. Technology / Logistics"
+                                placeholder="e.g. Technology, Retail, Logistics"
                                 value={companyIndustry}
                                 onChange={(e) => setCompanyIndustry(e.target.value)}
                                 className="w-full px-3 py-2 border border-slate-200/80 rounded-xl text-xs font-sans focus:outline-none hover:border-indigo-500 focus:border-indigo-600 focus:bg-white transition-all shadow-sm"
                               />
                             </div>
                             <div className="space-y-1">
-                              <label className="text-[10px] font-mono font-bold text-slate-400 uppercase block">
-                                Official Phone
+                              <label className="text-[10px] font-mono font-bold text-slate-500 uppercase block">
+                                Contact Phone
                               </label>
                               <input
                                 type="tel"
@@ -951,12 +1038,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({ forcedOpen = false, onClos
                       )}
 
                       <div className="space-y-1">
-                        <label className="text-[10px] font-mono font-bold text-slate-400 uppercase block">
-                          {isEmployerMode ? "Hiring Lead / Contact Person *" : "Full Name *"}
+                        <label className="text-[10px] font-mono font-bold text-slate-500 uppercase block">
+                          Full Name
                         </label>
                         <input
                           type="text"
-                          placeholder={isEmployerMode ? "e.g. David Apex (HR Lead)" : "e.g. Marcus Vance"}
+                          placeholder={isEmployerMode ? "e.g. David Vance" : "e.g. Marcus Vance"}
                           value={signupName}
                           onChange={(e) => setSignupName(e.target.value)}
                           required
@@ -965,8 +1052,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({ forcedOpen = false, onClos
                       </div>
 
                       <div className="space-y-1">
-                        <label className="text-[10px] font-mono font-bold text-slate-400 uppercase block">
-                          {isEmployerMode ? "Official Corporate Email *" : "Email Address *"}
+                        <label className="text-[10px] font-mono font-bold text-slate-500 uppercase block">
+                          Email
                         </label>
                         <input
                           type="email"
@@ -979,8 +1066,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({ forcedOpen = false, onClos
                       </div>
 
                       <div className="space-y-1">
-                        <label className="text-[10px] font-mono font-bold text-slate-400 uppercase block">
-                          Password *
+                        <label className="text-[10px] font-mono font-bold text-slate-500 uppercase block">
+                          Password
                         </label>
                         <div className="relative">
                           <span className="absolute inset-y-0 left-3 flex items-center text-slate-400">
@@ -1005,8 +1092,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({ forcedOpen = false, onClos
                       </div>
 
                       <div className="space-y-1">
-                        <label className="text-[10px] font-mono font-bold text-slate-400 uppercase block">
-                          Confirm Password *
+                        <label className="text-[10px] font-mono font-bold text-slate-500 uppercase block">
+                          Confirm Password
                         </label>
                         <div className="relative">
                           <span className="absolute inset-y-0 left-3 flex items-center text-slate-400">
@@ -1047,7 +1134,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ forcedOpen = false, onClos
                         <UserPlus className="w-3.5 h-3.5" />
                         <span>
                           {isEmployerMode 
-                            ? "Register Corporate Account & Sign In" 
+                            ? "Sign Up" 
                             : signupRole === "staff" 
                             ? "Create Staff Account" 
                             : "Register & Log In"
@@ -1097,6 +1184,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({ forcedOpen = false, onClos
         </div>
       )}
     </AnimatePresence>
+
+    {/* Fullscreen Preparing Message Overlay with Animated Dots */}
+    <PreparingMessageOverlay 
+      isVisible={isPreparingMessage} 
+      title="Preparing Message..." 
+      subtitle={preparingSubtitle}
+      jobTitle={preparingJobTitle}
+    />
     </>
   );
 };

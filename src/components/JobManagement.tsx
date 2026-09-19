@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { useWhatsAppConfig } from "../hooks/useWhatsAppConfig";
 import { getJobs, updateJob, deleteJob, getAllUserProfiles, subscribeToJobs, toggleJobAvailability, batchSetJobAvailability } from "../lib/services";
 import { Job, UserProfile } from "../types";
+import { useInfinitePagination, InfiniteScrollLoader } from "./InfiniteScrollLoader";
+import { copyToClipboard } from "../lib/clipboard";
 import { 
   Briefcase, 
   ArrowLeft, 
@@ -27,7 +28,8 @@ import {
   Search,
   CheckSquare,
   Square,
-  Loader2
+  Loader2,
+  ExternalLink
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { JobCardSkeleton } from "./JobCardSkeleton";
@@ -52,27 +54,27 @@ export const JobManagementCard: React.FC<JobManagementCardProps> = ({
   onToggleSelect
 }) => {
   const { currentUser } = useAuth();
-  const { getWhatsAppLink } = useWhatsAppConfig();
   const [isOpen, setIsOpen] = useState(false);
   const [copied, setCopied] = useState(false);
-
-  // Compile formatted WhatsApp deep link for copying with connected phone number
-  const messageText = `I am applying for the ${job.title} position. Reference ID: ${job.id}`;
-  const whatsappLink = getWhatsAppLink(messageText);
 
   const handleCopyLink = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     try {
-      await navigator.clipboard.writeText(whatsappLink);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      const isStaffOrAdmin = currentUser && (currentUser.role === "staff" || currentUser.role === "admin");
+      const refParam = isStaffOrAdmin ? `?ref=${currentUser.uid}` : "";
+      const shareUrl = `${window.location.origin}/jobs/${job.id}${refParam}`;
+      const success = await copyToClipboard(shareUrl);
+      if (success) {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      }
     } catch (err) {
-      console.error("Failed to copy link:", err);
+      console.debug("Failed to copy link:", err);
     }
   };
 
-  const formattedSalary = job.salary.replace(/\$/g, "₦");
+  const formattedSalary = String(job.salary || "").replace(/\$/g, "₦");
 
   return (
     <div className={`bg-white border rounded-2xl overflow-hidden shadow-[0_2px_8px_rgba(11,60,45,0.03)] hover:shadow-[0_4px_12px_rgba(11,60,45,0.05)] transition-all duration-300 text-left relative ${
@@ -275,11 +277,20 @@ export const JobManagementCard: React.FC<JobManagementCardProps> = ({
 
               {/* Engagement Panel */}
               <div className="pt-4 border-t border-blue-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div className="flex items-center gap-1.5 text-[9px] font-mono text-blue-800 font-bold">
+                <div className="flex items-center gap-1.5 text-[9px] font-mono text-blue-800 font-bold flex-wrap">
                   <Calendar className="w-3.5 h-3.5 text-blue-700" />
-                  Posted {new Date(job.createdAt).toLocaleDateString()}
+                  <span>Posted {new Date(job.createdAt).toLocaleDateString()}</span>
                   <span className="mx-1.5">•</span>
-                  <span>ID: {job.id}</span>
+                  <a
+                    href={`/jobs/${job.id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title="View public SEO page"
+                    className="hover:underline flex items-center gap-1 text-blue-900 font-bold bg-blue-100/80 px-1.5 py-0.5 rounded"
+                  >
+                    <span>ID: {job.id}</span>
+                    <ExternalLink className="w-2.5 h-2.5 text-blue-700" />
+                  </a>
                   <span className="mx-1.5">•</span>
                   <span>{job.impressions || 0} views</span>
                 </div>
@@ -325,7 +336,7 @@ export const JobManagementCard: React.FC<JobManagementCardProps> = ({
                   <button
                     onClick={handleCopyLink}
                     className="px-4 py-2 bg-white border border-blue-800 text-[#111827] rounded-xl text-[10px] font-sans font-black flex items-center gap-1.5 transition-all cursor-pointer shadow-sm hover:bg-blue-50"
-                    title="Copy WhatsApp Application Link"
+                    title="Copy Job Application Link"
                   >
                     {copied ? (
                       <>
@@ -579,6 +590,36 @@ export const JobManagement: React.FC<JobManagementProps> = ({ onBack, onPostJob 
     }
   };
 
+  const filteredJobs = useMemo(() => {
+    return jobs.filter((job) => {
+      if (!searchQuery.trim()) return true;
+      const query = searchQuery.toLowerCase();
+      
+      const titleMatch = job.title?.toLowerCase().includes(query) || false;
+      const locationMatch = job.location?.toLowerCase().includes(query) || false;
+      
+      const profile = job.postedByUid ? usersMap[job.postedByUid] : undefined;
+      const displayName = profile?.displayName?.toLowerCase() || "";
+      const email = profile?.email?.toLowerCase() || "";
+      const isSpecialAdmin = job.postedByUid === "admin-seed" || job.postedByUid === "admin-demo";
+      const postedByName = isSpecialAdmin ? "admin" : (profile ? `${displayName} ${email}` : "unknown staff");
+      
+      const postedByMatch = postedByName.toLowerCase().includes(query);
+      
+      return titleMatch || locationMatch || postedByMatch;
+    });
+  }, [jobs, searchQuery, usersMap]);
+
+  const {
+    displayedItems: displayedJobs,
+    hasMore,
+    isLoadingMore,
+    loadMore,
+    sentinelRef,
+    totalCount,
+    displayedCount
+  } = useInfinitePagination<Job>(filteredJobs, { pageSize: 8, initialPageSize: 8 }, [searchQuery]);
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 15 }}
@@ -634,168 +675,154 @@ export const JobManagement: React.FC<JobManagementProps> = ({ onBack, onPostJob 
         </div>
       )}
 
-      {/* Filter search queries */}
-      {(() => {
-        const filteredJobs = jobs.filter((job) => {
-          if (!searchQuery.trim()) return true;
-          const query = searchQuery.toLowerCase();
-          
-          const titleMatch = job.title?.toLowerCase().includes(query) || false;
-          const locationMatch = job.location?.toLowerCase().includes(query) || false;
-          
-          const profile = job.postedByUid ? usersMap[job.postedByUid] : undefined;
-          const displayName = profile?.displayName?.toLowerCase() || "";
-          const email = profile?.email?.toLowerCase() || "";
-          const isSpecialAdmin = job.postedByUid === "admin-seed" || job.postedByUid === "admin-demo";
-          const postedByName = isSpecialAdmin ? "admin" : (profile ? `${displayName} ${email}` : "unknown staff");
-          
-          const postedByMatch = postedByName.toLowerCase().includes(query);
-          
-          return titleMatch || locationMatch || postedByMatch;
-        });
-
-        return (
-          <>
-            {/* Search Bar & Batch Selection Toolbar */}
-            {jobs.length > 0 && (
-              <div className="mb-6 space-y-3">
-                <div className="relative flex items-center">
-                  <Search className="absolute left-4 w-4 h-4 text-slate-400 pointer-events-none" />
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search job listings by title, location, staff..."
-                    className="w-full pl-11 pr-10 py-3 bg-slate-100/80 border border-slate-200 hover:border-slate-300 focus:border-[#1E88E5] focus:ring-1 focus:ring-[#1E88E5]/20 text-slate-800 placeholder-gray-400 rounded-xl text-sm font-normal transition-all shadow-none outline-none"
-                  />
-                  {searchQuery && (
-                    <button
-                      onClick={() => setSearchQuery("")}
-                      className="absolute right-4 p-1 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-200 cursor-pointer transition-colors"
-                      title="Clear search"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  )}
-                </div>
-
-                {/* Batch Action Toolbar */}
-                <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 bg-slate-50 border border-slate-200 rounded-2xl">
-                  <button
-                    type="button"
-                    onClick={() => handleSelectAllJobs(filteredJobs)}
-                    className="flex items-center gap-2 text-xs font-bold text-slate-700 hover:text-blue-700 transition-colors cursor-pointer border-0 bg-transparent"
-                  >
-                    {filteredJobs.length > 0 && filteredJobs.every(j => selectedJobIds.includes(j.id)) ? (
-                      <CheckSquare className="w-4.5 h-4.5 text-blue-600" />
-                    ) : (
-                      <Square className="w-4.5 h-4.5 text-slate-400" />
-                    )}
-                    <span>
-                      {filteredJobs.length > 0 && filteredJobs.every(j => selectedJobIds.includes(j.id))
-                        ? "Deselect All"
-                        : `Select All (${filteredJobs.length})`}
-                    </span>
-                  </button>
-
-                  {selectedJobIds.length > 0 && (
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-xs font-mono font-bold text-blue-800 bg-blue-100/80 px-2.5 py-1 rounded-lg">
-                        {selectedJobIds.length} Selected
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => handleBatchSetAvailability(true)}
-                        className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold text-xs rounded-xl transition-all flex items-center gap-1.5 shadow-xs cursor-pointer border border-amber-600 hover:scale-[1.02] active:scale-95"
-                        title="Mark Selected Jobs as Unavailable"
-                      >
-                        <EyeOff className="w-3.5 h-3.5 text-slate-950" />
-                        <span>Make Unavailable</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleBatchSetAvailability(false)}
-                        className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl transition-all flex items-center gap-1.5 shadow-xs cursor-pointer border border-emerald-700 hover:scale-[1.02] active:scale-95"
-                        title="Mark Selected Jobs as Available"
-                      >
-                        <Eye className="w-3.5 h-3.5 text-white" />
-                        <span>Make Available</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setShowBatchDeleteModal(true)}
-                        className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-extrabold rounded-xl transition-all flex items-center gap-1.5 shadow-xs cursor-pointer border-0 hover:scale-[1.02] active:scale-95"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                        <span>Batch Delete ({selectedJobIds.length})</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setSelectedJobIds([])}
-                        className="px-2.5 py-1.5 text-xs text-slate-600 hover:text-slate-900 font-bold hover:bg-slate-200/60 rounded-xl transition-all cursor-pointer border-0 bg-transparent"
-                      >
-                        Clear
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
+      {/* Search Bar & Batch Selection Toolbar */}
+      {jobs.length > 0 && (
+        <div className="mb-6 space-y-3">
+          <div className="relative flex items-center">
+            <Search className="absolute left-4 w-4 h-4 text-slate-400 pointer-events-none" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search job listings by title, location, staff..."
+              className="w-full pl-11 pr-10 py-3 bg-slate-100/80 border border-slate-200 hover:border-slate-300 focus:border-[#1E88E5] focus:ring-1 focus:ring-[#1E88E5]/20 text-slate-800 placeholder-gray-400 rounded-xl text-sm font-normal transition-all shadow-none outline-none"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery("")}
+                className="absolute right-4 p-1 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-200 cursor-pointer transition-colors"
+                title="Clear search"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
             )}
+          </div>
 
-            {/* Main List */}
-            {loading ? (
-              <div className="grid grid-cols-1 gap-6">
-                <JobCardSkeleton />
-                <JobCardSkeleton />
-                <JobCardSkeleton />
-              </div>
-            ) : jobs.length === 0 ? (
-              <div className="bg-white border border-slate-100 rounded-3xl p-12 text-center shadow-sm">
-                <div className="w-16 h-16 bg-slate-50 border border-slate-100 rounded-2xl flex items-center justify-center text-slate-400 mx-auto mb-4">
-                  <Briefcase className="w-8 h-8" />
-                </div>
-                <h3 className="text-base font-sans font-bold text-slate-900">No Job Listings</h3>
-                <p className="text-xs font-sans text-slate-500 max-w-sm mx-auto mt-1 leading-relaxed">
-                  {currentUser?.role === "admin"
-                    ? "The database doesn't contain any job records."
-                    : "You haven't posted any jobs under this account yet."}
-                </p>
-              </div>
-            ) : filteredJobs.length === 0 ? (
-              <div className="bg-white border border-slate-100 rounded-3xl p-12 text-center shadow-sm">
-                <div className="w-16 h-16 bg-slate-50 border border-slate-100 rounded-2xl flex items-center justify-center text-slate-400 mx-auto mb-4">
-                  <Search className="w-8 h-8 text-slate-300" />
-                </div>
-                <h3 className="text-base font-sans font-bold text-slate-900">No Matches Found</h3>
-                <p className="text-xs font-sans text-slate-500 max-w-sm mx-auto mt-1 leading-relaxed">
-                  We couldn't find any job listings matching &ldquo;{searchQuery}&rdquo;. Try checking the spelling or searching for another term.
-                </p>
+          {/* Batch Action Toolbar */}
+          <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 bg-slate-50 border border-slate-200 rounded-2xl">
+            <button
+              type="button"
+              onClick={() => handleSelectAllJobs(filteredJobs)}
+              className="flex items-center gap-2 text-xs font-bold text-slate-700 hover:text-blue-700 transition-colors cursor-pointer border-0 bg-transparent"
+            >
+              {filteredJobs.length > 0 && filteredJobs.every(j => selectedJobIds.includes(j.id)) ? (
+                <CheckSquare className="w-4.5 h-4.5 text-blue-600" />
+              ) : (
+                <Square className="w-4.5 h-4.5 text-slate-400" />
+              )}
+              <span>
+                {filteredJobs.length > 0 && filteredJobs.every(j => selectedJobIds.includes(j.id))
+                  ? "Deselect All"
+                  : `Select All (${filteredJobs.length})`}
+              </span>
+            </button>
+
+            {selectedJobIds.length > 0 && (
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs font-mono font-bold text-blue-800 bg-blue-100/80 px-2.5 py-1 rounded-lg">
+                  {selectedJobIds.length} Selected
+                </span>
                 <button
-                  onClick={() => setSearchQuery("")}
-                  className="mt-4 px-4 py-2 bg-[#111827] text-white hover:bg-[#1f2937] rounded-xl text-xs font-sans font-bold transition-all shadow-sm cursor-pointer"
+                  type="button"
+                  onClick={() => handleBatchSetAvailability(true)}
+                  className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold text-xs rounded-xl transition-all flex items-center gap-1.5 shadow-xs cursor-pointer border border-amber-600 hover:scale-[1.02] active:scale-95"
+                  title="Mark Selected Jobs as Unavailable"
                 >
-                  Clear Search
+                  <EyeOff className="w-3.5 h-3.5 text-slate-950" />
+                  <span>Make Unavailable</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleBatchSetAvailability(false)}
+                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl transition-all flex items-center gap-1.5 shadow-xs cursor-pointer border border-emerald-700 hover:scale-[1.02] active:scale-95"
+                  title="Mark Selected Jobs as Available"
+                >
+                  <Eye className="w-3.5 h-3.5 text-white" />
+                  <span>Make Available</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowBatchDeleteModal(true)}
+                  className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-extrabold rounded-xl transition-all flex items-center gap-1.5 shadow-xs cursor-pointer border-0 hover:scale-[1.02] active:scale-95"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Batch Delete ({selectedJobIds.length})</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedJobIds([])}
+                  className="px-2.5 py-1.5 text-xs text-slate-600 hover:text-slate-900 font-bold hover:bg-slate-200/60 rounded-xl transition-all cursor-pointer border-0 bg-transparent"
+                >
+                  Clear
                 </button>
               </div>
-            ) : (
-              <div className="grid grid-cols-1 gap-6">
-                {filteredJobs.map((job) => (
-                  <JobManagementCard 
-                    key={job.id} 
-                    job={job}
-                    onEdit={handleOpenEdit}
-                    onDelete={setDeletingJob}
-                    onToggleAvailability={handleToggleSingleJobAvailability}
-                    postedByProfile={job.postedByUid ? usersMap[job.postedByUid] : undefined}
-                    isSelected={selectedJobIds.includes(job.id)}
-                    onToggleSelect={handleToggleSelectJob}
-                  />
-                ))}
-              </div>
             )}
-          </>
-        );
-      })()}
+          </div>
+        </div>
+      )}
+
+      {/* Main List */}
+      {loading ? (
+        <div className="grid grid-cols-1 gap-6">
+          <JobCardSkeleton />
+          <JobCardSkeleton />
+          <JobCardSkeleton />
+        </div>
+      ) : jobs.length === 0 ? (
+        <div className="bg-white border border-slate-100 rounded-3xl p-12 text-center shadow-sm">
+          <div className="w-16 h-16 bg-slate-50 border border-slate-100 rounded-2xl flex items-center justify-center text-slate-400 mx-auto mb-4">
+            <Briefcase className="w-8 h-8" />
+          </div>
+          <h3 className="text-base font-sans font-bold text-slate-900">No Job Listings</h3>
+          <p className="text-xs font-sans text-slate-500 max-w-sm mx-auto mt-1 leading-relaxed">
+            {currentUser?.role === "admin"
+              ? "The database doesn't contain any job records."
+              : "You haven't posted any jobs under this account yet."}
+          </p>
+        </div>
+      ) : filteredJobs.length === 0 ? (
+        <div className="bg-white border border-slate-100 rounded-3xl p-12 text-center shadow-sm">
+          <div className="w-16 h-16 bg-slate-50 border border-slate-100 rounded-2xl flex items-center justify-center text-slate-400 mx-auto mb-4">
+            <Search className="w-8 h-8 text-slate-300" />
+          </div>
+          <h3 className="text-base font-sans font-bold text-slate-900">No Matches Found</h3>
+          <p className="text-xs font-sans text-slate-500 max-w-sm mx-auto mt-1 leading-relaxed">
+            We couldn't find any job listings matching &ldquo;{searchQuery}&rdquo;. Try checking the spelling or searching for another term.
+          </p>
+          <button
+            onClick={() => setSearchQuery("")}
+            className="mt-4 px-4 py-2 bg-[#111827] text-white hover:bg-[#1f2937] rounded-xl text-xs font-sans font-bold transition-all shadow-sm cursor-pointer"
+          >
+            Clear Search
+          </button>
+        </div>
+      ) : (
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 gap-6">
+            {displayedJobs.map((job) => (
+              <JobManagementCard 
+                key={job.id} 
+                job={job}
+                onEdit={handleOpenEdit}
+                onDelete={setDeletingJob}
+                onToggleAvailability={handleToggleSingleJobAvailability}
+                postedByProfile={job.postedByUid ? usersMap[job.postedByUid] : undefined}
+                isSelected={selectedJobIds.includes(job.id)}
+                onToggleSelect={handleToggleSelectJob}
+              />
+            ))}
+          </div>
+          <InfiniteScrollLoader
+            hasMore={hasMore}
+            isLoadingMore={isLoadingMore}
+            onLoadMore={loadMore}
+            sentinelRef={sentinelRef}
+            totalCount={totalCount}
+            displayedCount={displayedCount}
+            itemLabel="job openings"
+          />
+        </div>
+      )}
 
       {/* Edit Job Modal */}
       <AnimatePresence>

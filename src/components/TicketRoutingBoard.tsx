@@ -1,7 +1,14 @@
-import React, { useState } from "react";
-import { UserProfile, Conversation } from "../types";
+import React, { useState, useEffect } from "react";
+import { UserProfile, Conversation, AppSettings } from "../types";
 import { SLACountdownTimer } from "./SLACountdownTimer";
-import { batchDeleteConversations, batchResetConversations, deleteConversation, updateConversationStatus } from "../lib/services";
+import { 
+  batchDeleteConversations, 
+  batchResetConversations, 
+  deleteConversation, 
+  updateConversationStatus,
+  subscribeToAppSettings,
+  getCachedAppSettingsTimeout
+} from "../lib/services";
 import { 
   BarChart3, 
   ArrowLeft, 
@@ -41,9 +48,17 @@ const RecruiterDropdown: React.FC<{
 }> = ({ currentOwnerId, staffList, getActiveChatsCount, onSelect, placeholder, label, onOpenChange }) => {
   const [isOpen, setIsOpen] = useState(false);
 
-  const filteredStaff = currentOwnerId 
-    ? staffList.filter(s => s.uid !== currentOwnerId)
-    : staffList;
+  const filteredStaff = React.useMemo(() => {
+    const seen = new Set<string>();
+    const baseList = currentOwnerId 
+      ? staffList.filter(s => s && s.uid && s.uid !== currentOwnerId)
+      : staffList;
+    return baseList.filter(s => {
+      if (!s || !s.uid || seen.has(s.uid)) return false;
+      seen.add(s.uid);
+      return true;
+    });
+  }, [staffList, currentOwnerId]);
 
   const toggleDropdown = () => {
     const nextState = !isOpen;
@@ -126,6 +141,18 @@ export const TicketRoutingBoard: React.FC<TicketRoutingBoardProps> = ({
   const [activeTab, setActiveTab] = useState<"pending" | "ongoing" | "finished" | "abandoned">("pending");
   const [expandedPendingChatId, setExpandedPendingChatId] = useState<string | null>(null);
   const [activeDropdownChatId, setActiveDropdownChatId] = useState<string | null>(null);
+  const [appSettings, setAppSettings] = useState<AppSettings>(() => ({
+    unclaimedChatTimeoutHours: getCachedAppSettingsTimeout()
+  }));
+
+  useEffect(() => {
+    const unsub = subscribeToAppSettings((settings) => {
+      if (settings?.unclaimedChatTimeoutHours && Number(settings.unclaimedChatTimeoutHours) > 0) {
+        setAppSettings(settings);
+      }
+    });
+    return () => unsub();
+  }, []);
 
   // Batch actions state
   const [selectedChatIds, setSelectedChatIds] = useState<Set<string>>(new Set());
@@ -137,11 +164,26 @@ export const TicketRoutingBoard: React.FC<TicketRoutingBoardProps> = ({
     setSelectedChatIds(new Set());
   };
 
-  // Group counts
-  const pendingChats = conversationsList.filter(c => c.status === "pending");
-  const ongoingChats = conversationsList.filter(c => c.status === "ongoing");
-  const finishedChats = conversationsList.filter(c => c.status === "finished");
-  const abandonedChats = conversationsList.filter(c => c.status === "abandoned");
+  // Sort helper for most recently added
+  const sortByRecentlyAdded = (a: Conversation, b: Conversation) => {
+    const timeA = a.createdAt ? Number(a.createdAt) : (a.lastMessageAt ? Number(a.lastMessageAt) : 0);
+    const timeB = b.createdAt ? Number(b.createdAt) : (b.lastMessageAt ? Number(b.lastMessageAt) : 0);
+    return timeB - timeA;
+  };
+
+  const isEmployerConv = (c: Conversation) => Boolean(
+    c.isEmployer ||
+    c.userRole === "employer" ||
+    c.seekerRole === "employer" ||
+    c.companyName ||
+    (c.chatId && c.chatId.startsWith("employer_"))
+  );
+
+  // Group counts and sorted arrays (most recently added first)
+  const pendingChats = conversationsList.filter(c => c.status === "pending" && !isEmployerConv(c)).sort(sortByRecentlyAdded);
+  const ongoingChats = conversationsList.filter(c => c.status === "ongoing" || (isEmployerConv(c) && c.status !== "finished" && c.status !== "abandoned")).sort(sortByRecentlyAdded);
+  const finishedChats = conversationsList.filter(c => c.status === "finished").sort(sortByRecentlyAdded);
+  const abandonedChats = conversationsList.filter(c => c.status === "abandoned" && !isEmployerConv(c)).sort(sortByRecentlyAdded);
 
   const toggleSelectChat = (chatId: string) => {
     setSelectedChatIds(prev => {
@@ -430,12 +472,34 @@ export const TicketRoutingBoard: React.FC<TicketRoutingBoardProps> = ({
                                 </button>
                               )}
                               <span className="text-xs font-mono font-extrabold text-slate-900 bg-slate-50 px-2 py-1 rounded-lg">
-                                {c.customerPhone}
+                                {(() => {
+                                  const isEmp = Boolean(
+                                    c.isEmployer ||
+                                    c.userRole === "employer" ||
+                                    c.seekerRole === "employer" ||
+                                    c.companyName ||
+                                    (c.chatId && c.chatId.startsWith("employer_"))
+                                  );
+                                  return isEmp
+                                    ? (c.companyName || c.name || c.customerPhone || "Employer Business")
+                                    : (c.customerPhone || c.name || "Candidate");
+                                })()}
                               </span>
+                              {Boolean(
+                                c.isEmployer ||
+                                c.userRole === "employer" ||
+                                c.seekerRole === "employer" ||
+                                c.companyName ||
+                                (c.chatId && c.chatId.startsWith("employer_"))
+                              ) && (
+                                <span className="px-1.5 py-0.5 bg-purple-100 text-purple-800 rounded text-[9px] font-mono font-bold">
+                                  Employer
+                                </span>
+                              )}
                             </div>
                             <div className="flex items-center gap-2">
                               <span className="text-[9px] font-sans font-medium text-slate-400">
-                                {new Date(c.lastMessageAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                {new Date(c.lastMessageAt || c.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                               </span>
                               {(activeTab === "finished" || activeTab === "abandoned") && (
                                 <button
@@ -450,7 +514,19 @@ export const TicketRoutingBoard: React.FC<TicketRoutingBoardProps> = ({
                           </div>
                           <div>
                             <h4 className="text-sm font-sans font-extrabold text-slate-800 leading-snug">
-                              {c.jobTitle}
+                              {(() => {
+                                const isEmp = Boolean(
+                                  c.isEmployer ||
+                                  c.userRole === "employer" ||
+                                  c.seekerRole === "employer" ||
+                                  c.companyName ||
+                                  (c.chatId && c.chatId.startsWith("employer_"))
+                                );
+                                if (isEmp) {
+                                  return c.companyIndustry ? `${c.companyIndustry} (Business Desk)` : (c.jobTitle || "Direct Admin Desk");
+                                }
+                                return c.jobTitle;
+                              })()}
                             </h4>
                             <p className="text-[11px] font-sans text-slate-500 line-clamp-2 leading-relaxed mt-1">
                               "{c.text}"
@@ -466,35 +542,34 @@ export const TicketRoutingBoard: React.FC<TicketRoutingBoardProps> = ({
                               label="Claim Countdown" 
                               isInApp={c.isInApp || (c.customerPhone ? !c.customerPhone.startsWith("+") : true)}
                               customerPhone={c.customerPhone}
+                              timeoutHours={appSettings.unclaimedChatTimeoutHours}
                             />
 
                             <div 
                               onClick={() => setExpandedPendingChatId(isExpanded ? null : c.chatId)}
                               className="flex items-center justify-between text-[10px] text-slate-600 font-sans font-bold cursor-pointer hover:opacity-80 select-none"
                             >
-                              <span>Routed staff members ({c.sharedWith?.length || 0})</span>
+                              <span>Staff who can see ({staffList.filter(s => s.role === "staff" || s.role === "admin").length || c.sharedWith?.length || 0})</span>
                               <span className="text-[#1E88E5] font-semibold">{isExpanded ? "▲ Hide" : "▼ Expand"}</span>
                             </div>
 
                             {isExpanded && (
                               <div className="space-y-1.5 max-h-24 overflow-y-auto bg-slate-50 p-2.5 rounded-xl border border-slate-200/50">
-                                {c.sharedWith && c.sharedWith.length > 0 ? (
-                                  c.sharedWith.map((uid) => {
-                                    const staffMember = staffList.find(s => s.uid === uid);
-                                    return (
-                                      <div key={uid} className="flex items-center justify-between text-[10px] text-slate-500 font-medium">
-                                        <span className="truncate max-w-[140px] font-bold text-slate-600">
-                                          {staffMember ? staffMember.displayName : `Recruiter (${uid.substring(0, 6)})`}
-                                        </span>
-                                        <span className="text-[8px] font-mono px-1 py-0.2 bg-slate-200/75 text-slate-500 rounded font-bold uppercase shrink-0">
-                                          Routed
-                                        </span>
-                                      </div>
-                                    );
-                                  })
-                                ) : (
-                                  <span className="text-[10px] font-mono text-slate-400 italic">No recruiters linked</span>
-                                )}
+                                {(staffList.filter(s => s.role === "staff" || s.role === "admin").length > 0
+                                  ? staffList.filter(s => s.role === "staff" || s.role === "admin")
+                                  : (c.sharedWith || []).map(uid => staffList.find(s => s.uid === uid) || { uid, displayName: `Recruiter (${uid.substring(0, 6)})`, email: "", role: "staff" as const, canPostJobs: true })
+                                ).map((staffMember, idx: number) => {
+                                  return (
+                                    <div key={`${c.chatId}-${staffMember.uid}-${idx}`} className="flex items-center justify-between text-[10px] text-slate-500 font-medium">
+                                      <span className="truncate max-w-[140px] font-bold text-slate-600">
+                                        {staffMember.displayName || `Recruiter (${staffMember.uid.substring(0, 6)})`}
+                                      </span>
+                                      <span className="text-[8px] font-mono px-1 py-0.2 bg-emerald-100 text-emerald-700 rounded font-bold uppercase shrink-0">
+                                        Broadcasted
+                                      </span>
+                                    </div>
+                                  );
+                                })}
                               </div>
                             )}
 
@@ -517,16 +592,19 @@ export const TicketRoutingBoard: React.FC<TicketRoutingBoardProps> = ({
                         {activeTab === "ongoing" && (
                           <div className="space-y-3 pt-2 border-t border-dashed border-slate-100">
                             <SLACountdownTimer 
-                              createdAt={c.createdAt} 
+                              createdAt={c.claimedAt || c.createdAt} 
                               label="Ongoing SLA Timer" 
                               isInApp={c.isInApp || (c.customerPhone ? !c.customerPhone.startsWith("+") : true)}
                               customerPhone={c.customerPhone}
+                              timeoutHours={appSettings.unclaimedChatTimeoutHours}
+                              lastMessageAt={c.lastMessageAt}
+                              status={c.status}
                             />
 
                             <div className="flex items-center gap-2 bg-blue-50/75 text-blue-800 p-2.5 rounded-xl text-[10px] font-sans font-bold border border-blue-100/50">
                               <Users className="w-3.5 h-3.5 text-blue-600 shrink-0" />
                               <span className="truncate">
-                                Owner: <strong className="font-extrabold text-blue-950">{c.assignedToName || "System Agent"}</strong>
+                                Owner: <strong className="font-extrabold text-blue-950">{c.assignedToName || c.adminName || "System Agent"}</strong>
                               </span>
                             </div>
 

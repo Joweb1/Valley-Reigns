@@ -13,7 +13,7 @@ import {
   Sparkles,
   HelpCircle
 } from "lucide-react";
-import { auth, db, rtdb, memoryStore } from "../lib/services";
+import { auth, db, memoryStore } from "../lib/services";
 import { 
   createUserWithEmailAndPassword, 
   signInWithEmailAndPassword 
@@ -24,17 +24,13 @@ import {
   collection, 
   getDocs 
 } from "firebase/firestore";
-import { 
-  ref, 
-  set 
-} from "firebase/database";
 import { Job, UserProfile, Conversation } from "../types";
 
 // Static Default Data with Naira prices and Nigerian context
 const SEED_JOBS: Job[] = [
   {
     id: "job-001",
-    title: "Lead WhatsApp Solutions Architect",
+    title: "Lead Enterprise Solutions Architect",
     company: "Apex Tech Solutions",
     category: "Tech",
     salary: "₦450,000 - ₦600,000 / month",
@@ -42,11 +38,11 @@ const SEED_JOBS: Job[] = [
     type: "Full-time",
     requirements: [
       "5+ years of experience designing scalable API solutions and conversational engines.",
-      "Expertise in Meta Graph API, Webhooks, and secure authentication flows.",
+      "Expertise in REST/GraphQL APIs, Webhooks, and secure authentication flows.",
       "Hands-on skills with Node.js, TypeScript, and Firebase Services.",
       "Strong background in customer journey maps and dialogue routing."
     ],
-    description: "Lead the design and deployment of conversational recruitment routing architectures. You will construct high-throughput integrations linking WhatsApp Business with enterprise CRM databases.",
+    description: "Lead the design and deployment of enterprise recruitment routing architectures. You will construct high-throughput integrations linking candidate support channels with enterprise CRM databases.",
     impressions: 42,
     createdAt: Date.now() - 3600000 * 24 * 3 // 3 days ago
   },
@@ -114,9 +110,9 @@ const SEED_CONVERSATIONS: Record<string, Conversation> = {
     assignedTo: null,
     assignedToName: null,
     sharedWith: ["staff-demo", "staff-1-seed", "staff-2-seed"],
-    text: "Hello! I am highly interested in the Lead WhatsApp Solutions Architect position. Here is my profile. Reference ID: job-001",
+    text: "Hello! I am highly interested in the Lead Enterprise Solutions Architect position. Here is my profile. Reference ID: job-001",
     jobId: "job-001",
-    jobTitle: "Lead WhatsApp Solutions Architect",
+    jobTitle: "Lead Enterprise Solutions Architect",
     createdAt: Date.now() - 3600000 * 2,
     lastMessageAt: Date.now() - 3600000 * 2
   },
@@ -162,7 +158,7 @@ export const DatabaseSeederModal: React.FC<{ inline?: boolean }> = ({ inline = f
     { id: "auth", label: "Establish Auth Credentials", status: "idle" },
     { id: "users", label: "Sync Firestore User Profiles", status: "idle" },
     { id: "jobs", label: "Seed Job Discovery Board", status: "idle" },
-    { id: "chats", label: "Set up WhatsApp Firestore Chats", status: "idle" }
+    { id: "chats", label: "Set up In-App Candidate Chats", status: "idle" }
   ]);
   const [globalError, setGlobalError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -454,7 +450,7 @@ export const DatabaseSeederModal: React.FC<{ inline?: boolean }> = ({ inline = f
         <div className="p-6 space-y-5">
           <div className="space-y-2">
             <p className="text-xs text-slate-600 leading-relaxed">
-              Set up your Valley Reigns developer workspace instantly. Clicking "Seed Database" registers default demo credentials in Firebase Authentication and builds complete database environments in Firestore and Realtime Database.
+              Set up your Valley Reigns developer workspace instantly. Clicking "Seed Database" registers default demo credentials in Firebase Authentication and builds complete database environments in Cloud Firestore.
             </p>
           </div>
 
@@ -628,7 +624,7 @@ export const DatabaseSeederModal: React.FC<{ inline?: boolean }> = ({ inline = f
               <div className="p-6 space-y-5">
                 <div className="space-y-2">
                   <p className="text-xs text-slate-600 leading-relaxed">
-                    Set up your Valley Reigns developer workspace instantly. Clicking "Seed Database" registers default demo credentials in Firebase Authentication and builds complete database environments in Firestore and Realtime Database.
+                    Set up your Valley Reigns developer workspace instantly. Clicking "Seed Database" registers default demo credentials in Firebase Authentication and builds complete database environments in Cloud Firestore.
                   </p>
                 </div>
 

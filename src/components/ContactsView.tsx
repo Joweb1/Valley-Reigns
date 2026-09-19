@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { CustomerContact } from "../types";
 import { getContacts, deleteContact } from "../lib/services";
+import { useInfinitePagination, InfiniteScrollLoader } from "./InfiniteScrollLoader";
 import { 
   Phone, 
   MessageCircle, 
@@ -78,6 +79,16 @@ export const ContactsView: React.FC<ContactsViewProps> = ({ onBack, hideTopTitle
       (c.lastJobTitle && c.lastJobTitle.toLowerCase().includes(query))
     );
   });
+
+  const {
+    displayedItems: displayedContacts,
+    hasMore,
+    isLoadingMore,
+    loadMore,
+    sentinelRef,
+    totalCount: totalPaginationCount,
+    displayedCount
+  } = useInfinitePagination<CustomerContact>(filteredContacts, { pageSize: 9, initialPageSize: 9 }, [searchQuery, viewMode]);
 
   const formatDate = (timestamp: number) => {
     if (!timestamp) return "N/A";
@@ -241,13 +252,13 @@ export const ContactsView: React.FC<ContactsViewProps> = ({ onBack, hideTopTitle
           <Phone className="w-8 h-8 text-slate-300 mx-auto" />
           <p className="text-xs font-bold text-slate-700">No contacts found</p>
           <p className="text-[11px] font-mono text-slate-400 max-w-xs mx-auto">
-            {searchQuery ? "No customer contacts matched your search query." : "No WhatsApp customer contacts recorded yet."}
+            {searchQuery ? "No customer contacts matched your search query." : "No customer contacts recorded yet."}
           </p>
         </div>
       ) : viewMode === "card" ? (
         /* Compact Card Grid View */
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {filteredContacts.map((contact) => (
+          {displayedContacts.map((contact) => (
             <motion.div
               key={contact.id}
               layout
@@ -303,14 +314,11 @@ export const ContactsView: React.FC<ContactsViewProps> = ({ onBack, hideTopTitle
 
               <div className="pt-2 border-t border-slate-100 flex items-center gap-2">
                 <a
-                  href={`https://wa.me/${contact.customerPhone.replace(/[^0-9]/g, "")}`}
-                  target="_blank"
-                  rel="noreferrer"
+                  href={`tel:${contact.customerPhone}`}
                   className="w-full py-1.5 px-2.5 bg-[#0B1B3D] hover:bg-[#162A52] text-white text-xs font-extrabold rounded-lg transition-all flex items-center justify-center gap-1.5 shadow-none cursor-pointer no-underline"
                 >
-                  <MessageCircle className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>WhatsApp</span>
-                  <ExternalLink className="w-3 h-3 opacity-60" />
+                  <Phone className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Call Contact</span>
                 </a>
               </div>
             </motion.div>
@@ -331,7 +339,7 @@ export const ContactsView: React.FC<ContactsViewProps> = ({ onBack, hideTopTitle
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-medium text-xs">
-                {filteredContacts.map((contact) => (
+                {displayedContacts.map((contact) => (
                   <tr key={contact.id} className="hover:bg-slate-50/80 transition-colors">
                     <td className="py-2.5 px-3">
                       <div className="flex items-center gap-2">
@@ -361,14 +369,12 @@ export const ContactsView: React.FC<ContactsViewProps> = ({ onBack, hideTopTitle
                     <td className="py-2.5 px-3 text-right">
                       <div className="flex items-center justify-end gap-1.5">
                         <a
-                          href={`https://wa.me/${contact.customerPhone.replace(/[^0-9]/g, "")}`}
-                          target="_blank"
-                          rel="noreferrer"
+                          href={`tel:${contact.customerPhone}`}
                           className="p-1.5 bg-[#0B1B3D] hover:bg-[#162A52] text-white rounded-lg transition-all cursor-pointer inline-flex items-center gap-1 font-bold text-[10px] no-underline"
-                          title="Open WhatsApp chat"
+                          title="Call contact"
                         >
-                          <MessageCircle className="w-3 h-3 text-emerald-400" />
-                          <span className="hidden sm:inline">WhatsApp</span>
+                          <Phone className="w-3 h-3 text-emerald-400" />
+                          <span className="hidden sm:inline">Call</span>
                         </a>
 
                         <button
@@ -387,6 +393,17 @@ export const ContactsView: React.FC<ContactsViewProps> = ({ onBack, hideTopTitle
           </div>
         </div>
       )}
+
+      {/* Infinite Scroll Loader for Contacts */}
+      <InfiniteScrollLoader
+        hasMore={hasMore}
+        isLoadingMore={isLoadingMore}
+        onLoadMore={loadMore}
+        sentinelRef={sentinelRef}
+        totalCount={totalPaginationCount}
+        displayedCount={displayedCount}
+        itemLabel="contacts"
+      />
 
       {/* Delete Confirmation Modal */}
       <AnimatePresence>

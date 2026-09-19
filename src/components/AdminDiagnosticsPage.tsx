@@ -1,10 +1,9 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { motion } from "motion/react";
-import { ArrowLeft, Cpu, Activity, Database, Sparkles } from "lucide-react";
-import { DatabaseSeederModal } from "./DatabaseSeederModal";
+import { ArrowLeft, Cpu, Activity, Database, MessageSquare } from "lucide-react";
 import { DatabaseTesterModal } from "./DatabaseTesterModal";
-import { WhatsAppSimulator } from "./WhatsAppSimulator";
+import { ChatMessagingTester } from "./ChatMessagingTester";
 
 export const AdminDiagnosticsPage: React.FC = () => {
   return (
@@ -28,15 +27,13 @@ export const AdminDiagnosticsPage: React.FC = () => {
               </span>
             </div>
           </div>
-
-
         </div>
       </div>
 
       {/* Main Content Body */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-8">
         {/* Header Block */}
-        <div className="mb-8">
+        <div>
           <motion.div
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -46,43 +43,31 @@ export const AdminDiagnosticsPage: React.FC = () => {
               Diagnostics & Developer Tools
             </h1>
             <p className="text-xs text-slate-500 max-w-2xl mt-1 leading-relaxed">
-              Verify database connectivity, seed sample careers or recruitment support conversation pipelines, and trigger mock incoming WhatsApp Business messages directly inside a sandboxed developer environment.
+              Verify database connectivity, test Firebase synchronization, and run end-to-end messaging diagnostic suites directly inside a sandboxed developer environment.
             </p>
           </motion.div>
         </div>
 
-        {/* Dashboard Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-          {/* Left Column: WhatsApp Application Router */}
-          <motion.div
-            initial={{ opacity: 0, x: -15 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.4, delay: 0.1 }}
-            className="lg:col-span-5 space-y-6"
-          >
-            <div className="bg-white p-2 rounded-[32px] shadow-sm border border-slate-100 flex justify-center">
-              <WhatsAppSimulator inline={true} />
-            </div>
-          </motion.div>
+        {/* Messaging & Chat Diagnostics Suite */}
+        <motion.div
+          initial={{ opacity: 0, y: 15 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.05 }}
+        >
+          <ChatMessagingTester inline={false} />
+        </motion.div>
 
-          {/* Right Column: Database Seeder and Connection Tester */}
-          <motion.div
-            initial={{ opacity: 0, x: 15 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.4, delay: 0.2 }}
-            className="lg:col-span-7 space-y-8"
-          >
-            {/* Database Connection Tester Card */}
-            <div className="bg-white p-2 rounded-[32px] shadow-sm border border-slate-100 flex justify-center">
-              <DatabaseTesterModal inline={true} />
-            </div>
-
-            {/* Database & Auth Seeding Card */}
-            <div className="bg-white p-2 rounded-[32px] shadow-sm border border-slate-100 flex justify-center">
-              <DatabaseSeederModal inline={true} />
-            </div>
-          </motion.div>
-        </div>
+        {/* Database Connection Tester Card */}
+        <motion.div
+          initial={{ opacity: 0, y: 15 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.1 }}
+          className="space-y-6"
+        >
+          <div className="bg-white p-2 rounded-[32px] shadow-sm border border-slate-100 flex justify-center">
+            <DatabaseTesterModal inline={true} />
+          </div>
+        </motion.div>
       </div>
     </div>
   );

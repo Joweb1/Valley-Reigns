@@ -8,7 +8,10 @@ import {
   isTimestampOnTime,
   formatTimeStr,
   isReportSubmissionReopened,
-  subscribeToReportReopens
+  subscribeToReportReopens,
+  isDeadlinePassedForDate,
+  getStaffReportDeadlineConfig,
+  getAppSettings
 } from "../lib/services";
 import { StaffDailyReport, StaffResumptionRecord } from "../types";
 import { CandidateListSummarySection } from "./CandidateListSummarySection";
@@ -55,12 +58,24 @@ export const StaffReportForm: React.FC<{ onSuccess?: () => void }> = ({ onSucces
 
   // Staff Resumption (9:00 AM Resumption SLA) & Reopen Override states
   const [resumptionRecord, setResumptionRecord] = useState<StaffResumptionRecord | null>(null);
+  const [slaDeadlineConfig, setSlaDeadlineConfig] = useState(() => getStaffReportDeadlineConfig());
   const [reopenInfo, setReopenInfo] = useState<{
     isReopened: boolean;
     remainingMs: number;
     expiresAt: number | null;
     reopenedAt: number | null;
   }>({ isReopened: false, remainingMs: 0, expiresAt: null, reopenedAt: null });
+
+  useEffect(() => {
+    getAppSettings().then(() => {
+      setSlaDeadlineConfig(getStaffReportDeadlineConfig());
+    });
+    const handleSettingsUpdate = () => {
+      setSlaDeadlineConfig(getStaffReportDeadlineConfig());
+    };
+    window.addEventListener("vr_app_settings_updated", handleSettingsUpdate);
+    return () => window.removeEventListener("vr_app_settings_updated", handleSettingsUpdate);
+  }, []);
 
   useEffect(() => {
     const unsub = subscribeToDailyReports((reports) => {
@@ -106,21 +121,9 @@ export const StaffReportForm: React.FC<{ onSuccess?: () => void }> = ({ onSucces
 
   const localTodayStr = getLocalTodayString();
 
-  const deadlinePassed = (() => {
-    if (date < localTodayStr) {
-      return true;
-    }
-    if (date === localTodayStr) {
-      const now = new Date();
-      const currentHour = now.getHours();
-      if (currentHour >= 21) {
-        return true;
-      }
-    }
-    return false;
-  })();
+  const deadlinePassed = isDeadlinePassedForDate(date);
 
-  // If 9:00 PM deadline passed, read-only EXCEPT if admin reopened submission for this staff
+  // If SLA deadline passed, read-only EXCEPT if admin reopened submission for this staff
   const isReadOnly = deadlinePassed && !reopenInfo.isReopened;
 
   // Morning Resumption SLA (9:00 AM)
@@ -292,7 +295,7 @@ export const StaffReportForm: React.FC<{ onSuccess?: () => void }> = ({ onSucces
               </span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-slate-600">Submitted before 9:00 PM:</span>
+              <span className="text-slate-600">Submitted before {slaDeadlineConfig.time12}:</span>
               <span className={`font-bold font-mono px-2 py-0.5 rounded text-[10px] ${targetOnTimeMet ? "bg-blue-100 text-blue-800" : "bg-amber-100 text-amber-800"}`}>
                 {targetOnTimeMet ? `MET (${submitTimeStr})` : `UNMET (${submitTimeStr})`}
               </span>
@@ -391,12 +394,12 @@ export const StaffReportForm: React.FC<{ onSuccess?: () => void }> = ({ onSucces
             <AlertCircle className="w-5 h-5 text-amber-600 shrink-0" />
             <div>
               <p className="text-xs font-bold text-amber-900">
-                {date < localTodayStr ? "Past Day (Read-Only Mode)" : "9:00 PM Deadline Reached (Read-Only Mode)"}
+                {date < localTodayStr ? "Past Day (Read-Only Mode)" : `${slaDeadlineConfig.time12} Deadline Reached (Read-Only Mode)`}
               </p>
               <p className="text-[10px] text-amber-700 mt-0.5">
                 {date < localTodayStr
                   ? "Daily report submissions for past days are closed. Ask an admin to reopen submission if required."
-                  : "The 9:00 PM daily deadline has passed. Contact an admin to reopen submission for your account."}
+                  : `The ${slaDeadlineConfig.time12} daily deadline has passed. Contact an admin to reopen submission for your account.`}
               </p>
             </div>
           </motion.div>
@@ -446,7 +449,7 @@ export const StaffReportForm: React.FC<{ onSuccess?: () => void }> = ({ onSucces
             </div>
 
             <p className="text-xs text-white/80 max-w-lg leading-relaxed pt-0.5">
-              Hello, <span className="font-bold text-white underline">{currentUser?.displayName}</span>. Complete and submit your targets, candidate registrations, address logs, and chats status on or before <span className="underline font-bold">9:00 PM</span>.
+              Hello, <span className="font-bold text-white underline">{currentUser?.displayName}</span>. Complete and submit your targets, candidate registrations, address logs, and chats status on or before <span className="underline font-bold">{slaDeadlineConfig.time12}</span>.
             </p>
           </div>
         </div>
@@ -477,7 +480,7 @@ export const StaffReportForm: React.FC<{ onSuccess?: () => void }> = ({ onSucces
                   title="Click to view SLA details"
                 >
                   <Clock className="w-3 h-3" />
-                  <span>SLA: 9:00 PM</span>
+                  <span>SLA: {slaDeadlineConfig.time12}</span>
                   <Info className="w-3 h-3 text-blue-600 shrink-0 ml-0.5" />
                 </button>
 
@@ -505,7 +508,7 @@ export const StaffReportForm: React.FC<{ onSuccess?: () => void }> = ({ onSucces
                             </div>
                             <div>
                               <h4 className="text-xs font-bold text-white tracking-wide">SLA Target Time</h4>
-                              <p className="text-[10px] text-slate-400 font-mono">9:00 PM Daily</p>
+                              <p className="text-[10px] text-slate-400 font-mono">{slaDeadlineConfig.label}</p>
                             </div>
                           </div>
                           <button
@@ -518,17 +521,17 @@ export const StaffReportForm: React.FC<{ onSuccess?: () => void }> = ({ onSucces
                         </div>
 
                         <p className="text-[11px] text-slate-300 leading-snug">
-                          Daily staff reports must be submitted on or before 9:00 PM to meet compliance.
+                          Daily staff reports must be submitted on or before {slaDeadlineConfig.time12} to meet compliance.
                         </p>
 
                         <div className="bg-slate-800/80 border border-slate-700/60 rounded-xl p-2 space-y-1 text-[10px]">
                           <div className="flex items-center gap-1.5 text-emerald-300">
                             <CheckCircle2 className="w-3 h-3 shrink-0" />
-                            <span>Before 9:00 PM: On-Time</span>
+                            <span>Before {slaDeadlineConfig.time12}: On-Time</span>
                           </div>
                           <div className="flex items-center gap-1.5 text-amber-300">
                             <AlertCircle className="w-3 h-3 shrink-0" />
-                            <span>After 9:00 PM: SLA Exception</span>
+                            <span>After {slaDeadlineConfig.time12}: SLA Exception</span>
                           </div>
                         </div>
                       </motion.div>
@@ -832,7 +835,7 @@ export const StaffReportForm: React.FC<{ onSuccess?: () => void }> = ({ onSucces
           {/* Screenshot Proof Uploader */}
           <div className="space-y-2">
             <span className="block text-xs font-bold text-slate-700">Screenshot / File Proof Upload (ImageKit CDN)</span>
-            <span className="block text-[10px] text-slate-400">Provide image, PDF or document proof that all WhatsApp/In-app candidate channels have been cleared.</span>
+            <span className="block text-[10px] text-slate-400">Provide image, PDF or document proof that all candidate communication channels have been cleared.</span>
             
             <input 
               ref={fileInputRef}

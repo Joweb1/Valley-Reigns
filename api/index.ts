@@ -1,200 +1,304 @@
+import "dotenv/config";
 import express from "express";
+import crypto from "crypto";
 import { initializeApp } from "firebase/app";
-import { getFirestore, doc, getDoc, updateDoc, setDoc, collection, getDocs } from "firebase/firestore";
-import { getDatabase, ref, set } from "firebase/database";
+import { 
+  getFirestore, 
+  doc, 
+  getDoc, 
+  setDoc, 
+  collection, 
+  getDocs, 
+  deleteDoc 
+} from "firebase/firestore";
+import webpush from "web-push";
 
 const app = express();
+
+// Security & Header Configuration
+app.disable("x-powered-by");
+app.use((req, res, next) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "SAMEORIGIN");
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  next();
+});
+
+// Standard JSON body parser for general API endpoints
+app.use(express.json({ limit: "1mb" }));
+app.use(express.urlencoded({ limit: "1mb", extended: true }));
+
+// Higher payload parser exclusively for media/file upload endpoint
+const uploadJsonParser = express.json({ limit: "25mb" });
 
 // Dynamic Firebase credentials safely split to prevent GitHub secret scans
 const DEFAULT_KEY_PART1 = "AIzaSyCviINa6";
 const DEFAULT_KEY_PART2 = "wlqGvTIOIlk9FN4-Kc-vOUpah4";
 
 const firebaseConfig = {
-  projectId: process.env.FIREBASE_PROJECT_ID || "gen-lang-client-0916743897",
-  appId: process.env.FIREBASE_APP_ID || "1:926249999164:web:30f871772d87bca5e01c39",
-  apiKey: process.env.FIREBASE_API_KEY || (DEFAULT_KEY_PART1 + DEFAULT_KEY_PART2),
-  authDomain: process.env.FIREBASE_AUTH_DOMAIN || "gen-lang-client-0916743897.firebaseapp.com",
-  firestoreDatabaseId: process.env.FIREBASE_FIRESTORE_DATABASE_ID || "ai-studio-valleyreigns-b8be1d27-7bef-4ee3-8468-1b1246b9b417",
-  storageBucket: process.env.FIREBASE_STORAGE_BUCKET || "gen-lang-client-0916743897.firebasestorage.app",
-  messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID || "926249999164",
-  databaseURL: process.env.FIREBASE_DATABASE_URL || "https://gen-lang-client-0916743897-default-rtdb.firebaseio.com/"
+  projectId: process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID || "gen-lang-client-0916743897",
+  appId: process.env.FIREBASE_APP_ID || process.env.VITE_FIREBASE_APP_ID || "1:926249999164:web:30f871772d87bca5e01c39",
+  apiKey: process.env.FIREBASE_API_KEY || process.env.VITE_FIREBASE_API_KEY || (DEFAULT_KEY_PART1 + DEFAULT_KEY_PART2),
+  authDomain: process.env.FIREBASE_AUTH_DOMAIN || process.env.VITE_FIREBASE_AUTH_DOMAIN || "gen-lang-client-0916743897.firebaseapp.com",
+  firestoreDatabaseId: process.env.FIREBASE_FIRESTORE_DATABASE_ID || process.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID || "ai-studio-valleyreigns-b8be1d27-7bef-4ee3-8468-1b1246b9b417",
+  storageBucket: process.env.FIREBASE_STORAGE_BUCKET || process.env.VITE_FIREBASE_STORAGE_BUCKET || "gen-lang-client-0916743897.firebasestorage.app",
+  messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID || process.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "926249999164"
 };
 
 // Initialize Firebase App & Firestore
 const firebaseApp = initializeApp(firebaseConfig);
 const db = getFirestore(firebaseApp, firebaseConfig.firestoreDatabaseId);
 
-// Active Presence Sync checking for offline staff members based on heartbeat timeouts
-async function checkAndCleanStaffStatuses() {
-  try {
-    const statusesCol = collection(db, "staff_statuses");
-    const snap = await getDocs(statusesCol);
-    const now = Date.now();
-    const threshold = 3 * 60 * 1000; // 3 minutes (3x the 1 minute heartbeat window)
-    
-    // Initialize Realtime Database
-    let rtdbInstance: any = null;
-    try {
-      rtdbInstance = getDatabase(firebaseApp);
-    } catch (e) {
-      console.warn("[Presence Sync] Could not load Realtime Database:", e);
-    }
-
-    for (const d of snap.docs) {
-      const data = d.data();
-      if (data.status === "online" && data.lastActive) {
-        const timeDiff = now - data.lastActive;
-        if (timeDiff > threshold) {
-          console.log(`[Presence Sync] Staff/Admin ${d.id} is marked online but has been inactive for ${Math.round(timeDiff / 1000)}s. Force-marking offline.`);
-          
-          // 1. Mark offline in Firestore
-          await setDoc(doc(db, "staff_statuses", d.id), {
-            status: "offline",
-            lastActive: data.lastActive
-          }, { merge: true });
-
-          // 2. Mark offline in RTDB
-          if (rtdbInstance) {
-            try {
-              const rtdbRef = ref(rtdbInstance, `staff_statuses/${d.id}`);
-              await set(rtdbRef, {
-                status: "offline",
-                lastActive: data.lastActive
-              });
-            } catch (err) {
-              console.warn(`[Presence Sync] Failed to update RTDB for ${d.id}:`, err);
-            }
-          }
-        }
-      }
-    }
-  } catch (error) {
-    console.error("[Presence Sync] Error checking and cleaning staff statuses:", error);
-  }
-}
-
-// Middleware
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-
-// API health endpoints for uptime pingers
+// ---------------------------------------------------------
+// Fast Health & Uptime Endpoints
+// ---------------------------------------------------------
 app.get("/api/health", (req, res) => {
-  res.status(200).json({ status: "ok" });
-  checkAndCleanStaffStatuses().catch(err => console.error("Error in checkAndCleanStaffStatuses:", err));
+  res.status(200).json({ 
+    status: "ok", 
+    uptime: Math.floor(process.uptime()), 
+    timestamp: Date.now() 
+  });
 });
 
 app.get("/ping", (req, res) => {
   res.status(200).send("OK");
-  checkAndCleanStaffStatuses().catch(err => console.error("Error in checkAndCleanStaffStatuses:", err));
 });
 
-// Meta WhatsApp Webhook GET Verification
-app.get("/api/webhook/whatsapp", async (req, res) => {
-  const mode = req.query["hub.mode"];
-  const token = req.query["hub.verify_token"];
-  const challenge = req.query["hub.challenge"];
+// ---------------------------------------------------------
+// ImageKit Authentication & Proxy Upload Endpoints
+// ---------------------------------------------------------
+app.get("/api/imagekit-auth", (req, res) => {
+  try {
+    const privateKey = process.env.IMAGEKIT_PRIVATE_KEY;
+    if (!privateKey) {
+      res.status(500).json({ error: "IMAGEKIT_PRIVATE_KEY is not configured on the server." });
+      return;
+    }
 
-  console.log(`[WHATSAPP WEBHOOK VERIFICATION] hub.mode: ${mode}, hub.verify_token: ${token}`);
+    const token = (req.query.token as string) || crypto.randomUUID();
+    const expire = (req.query.expire as string) || String(Math.floor(Date.now() / 1000) + 2400);
 
-  if (mode === "subscribe" && token) {
-    try {
-      const configDoc = await getDoc(doc(db, "settings", "whatsapp"));
-      const configData = configDoc.exists() ? configDoc.data() : null;
-      const expectedToken = configData?.verifyToken || "valleyreigns_verify_token";
+    const signature = crypto
+      .createHmac("sha1", privateKey)
+      .update(token + expire)
+      .digest("hex");
 
-      if (token === expectedToken) {
-        console.log("[WHATSAPP WEBHOOK VERIFICATION] Success! Returning challenge:", challenge);
-        res.status(200).send(challenge);
-        return;
+    res.json({
+      token,
+      expire,
+      signature,
+      publicKey: process.env.IMAGEKIT_PUBLIC_KEY || "public_7cIQfpYvqi4X6yx3g4c+6BnOZOA=",
+      urlEndpoint: process.env.IMAGEKIT_URL_ENDPOINT || "https://ik.imagekit.io/deglio1ni"
+    });
+  } catch (err: any) {
+    console.error("[ImageKit Auth Error]", err);
+    res.status(500).json({ error: err.message || "Failed to generate ImageKit auth signature" });
+  }
+});
+
+app.post("/api/upload", uploadJsonParser, async (req, res, next) => {
+  try {
+    const privateKey = process.env.IMAGEKIT_PRIVATE_KEY;
+    if (!privateKey) {
+      res.status(500).json({ error: "IMAGEKIT_PRIVATE_KEY is not configured on the server." });
+      return;
+    }
+
+    const { file, fileName, folder } = req.body;
+    if (!file || !fileName) {
+      res.status(400).json({ error: "Missing required fields: 'file' (base64 string or URL) and 'fileName'." });
+      return;
+    }
+
+    const safeFileName = String(fileName).replace(/[^a-zA-Z0-9._-]/g, "_");
+    const authHeader = "Basic " + Buffer.from(privateKey + ":").toString("base64");
+
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("fileName", safeFileName);
+    formData.append("useUniqueFileName", "true");
+    if (folder) {
+      formData.append("folder", String(folder).replace(/[^a-zA-Z0-9_\-\/]/g, ""));
+    }
+
+    const ikRes = await fetch("https://upload.imagekit.io/api/v1/files/upload", {
+      method: "POST",
+      headers: {
+        "Authorization": authHeader
+      },
+      body: formData
+    });
+
+    const ikData = await ikRes.json();
+    if (!ikRes.ok) {
+      console.error("[ImageKit Upload API Error]", ikData);
+      res.status(ikRes.status || 400).json({ error: ikData?.message || "Failed to upload file to ImageKit." });
+      return;
+    }
+
+    res.json({
+      success: true,
+      url: ikData.url,
+      fileId: ikData.fileId,
+      name: ikData.name,
+      fileType: ikData.fileType || "file",
+      thumbnailUrl: ikData.thumbnailUrl || ikData.url,
+      size: ikData.size
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ---------------------------------------------------------
+// Push Subscription REST API Endpoints
+// ---------------------------------------------------------
+app.get("/api/push/public-key", async (req, res, next) => {
+  try {
+    const envPublic = process.env.VAPID_PUBLIC_KEY;
+    if (envPublic) {
+      res.status(200).json({ publicKey: envPublic.trim() });
+      return;
+    }
+
+    const vapidRef = doc(db, "settings", "vapid");
+    const vapidSnap = await getDoc(vapidRef);
+    if (vapidSnap.exists()) {
+      res.status(200).json({ publicKey: vapidSnap.data().publicKey });
+      return;
+    }
+
+    res.status(503).json({ error: "VAPID keys are initializing. Please retry in a few seconds." });
+  } catch (err) {
+    next(err);
+  }
+});
+
+app.post("/api/push/subscribe", async (req, res, next) => {
+  const { subscription, userId, role, email, displayName } = req.body;
+  if (!subscription || !subscription.endpoint) {
+    res.status(400).json({ error: "Missing required W3C subscription endpoint." });
+    return;
+  }
+
+  try {
+    const subId = Buffer.from(subscription.endpoint).toString("base64").substring(0, 100).replace(/[^a-zA-Z0-9_-]/g, "");
+    const subData = {
+      id: subId,
+      endpoint: subscription.endpoint,
+      keys: subscription.keys || {},
+      userId: userId || null,
+      role: role || null,
+      email: email || null,
+      displayName: displayName || null,
+      createdAt: Date.now()
+    };
+
+    await setDoc(doc(db, "push_subscriptions", subId), subData);
+    res.status(200).json({ success: true, id: subId });
+  } catch (err) {
+    next(err);
+  }
+});
+
+app.post("/api/push/unsubscribe", async (req, res, next) => {
+  const { endpoint } = req.body;
+  if (!endpoint) {
+    res.status(400).json({ error: "Missing subscription endpoint." });
+    return;
+  }
+
+  try {
+    const subId = Buffer.from(endpoint).toString("base64").substring(0, 100).replace(/[^a-zA-Z0-9_-]/g, "");
+    await deleteDoc(doc(db, "push_subscriptions", subId));
+    res.status(200).json({ success: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
+app.post("/api/push/test", async (req, res, next) => {
+  const { title, body, endpoint } = req.body;
+  const testTitle = title || "True Web Push Test";
+  const testBody = body || "Native browser-level push notifications are active and working!";
+
+  try {
+    const envPublic = process.env.VAPID_PUBLIC_KEY;
+    const envPrivate = process.env.VAPID_PRIVATE_KEY;
+    let pubKey = envPublic?.trim();
+    let privKey = envPrivate?.trim();
+
+    if (!pubKey || !privKey) {
+      const vapidSnap = await getDoc(doc(db, "settings", "vapid"));
+      if (vapidSnap.exists()) {
+        pubKey = vapidSnap.data().publicKey;
+        privKey = vapidSnap.data().privateKey;
+      }
+    }
+
+    if (!pubKey || !privKey) {
+      res.status(500).json({ error: "VAPID credentials not configured." });
+      return;
+    }
+
+    webpush.setVapidDetails("mailto:admin@valleyreigns.com", pubKey, privKey);
+
+    if (endpoint) {
+      const subId = Buffer.from(endpoint).toString("base64").substring(0, 100).replace(/[^a-zA-Z0-9_-]/g, "");
+      const subSnap = await getDoc(doc(db, "push_subscriptions", subId));
+      if (subSnap.exists()) {
+        const subData = subSnap.data();
+        await webpush.sendNotification({ endpoint: subData.endpoint, keys: subData.keys || {} }, JSON.stringify({ title: testTitle, body: testBody, tag: "test-alert" }));
+        res.status(200).json({ success: true, message: "Targeted test push sent." });
       } else {
-        console.warn(`[WHATSAPP WEBHOOK VERIFICATION] Failed: Expected token "${expectedToken}" but received "${token}"`);
-        res.status(403).send("Forbidden: Verification token mismatch");
+        res.status(404).json({ error: "Subscription endpoint not recognized." });
+      }
+    } else {
+      const subsSnap = await getDocs(collection(db, "push_subscriptions"));
+      if (subsSnap.empty) {
+        res.status(404).json({ error: "No devices registered." });
         return;
       }
-    } catch (err) {
-      console.error("[WHATSAPP WEBHOOK VERIFICATION] Error fetching config from Firestore:", err);
-      // Fallback verification token
-      const expectedToken = process.env.WHATSAPP_VERIFY_TOKEN || "valleyreigns_verify_token";
-      if (token === expectedToken) {
-        res.status(200).send(challenge);
-        return;
-      }
-      res.status(500).send("Internal server error during verification");
-      return;
+
+      await Promise.all(
+        subsSnap.docs.map(d => {
+          const subData = d.data();
+          return webpush.sendNotification(
+            { endpoint: subData.endpoint, keys: subData.keys || {} }, 
+            JSON.stringify({ title: testTitle, body: testBody, tag: "test-alert" })
+          ).catch(() => {});
+        })
+      );
+      res.status(200).json({ success: true, message: `Broadcast test sent to ${subsSnap.size} devices.` });
     }
+  } catch (err) {
+    next(err);
   }
-  res.status(400).send("Bad Request: Missing parameters");
 });
 
-// Meta WhatsApp Webhook POST Payload Event Handler
-app.post("/api/webhook/whatsapp", async (req, res) => {
-  const body = req.body;
-  console.log("[WHATSAPP WEBHOOK EVENT] Incoming Payload:", JSON.stringify(body, null, 2));
+// ---------------------------------------------------------
+// Central API 404 Handler for undefined API routes
+// ---------------------------------------------------------
+app.all("/api/*", (req, res) => {
+  res.status(404).json({ 
+    success: false, 
+    error: `API endpoint not found: ${req.method} ${req.path}` 
+  });
+});
 
-  if (body.object === "whatsapp_business_account") {
-    try {
-      if (
-        body.entry &&
-        body.entry[0] &&
-        body.entry[0].changes &&
-        body.entry[0].changes[0] &&
-        body.entry[0].changes[0].value &&
-        body.entry[0].changes[0].value.messages &&
-        body.entry[0].changes[0].value.messages[0]
-      ) {
-        const changeValue = body.entry[0].changes[0].value;
-        const message = changeValue.messages[0];
-        const from = message.from; // Phone number
-        const text = message.text ? message.text.body : "Media or Unsupported Message Type";
-        const name = changeValue.contacts && changeValue.contacts[0] ? changeValue.contacts[0].profile.name : "WhatsApp User";
-
-        console.log(`[WHATSAPP WEBHOOK EVENT] Text message from ${name} (${from}): "${text}"`);
-
-        const chatId = `whatsapp-${from}`;
-        const convRef = doc(db, "conversations", chatId);
-        const docSnap = await getDoc(convRef);
-
-        const newMessage = {
-          sender: "customer" as const,
-          text: text,
-          timestamp: Date.now()
-        };
-
-        if (docSnap.exists()) {
-          const currentData = docSnap.data();
-          const messages = Array.isArray(currentData.messages) ? currentData.messages : [];
-          await updateDoc(convRef, {
-            text: text,
-            lastMessageAt: Date.now(),
-            messages: [...messages, newMessage]
-          });
-        } else {
-          // Create new chat session
-          await setDoc(convRef, {
-            chatId: chatId,
-            name: `${name} (${from})`,
-            category: "General",
-            text: text,
-            status: "unassigned",
-            assignedTo: "",
-            assignedToName: "",
-            lastMessageAt: Date.now(),
-            createdAt: Date.now(),
-            messages: [newMessage]
-          });
-        }
-        console.log(`[WHATSAPP WEBHOOK EVENT] Successfully synchronized message to Firestore conversation "${chatId}"`);
-      }
-      res.sendStatus(200);
-      return;
-    } catch (err) {
-      console.error("[WHATSAPP WEBHOOK EVENT] Error processing webhook event payload:", err);
-      res.status(500).send("Internal server error handling event payload");
-      return;
-    }
+// ---------------------------------------------------------
+// Central Express Error Handling Middleware
+// ---------------------------------------------------------
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  console.error(`[API Error] ${req.method} ${req.url}:`, err);
+  if (res.headersSent) {
+    return next(err);
   }
-
-  res.sendStatus(404);
+  const statusCode = typeof err.statusCode === "number" ? err.statusCode : (typeof err.status === "number" ? err.status : 500);
+  res.status(statusCode).json({
+    success: false,
+    error: err.message || "Internal server error"
+  });
 });
 
 export default app;

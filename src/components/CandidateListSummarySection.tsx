@@ -303,22 +303,16 @@ export const CandidateListSummarySection: React.FC<CandidateListSummarySectionPr
             </div>
           ) : (
             <div className="divide-y divide-slate-100 max-h-80 overflow-y-auto">
-              {detailedRecords.map((log) => {
+              {detailedRecords.map((log, idx) => {
                 const config = CANDIDATE_LIST_CONFIG.find(c => c.id === log.listName);
                 const isAdded = log.action === "added";
                 const d = new Date(log.timestamp);
                 const timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-                // Check if this log is for a WhatsApp chat (only WhatsApp chats show mobile number)
-                const isWhatsApp = Boolean(
-                  !log.chatId?.startsWith("inapp_") && 
-                  log.customerPhone && 
-                  (log.customerPhone.startsWith("+") || /^\+?\d[\d\s\-\(\)]{6,}$/.test(log.customerPhone))
-                );
-                const displayName = log.customerName || (isWhatsApp ? log.customerPhone : "Candidate");
+                const displayName = log.customerName || log.customerPhone || "Candidate";
 
                 return (
-                  <div key={log.id} className="p-3.5 bg-white hover:bg-slate-50/80 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                  <div key={log.id ? `${log.id}-${idx}` : `log-${idx}-${log.timestamp}`} className="p-3.5 bg-white hover:bg-slate-50/80 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
                     <div className="flex items-center gap-3">
                       <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${config?.lightBg || "bg-slate-100"}`}>
                         {config ? (
@@ -330,7 +324,7 @@ export const CandidateListSummarySection: React.FC<CandidateListSummarySectionPr
                       <div>
                         <div className="flex items-center gap-2">
                           <span className="text-xs font-bold text-slate-800">{displayName}</span>
-                          {isWhatsApp && log.customerPhone && (
+                          {log.customerPhone && log.customerName && log.customerPhone !== log.customerName && (
                             <span className="text-[10px] font-mono text-slate-400">({log.customerPhone})</span>
                           )}
                         </div>

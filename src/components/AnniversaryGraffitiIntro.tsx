@@ -16,6 +16,7 @@ import {
   CheckCircle2,
   Share2
 } from "lucide-react";
+import { copyToClipboard } from "../lib/clipboard";
 
 interface AnniversaryGraffitiIntroProps {
   onComplete: () => void;
@@ -384,11 +385,15 @@ export const AnniversaryGraffitiIntro: React.FC<AnniversaryGraffitiIntroProps> =
     }
   };
 
-  const handleShare = () => {
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(window.location.href);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2500);
+  const handleShare = async () => {
+    try {
+      const success = await copyToClipboard(window.location.href);
+      if (success) {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2500);
+      }
+    } catch (err) {
+      console.debug("Share copy error:", err);
     }
   };
 

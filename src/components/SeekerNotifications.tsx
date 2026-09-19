@@ -3,6 +3,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { getSystemNotifications, markNotificationAsRead } from "../lib/services";
 import { SystemNotification } from "../types";
+import { useInfinitePagination, InfiniteScrollLoader } from "./InfiniteScrollLoader";
 import { 
   Bell, 
   ArrowLeft, 
@@ -55,6 +56,16 @@ export const SeekerNotifications: React.FC = () => {
     const interval = setInterval(fetchNotifications, 8000);
     return () => clearInterval(interval);
   }, [currentUser]);
+
+  const {
+    displayedItems: displayedNotifications,
+    hasMore,
+    isLoadingMore,
+    loadMore,
+    sentinelRef,
+    totalCount,
+    displayedCount
+  } = useInfinitePagination<SystemNotification>(notifications, { pageSize: 8, initialPageSize: 8 }, [notifications.length]);
 
   const handleMarkAsRead = async (id: string) => {
     try {
@@ -249,7 +260,7 @@ export const SeekerNotifications: React.FC = () => {
         ) : (
           <div className="space-y-3">
             <AnimatePresence initial={false}>
-              {notifications.map((notif) => (
+              {displayedNotifications.map((notif) => (
                 <motion.div
                   key={notif.id}
                   layout
@@ -314,6 +325,16 @@ export const SeekerNotifications: React.FC = () => {
                 </motion.div>
               ))}
             </AnimatePresence>
+
+            <InfiniteScrollLoader
+              hasMore={hasMore}
+              isLoadingMore={isLoadingMore}
+              onLoadMore={loadMore}
+              sentinelRef={sentinelRef}
+              totalCount={totalCount}
+              displayedCount={displayedCount}
+              itemLabel="notifications"
+            />
           </div>
         )}
       </div>

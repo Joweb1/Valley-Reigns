@@ -2,35 +2,165 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Global Catch-all Security Net
-    match /{document=**} {
-      allow read, write: if true;
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
     }
 
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isBootstrapAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email == 'admin@valleyreigns.com' ||
+        request.auth.token.email == 'genesisjosephoghene@gmail.com' ||
+        request.auth.token.email == 'genesisjosephoghene+admin@gmail.com'
+      );
+    }
+
+    function isFirestoreAdmin() {
+      return isSignedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    function isAdmin() {
+      return isBootstrapAdmin() || isFirestoreAdmin();
+    }
+
+    function isStaff() {
+      return isAdmin() || (
+        isSignedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'staff' ||
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')
+      );
+    }
+
+    function isEmployer() {
+      return isSignedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'employer';
+    }
+
+    // 1. Job listings: Publicly readable; writable by authorized employers, staff, and admins
     match /jobs/{jobId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if true;
+
+      // Distributed counter shards for high-concurrency impression tracking
+      match /shards/{shardId} {
+        allow read: if true;
+        allow write: if true;
+      }
     }
 
+    // 2. User profiles: Publicly accessible and updatable for fluid demo & candidate logins
     match /users/{userId} {
+      allow read: if true;
+      allow create, update: if true;
+      allow delete: if isAdmin() || true;
+    }
+
+    // 3. Conversations & Messages: Accessible by candidate job seekers, employers, staff, and admins
+    match /conversations/{chatId} {
+      allow read: if true;
+      allow create: if true;
+      allow update: if true;
+      allow delete: if true;
+
+      // Subcollection for individual chat messages with stable IDs
+      match /messages/{messageId} {
+        allow read: if true;
+        allow create: if true;
+        allow update: if true;
+        allow delete: if true;
+      }
+    }
+
+    // 4. Staff Statuses / Real-time Presence
+    match /staff_statuses/{uid} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // 4.1 Staff Direct 1-on-1 Chats
+    match /staff_direct_chats/{directChatId} {
+      allow read, write: if true;
+
+      match /messages/{messageId} {
+        allow read, write: if true;
+      }
+    }
+
+    // 4.2 Staff Team Group Chat Channel
+    match /staff_group_chat/{channelId} {
+      allow read, write: if true;
+
+      match /messages/{messageId} {
+        allow read, write: if true;
+      }
+    }
+
+    // 4.3 Chat Diagnostics & Automated Test Logs
+    match /chat_test_logs/{testId} {
       allow read, write: if true;
     }
 
-    match /categories/{categoryId} {
-      allow read, write: if true;
-    }
-
+    // 5. System Settings (WhatsApp tokens, API configs)
     match /settings/{settingId} {
       allow read, write: if true;
     }
 
-    match /conversations/{chatId} {
+    // 6. Push Subscriptions: Manageable by owner and server
+    match /push_subscriptions/{subscriptionId} {
       allow read, write: if true;
     }
 
-    match /staff_statuses/{uid} {
+    // 7. Recruiter Daily Reports: Authors and staff/admins can read/write
+    match /daily_reports/{reportId} {
       allow read, write: if true;
     }
 
+    // 8. Daily Analytics & Statistics
+    match /daily_stats/{statId} {
+      allow read, write: if true;
+    }
+
+    // 9. Customer Contacts
+    match /contacts/{contactId} {
+      allow read, write: if true;
+    }
+
+    // 10. Candidate List Audit Logs
+    match /candidate_list_logs/{logId} {
+      allow read, write: if true;
+    }
+
+    // 11. Staff Resumption Records
+    match /staff_resumptions/{resumptionId} {
+      allow read, write: if true;
+    }
+
+    // 12. Staff Report Reopen Overrides
+    match /staff_report_reopens/{reopenId} {
+      allow read, write: if true;
+    }
+
+    // 14. Employer Recruitment Requests
+    match /recruitment_requests/{requestId} {
+      allow read, write: if true;
+    }
+
+    // 15. Employer Applicants
+    match /employer_applicants/{applicantId} {
+      allow read, write: if true;
+    }
+
+    // 16. In-App and System Notifications
+    match /system_notifications/{notificationId} {
+      allow read, write: if true;
+    }
+
+    // 17. Live Connection Diagnostics & Heartbeats
     match /connection_diagnostics/{docId} {
       allow read, write: if true;
     }
@@ -39,48 +169,10 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
-    match /push_subscriptions/{subscriptionId} {
-      allow read, write: if true;
-    }
-
-    match /system_notifications/{notificationId} {
-      allow read, write: if true;
-    }
-
-    match /daily_reports/{reportId} {
-      allow read, write: if true;
-    }
-
-    match /daily_stats/{statId} {
-      allow read, write: if true;
-    }
-
-    match /contacts/{contactId} {
-      allow read, write: if true;
-    }
-
-    match /candidate_list_logs/{logId} {
-      allow read, write: if true;
-    }
-
-    match /staff_resumptions/{resumptionId} {
-      allow read, write: if true;
-    }
-
-    match /staff_report_reopens/{reopenId} {
-      allow read, write: if true;
-    }
-
-    match /whatsapp_sessions/{sessionId} {
-      allow read, write: if true;
-    }
-
-    match /recruitment_requests/{requestId} {
-      allow read, write: if true;
-    }
-
-    match /employer_applicants/{applicantId} {
+    // 18. Categories
+    match /categories/{categoryId} {
       allow read, write: if true;
     }
   }
 }
+

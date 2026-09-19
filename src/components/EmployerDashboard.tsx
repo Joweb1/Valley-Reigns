@@ -21,6 +21,7 @@ import {
   addSystemNotification,
   memoryStore
 } from "../lib/services";
+import { useInfinitePagination, InfiniteScrollLoader } from "./InfiniteScrollLoader";
 import { 
   Building2, 
   Briefcase, 
@@ -356,7 +357,7 @@ export const EmployerDashboard: React.FC = () => {
     if (selectedApplicant?.id === id) {
       setSelectedApplicant(prev => prev ? { ...prev, status, interviewDate, notes } : null);
     }
-    showToast(`Applicant status updated to: ${status.replace("_", " ").toUpperCase()}`);
+    showToast(`Applicant status updated to: ${(status || "").replace("_", " ").toUpperCase()}`);
   };
 
   // Save Profile
@@ -412,6 +413,36 @@ export const EmployerDashboard: React.FC = () => {
     if (applicantFilter === "all") return true;
     return a.status === applicantFilter;
   });
+
+  const {
+    displayedItems: displayedApplicants,
+    hasMore: hasMoreApplicants,
+    isLoadingMore: isLoadingMoreApplicants,
+    loadMore: loadMoreApplicants,
+    sentinelRef: applicantsSentinelRef,
+    totalCount: totalApplicantsPaginationCount,
+    displayedCount: displayedApplicantsCount
+  } = useInfinitePagination<EmployerApplicant>(filteredApplicants, { pageSize: 8, initialPageSize: 8 }, [applicantFilter, applicants.length]);
+
+  const {
+    displayedItems: displayedEmployerJobs,
+    hasMore: hasMoreEmployerJobs,
+    isLoadingMore: isLoadingMoreEmployerJobs,
+    loadMore: loadMoreEmployerJobs,
+    sentinelRef: employerJobsSentinelRef,
+    totalCount: totalEmployerJobsPaginationCount,
+    displayedCount: displayedEmployerJobsCount
+  } = useInfinitePagination<Job>(jobs, { pageSize: 8, initialPageSize: 8 }, [jobs.length]);
+
+  const {
+    displayedItems: displayedRecruitmentRequests,
+    hasMore: hasMoreRecruitmentRequests,
+    isLoadingMore: isLoadingMoreRecruitmentRequests,
+    loadMore: loadMoreRecruitmentRequests,
+    sentinelRef: recruitmentSentinelRef,
+    totalCount: totalRecruitmentPaginationCount,
+    displayedCount: displayedRecruitmentCount
+  } = useInfinitePagination<EmployerRecruitmentRequest>(recruitmentRequests, { pageSize: 8, initialPageSize: 8 }, [recruitmentRequests.length]);
 
   // Chart data for employer metrics
   const getChartData = () => {
@@ -1035,7 +1066,7 @@ export const EmployerDashboard: React.FC = () => {
                             ? "bg-blue-50 text-blue-800 border border-blue-200"
                             : "bg-amber-50 text-amber-800 border border-amber-200"
                         }`}>
-                          {req.status.replace("_", " ").toUpperCase()}
+                          {String(req.status || "").replace("_", " ").toUpperCase()}
                         </span>
                       </div>
                       <span className="text-[11px] font-mono text-slate-400">
@@ -1054,7 +1085,7 @@ export const EmployerDashboard: React.FC = () => {
                       </div>
                       <div>
                         <span className="text-slate-400 text-[10px] block">Urgency</span>
-                        <span className="font-bold text-slate-800 capitalize">{req.urgency.replace(/_/g, " ")}</span>
+                        <span className="font-bold text-slate-800 capitalize">{String(req.urgency || "").replace(/_/g, " ")}</span>
                       </div>
                       <div>
                         <span className="text-slate-400 text-[10px] block">Assigned Recruiter</span>
@@ -1114,7 +1145,7 @@ export const EmployerDashboard: React.FC = () => {
                         : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                     }`}
                   >
-                    {stage.replace("_", " ")}
+                    {String(stage || "").replace("_", " ")}
                   </button>
                 ))}
               </div>
@@ -1148,7 +1179,7 @@ export const EmployerDashboard: React.FC = () => {
                             app.status === "rejected" ? "bg-rose-50 text-rose-800 border border-rose-200" :
                             "bg-amber-50 text-amber-800 border border-amber-200"
                           }`}>
-                            {app.status.replace("_", " ").toUpperCase()}
+                            {String(app.status || "").replace("_", " ").toUpperCase()}
                           </span>
                         </div>
                         <p className="text-xs text-slate-500 font-mono">

@@ -43,6 +43,15 @@ export const StaffManagement: React.FC<StaffManagementProps> = ({
     return (staffStatuses[staffUid] || "offline") === "online";
   };
 
+  const uniqueStaffList = React.useMemo(() => {
+    const seen = new Set<string>();
+    return (staffList || []).filter(s => {
+      if (!s || !s.uid || seen.has(s.uid)) return false;
+      seen.add(s.uid);
+      return true;
+    });
+  }, [staffList]);
+
   return (
     <div className="space-y-6">
       {/* View Header with Back Navigation */}
@@ -136,15 +145,15 @@ export const StaffManagement: React.FC<StaffManagementProps> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {staffList.length === 0 ? (
+                {uniqueStaffList.length === 0 ? (
                   <tr>
                     <td colSpan={8} className="px-6 py-12 text-center text-xs font-mono text-slate-400 italic">
                       No operational staff records retrieved. Click refresh or seed data first.
                     </td>
                   </tr>
                 ) : (
-                  staffList.map((staff) => (
-                    <tr key={staff.uid} className="hover:bg-slate-50/30 transition-colors">
+                  uniqueStaffList.map((staff, idx) => (
+                    <tr key={staff.uid ? `${staff.uid}-${idx}` : `staff-${idx}`} className="hover:bg-slate-50/30 transition-colors">
                       <td className="px-6 py-4.5 font-sans text-xs font-extrabold text-slate-900">
                         {staff.displayName}
                       </td>

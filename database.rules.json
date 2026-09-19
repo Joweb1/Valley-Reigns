@@ -1,23 +1,8 @@
 {
   "rules": {
-    "connection_diagnostics": {
-      ".read": true,
-      ".write": true
-    },
-    "connection_tests": {
-      ".read": true,
-      ".write": true
-    },
-    "conversations": {
-      ".read": true,
-      ".write": true
-    },
-    "staff_statuses": {
-      ".read": true,
-      ".write": true
-    },
-    ".read": true,
-    ".write": true
+    ".read": false,
+    ".write": false
   }
 }
+
 

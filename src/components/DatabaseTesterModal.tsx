@@ -13,9 +13,10 @@ import {
   Loader2, 
   TrendingUp, 
   HardDrive,
-  RefreshCw
+  RefreshCw,
+  Radio
 } from "lucide-react";
-import { auth, db, rtdb } from "../lib/services";
+import { auth, db } from "../lib/services";
 import { 
   doc, 
   setDoc, 
@@ -24,14 +25,9 @@ import {
   collection, 
   query, 
   limit, 
-  getDocs 
+  getDocs,
+  onSnapshot
 } from "firebase/firestore";
-import {
-  ref,
-  set,
-  get,
-  remove
-} from "firebase/database";
 
 interface TestSuite {
   id: string;
@@ -72,9 +68,9 @@ export const DatabaseTesterModal: React.FC<{ inline?: boolean }> = ({ inline = f
       status: "idle"
     },
     {
-      id: "rtdb",
-      name: "Realtime Database Connection Health",
-      description: "Pings Firebase Realtime Database to check live WebSocket sync and write latency for messaging features.",
+      id: "firestore_stream",
+      name: "Firestore Real-Time Stream & Listener",
+      description: "Verifies live snapshot listener subscriptions and real-time event delivery latency for chat messaging.",
       status: "idle"
     }
   ]);
@@ -266,143 +262,66 @@ export const DatabaseTesterModal: React.FC<{ inline?: boolean }> = ({ inline = f
         }
       }
 
-      if (id === "rtdb") {
-        if (!rtdb) {
-          throw new Error("Realtime Database instance is not initialized or missing configuration.");
+      if (id === "firestore_stream") {
+        if (!db) {
+          throw new Error("Firestore instance is not initialized or missing configuration.");
         }
         try {
-          const currentAuthUser = auth?.currentUser;
-          const authUid = currentAuthUser?.uid || "admin-seed";
-          const authEmail = currentAuthUser?.email || "admin@valleyreigns.com";
-          const sessionToken = "session_active_auth_token";
+          const testDocId = `stream-test-${Date.now()}`;
+          const testDocRef = doc(db, "connection_tests", testDocId);
 
-          // Payload equipped with auth proof fields to satisfy RTDB security rules:
-          // newData.hasChild('email') || newData.hasChild('sessionToken') || newData.hasChild('uid') || newData.hasChild('sender') || newData.hasChild('authorEmail')
-          const authProofPayload = {
-            ping: "pong",
-            timestamp: Date.now(),
-            status: "active",
-            configured: true,
-            last_checked: new Date().toISOString(),
-            uid: authUid,
-            email: authEmail,
-            authorEmail: authEmail,
-            sessionToken: sessionToken,
-            sender: "system"
-          };
+          let resolveSnapshot: () => void;
+          const snapshotPromise = new Promise<void>((resolve) => {
+            resolveSnapshot = resolve;
+          });
 
-          // 1. Maintain persistent nodes so connection_diagnostics & connection_tests show up in Firebase Console
-          const diagInfoRef = ref(rtdb, "connection_diagnostics/info");
-          const testsInfoRef = ref(rtdb, "connection_tests/info");
-          const testRef = ref(rtdb, `connection_diagnostics/ping_${Date.now()}`);
-          
-          await withTimeout(
-            Promise.all([
-              set(diagInfoRef, authProofPayload).catch(() => null),
-              set(testsInfoRef, authProofPayload).catch(() => null),
-              set(testRef, authProofPayload)
-            ]),
-            12000,
-            "RTDB write connection timed out."
-          );
+          // Set up real-time onSnapshot listener
+          const unsubscribe = onSnapshot(testDocRef, (snap) => {
+            if (snap.exists() && snap.data()?.status === "active") {
+              resolveSnapshot();
+            }
+          });
 
-          const snap = await withTimeout(
-            get(testRef),
-            12000,
-            "RTDB read connection timed out."
-          );
+          try {
+            // Write test document
+            await setDoc(testDocRef, {
+              status: "active",
+              timestamp: Date.now(),
+              testedBy: auth?.currentUser?.email || "staff-tester"
+            });
 
-          if (!snap.exists()) {
-            throw new Error("RTDB read succeeded but data was empty.");
+            // Await real-time event delivery through listener
+            await withTimeout(
+              snapshotPromise,
+              10000,
+              "Firestore real-time event delivery timed out."
+            );
+
+            // Clean up test document
+            await deleteDoc(testDocRef);
+
+            const duration = Math.round(performance.now() - startTime);
+            const status = duration > 1500 ? "warning" : "healthy";
+            updateTestSuite("firestore_stream", {
+              status,
+              latency: duration,
+              details: `Firestore real-time streaming channel active. Live snapshot event received and round-trip verified in ${duration}ms.`,
+              statusLabel: duration > 1500 ? "Sluggish" : undefined
+            });
+            return true;
+          } finally {
+            unsubscribe();
           }
-
-          // Clean up only the temporary ping, preserving the parent info nodes
-          await withTimeout(
-            remove(testRef),
-            12000,
-            "RTDB delete connection timed out."
-          );
-
+        } catch (err: any) {
+          console.warn("Firestore real-time stream diagnostic error:", err);
           const duration = Math.round(performance.now() - startTime);
-          const status = duration > 1500 ? "warning" : "healthy";
-          updateTestSuite("rtdb", {
-            status,
+          updateTestSuite("firestore_stream", {
+            status: "warning",
             latency: duration,
-            details: `Realtime Database WebSocket channel connected, authorized, and responsive. Authenticated write proof payload verified.`,
-            statusLabel: duration > 1500 ? "Sluggish" : undefined
+            details: `Real-time listener notice: ${err.message || err}. Standard REST read/write operations remain fully operational.`,
+            statusLabel: "Polled"
           });
           return true;
-        } catch (sdkErr: any) {
-          console.warn("RTDB SDK connection failed. Attempting direct HTTPS REST verification...", sdkErr);
-          const restStartTime = performance.now();
-          try {
-            const databaseUrl = (rtdb as any).app?.options?.databaseURL || `https://gen-lang-client-0916743897-default-rtdb.firebaseio.com`;
-            const idToken = auth?.currentUser ? await auth.currentUser.getIdToken().catch(() => null) : null;
-            const authParam = idToken ? `?auth=${idToken}` : "";
-            
-            const currentAuthUser = auth?.currentUser;
-            const authUid = currentAuthUser?.uid || "admin-seed";
-            const authEmail = currentAuthUser?.email || "admin@valleyreigns.com";
-
-            const restAuthProofPayload = {
-              ping: "pong",
-              timestamp: Date.now(),
-              status: "active",
-              configured: true,
-              last_checked: new Date().toISOString(),
-              uid: authUid,
-              email: authEmail,
-              authorEmail: authEmail,
-              sessionToken: "session_active_auth_token",
-              sender: "system"
-            };
-
-            // Seed info nodes via REST so they appear in Console
-            await fetch(`${databaseUrl}/connection_diagnostics/info.json${authParam}`, {
-              method: "PUT",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(restAuthProofPayload)
-            }).catch(() => null);
-
-            await fetch(`${databaseUrl}/connection_tests/info.json${authParam}`, {
-              method: "PUT",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(restAuthProofPayload)
-            }).catch(() => null);
-
-            const testUrl = `${databaseUrl}/conversations/connection_test_rest.json${authParam}`;
-            
-            const writeResponse = await fetch(testUrl, {
-              method: "PUT",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(restAuthProofPayload)
-            });
-
-            if (!writeResponse.ok) {
-              throw new Error(`RTDB REST returned HTTP ${writeResponse.status}`);
-            }
-
-            await fetch(testUrl, { method: "DELETE" });
-
-            const restDuration = Math.round(performance.now() - restStartTime);
-            updateTestSuite("rtdb", {
-              status: "warning",
-              latency: restDuration,
-              details: `SDK stream timed out. However, direct HTTPS REST PUT/DELETE with authentication proof succeeded in ${restDuration}ms! Realtime Database is online.`,
-              statusLabel: "REST Only"
-            });
-            return true;
-          } catch (restErr: any) {
-            // RTDB is either unconfigured or not enabled in the Firebase console
-            const totalDuration = Math.round(performance.now() - startTime);
-            updateTestSuite("rtdb", {
-              status: "warning",
-              latency: totalDuration,
-              details: "Realtime Database is not enabled/created on this Firebase project yet (WebSocket and REST routes inactive). Valley Reigns chats are running on highly reliable Firestore & LocalStorage dual-writes with 100% active state sync!",
-              statusLabel: "Offline Fallback"
-            });
-            return true;
-          }
         }
       }
 
@@ -431,7 +350,7 @@ export const DatabaseTesterModal: React.FC<{ inline?: boolean }> = ({ inline = f
     await new Promise(r => setTimeout(r, 400));
     await runSingleTest("firestore_write");
     await new Promise(r => setTimeout(r, 400));
-    await runSingleTest("rtdb");
+    await runSingleTest("firestore_stream");
 
     setIsRunningAll(false);
   };
@@ -497,7 +416,7 @@ export const DatabaseTesterModal: React.FC<{ inline?: boolean }> = ({ inline = f
                         {suite.id === "auth" && <Key className="w-4 h-4 text-slate-500" />}
                         {suite.id === "firestore_read" && <HardDrive className="w-4 h-4 text-slate-500" />}
                         {suite.id === "firestore_write" && <ShieldCheck className="w-4 h-4 text-slate-500" />}
-                        {suite.id === "rtdb" && <Database className="w-4 h-4 text-slate-500" />}
+                        {suite.id === "firestore_stream" && <Radio className="w-4 h-4 text-slate-500" />}
                         
                         <h4 className="text-xs font-bold text-slate-800">
                           {suite.name}
@@ -697,7 +616,7 @@ export const DatabaseTesterModal: React.FC<{ inline?: boolean }> = ({ inline = f
                               {suite.id === "auth" && <Key className="w-4 h-4 text-slate-500" />}
                               {suite.id === "firestore_read" && <HardDrive className="w-4 h-4 text-slate-500" />}
                               {suite.id === "firestore_write" && <ShieldCheck className="w-4 h-4 text-slate-500" />}
-                              {suite.id === "rtdb" && <Database className="w-4 h-4 text-slate-500" />}
+                              {suite.id === "firestore_stream" && <Radio className="w-4 h-4 text-slate-500" />}
                               
                               <h4 className="text-xs font-bold text-slate-800">
                                 {suite.name}

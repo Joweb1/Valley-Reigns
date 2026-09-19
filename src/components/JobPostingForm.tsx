@@ -819,19 +819,35 @@ export const JobPostingForm: React.FC<JobPostingFormProps> = ({ onJobAdded, hide
                   </motion.div>
                 </div>
 
-                {/* Interactive Continue Button */}
+                {/* Interactive Action Buttons */}
                 <motion.div
                   initial={{ scale: 0, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
-                  transition={{ type: "spring", stiffness: 150, delay: 1.2 }}
-                  className="mt-12 relative z-10"
+                  transition={{ type: "spring", stiffness: 150, delay: 0.8 }}
+                  className="mt-8 relative z-10 flex flex-col sm:flex-row items-center justify-center gap-3 w-full max-w-md px-4"
                 >
+                  {postedJob && (
+                    <a
+                      href={`/jobs/${postedJob.id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="w-full sm:w-auto px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-sans font-black text-xs tracking-wider rounded-xl uppercase shadow-lg border border-blue-400/30 flex items-center justify-center gap-2 transition-all hover:scale-105"
+                    >
+                      <span>View Public Page & SEO</span>
+                      <svg className="w-4 h-4 stroke-current" viewBox="0 0 24 24" fill="none" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                        <polyline points="15 3 21 3 21 9" />
+                        <line x1="10" y1="14" x2="21" y2="3" />
+                      </svg>
+                    </a>
+                  )}
+
                   <button
                     onClick={handleContinueToManagement}
-                    className="px-8 py-3.5 bg-[#10B981] hover:bg-[#059669] text-slate-950 hover:text-white font-sans font-black text-sm tracking-widest rounded-2xl uppercase shadow-[6px_6px_0px_#EC4899] border-3 border-slate-950 hover:shadow-[4px_4px_0px_#EC4899] active:translate-x-1 active:translate-y-1 transition-all cursor-pointer inline-flex items-center gap-2"
+                    className="w-full sm:w-auto px-6 py-3 bg-[#10B981] hover:bg-[#059669] text-slate-950 hover:text-white font-sans font-black text-xs tracking-wider rounded-xl uppercase shadow-[4px_4px_0px_#EC4899] border-2 border-slate-950 hover:shadow-[2px_2px_0px_#EC4899] active:translate-x-0.5 active:translate-y-0.5 transition-all cursor-pointer inline-flex items-center justify-center gap-2"
                   >
-                    <span>Continue to Management</span>
-                    <svg className="w-5 h-5 stroke-current" viewBox="0 0 24 24" fill="none" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                    <span>Job Management</span>
+                    <svg className="w-4 h-4 stroke-current" viewBox="0 0 24 24" fill="none" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M5 12h14M12 5l7 7-7 7" />
                     </svg>
                   </button>

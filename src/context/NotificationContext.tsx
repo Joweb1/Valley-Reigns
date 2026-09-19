@@ -15,6 +15,9 @@ interface NotificationContextType {
 
 // Helper to convert base64 VAPID public keys to Uint8Array required by pushManager.subscribe
 function urlBase64ToUint8Array(base64String: string) {
+  if (!base64String || typeof base64String !== "string") {
+    return new Uint8Array();
+  }
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
   const base64 = (base64String + padding)
     .replace(/\-/g, "+")
@@ -32,7 +35,7 @@ function urlBase64ToUint8Array(base64String: string) {
 let activeSubscribePromise: Promise<PushSubscription | undefined> | null = null;
 
 // Subscribe the device browser service worker to standard Web Push
-async function subscribeToWebPush(userId: string | null = null): Promise<PushSubscription | undefined> {
+async function subscribeToWebPush(user: { uid?: string; role?: string; email?: string; displayName?: string } | null = null): Promise<PushSubscription | undefined> {
   if (typeof window === "undefined" || !("serviceWorker" in navigator)) return;
 
   if (activeSubscribePromise) {
@@ -75,7 +78,13 @@ async function subscribeToWebPush(userId: string | null = null): Promise<PushSub
       await fetch("/api/push/subscribe", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ subscription: serializedSubscription, userId })
+        body: JSON.stringify({ 
+          subscription: serializedSubscription, 
+          userId: user?.uid || null,
+          role: user?.role || null,
+          email: user?.email || null,
+          displayName: user?.displayName || null
+        })
       });
 
       console.log("[Web Push] Subscription successfully registered on server.");
@@ -115,7 +124,7 @@ async function unsubscribeFromWebPush() {
   }
 }
 
-const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
+export const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
 
 export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { currentUser } = useAuth();
@@ -165,7 +174,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   // Synchronize W3C Push subscription with backend Firestore database
   useEffect(() => {
     if (pushNotificationsEnabled) {
-      subscribeToWebPush(currentUser?.uid || null);
+      subscribeToWebPush(currentUser || null);
     } else {
       unsubscribeFromWebPush();
     }
@@ -209,7 +218,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
           );
         } else {
           // Immediately subscribe and trigger an instant backend Web Push verification
-          subscribeToWebPush(currentUser?.uid || null).then(async (sub) => {
+          subscribeToWebPush(currentUser || null).then(async (sub) => {
             if (sub) {
               await fetch("/api/push/test", {
                 method: "POST",

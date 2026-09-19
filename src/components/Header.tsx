@@ -8,7 +8,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { setStaffOnlineStatus, getAllUserProfiles } from "../lib/services";
 
 export const Header: React.FC = () => {
-  const { currentUser, firebaseUser, loginWithGoogle, logout, updateUserPreference } = useAuth();
+  const { currentUser, firebaseUser, loginWithGoogle, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -99,20 +99,6 @@ export const Header: React.FC = () => {
     return () => window.removeEventListener("staff-status-changed", handleStatusChange);
   }, []);
 
-  // Active WhatsApp Engine state synced with server
-  const [whatsAppEngine, setWhatsAppEngine] = useState<"official" | "baileys">("baileys");
-
-  useEffect(() => {
-    fetch("/api/whatsapp/provider-status")
-      .then(res => res.json())
-      .then(data => {
-        if (data && data.activeMode) {
-          setWhatsAppEngine(data.activeMode);
-        }
-      })
-      .catch(() => {});
-  }, []);
-
   const isDashboardPage = location.pathname.startsWith("/seeker") || location.pathname.startsWith("/staff") || location.pathname.startsWith("/admin") || location.pathname.startsWith("/employer");
 
   const handleFindJobsClick = (e: React.MouseEvent) => {
@@ -130,12 +116,12 @@ export const Header: React.FC = () => {
 
   if (isDashboardPage) {
     return (
-      <header id="app-header" className="sticky top-4 z-40 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
+      <header id="app-header" className="sticky top-4 z-[80] max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
         <div className="bg-white/95 backdrop-blur-md border border-slate-200/60 rounded-[28px] shadow-[0_24px_55px_-10px_rgba(30, 136, 229, 0.12),0_12px_24px_-12px_rgba(30, 136, 229, 0.08)] px-4 sm:px-6 h-16 flex items-center justify-between relative">
           
           {/* Left: Companies logo and Administration tag */}
           <div className="flex items-center gap-3">
-            <Link to={currentUser?.role === "admin" ? "/admin/dashboard" : currentUser?.role === "employer" ? "/employer/dashboard" : "/seeker"} className="flex items-center group">
+            <Link to={currentUser?.role === "admin" ? "/admin/dashboard" : currentUser?.role === "employer" ? "/employer/chat" : "/seeker"} className="flex items-center group">
               <div className="w-12 h-12 flex items-center justify-center group-hover:scale-105 transition-all duration-300">
                 <img 
                   src="/icon.svg" 
@@ -224,7 +210,7 @@ export const Header: React.FC = () => {
                   <>
                     {createPortal(
                       <div 
-                        className="fixed inset-0 z-30 bg-slate-900/20 backdrop-blur-[4px]" 
+                        className="fixed inset-0 z-40 bg-slate-900/20 backdrop-blur-[4px]" 
                         onClick={() => setProfilePopupOpen(false)}
                       />,
                       document.body
@@ -234,7 +220,7 @@ export const Header: React.FC = () => {
                       animate={{ opacity: 1, scale: 1, y: 0 }}
                       exit={{ opacity: 0, scale: 0.92, y: 10 }}
                       transition={{ type: "spring", duration: 0.3 }}
-                      className="absolute right-[-8px] mt-3 w-64 bg-white/95 backdrop-blur-md border border-slate-200/60 rounded-xl shadow-[0_24px_50px_rgba(30, 136, 229, 0.18),0_1px_3px_rgba(0,0,0,0.05)] p-2 z-50 overflow-hidden"
+                      className="absolute right-[-8px] mt-3 w-64 bg-white/95 backdrop-blur-md border border-slate-200/60 rounded-xl shadow-[0_24px_50px_rgba(30, 136, 229, 0.18),0_1px_3px_rgba(0,0,0,0.05)] p-2 z-[60] overflow-hidden"
                     >
                     {/* User profile header inside popup */}
                     <div className="px-3.5 py-3 border-b border-slate-100 mb-2 flex items-center gap-3">
@@ -308,76 +294,6 @@ export const Header: React.FC = () => {
                             <div
                               className={`w-4 h-4 rounded-full bg-white shadow-sm transform duration-200 ${
                                 isStaffOnlineState ? "translate-x-5" : "translate-x-0"
-                              }`}
-                            />
-                          </button>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Messaging Preference Toggle Switch */}
-                    {currentUser && (
-                      <div className="px-1.5 py-1">
-                        <div className="px-3 py-2 bg-slate-50/50 border border-slate-100 rounded-2xl mx-1 mb-1 flex items-center justify-between">
-                          <div className="flex flex-col text-left">
-                            <span className="text-[10px] font-bold text-slate-700">Messaging Pipeline</span>
-                            <span className="text-[8px] font-mono font-medium text-slate-400">
-                              {currentUser.messagingPreference === "in-app" ? "In-App Mode" : "WhatsApp Mode"}
-                            </span>
-                          </div>
-                          <button
-                            onClick={async () => {
-                              const nextPref = currentUser.messagingPreference === "in-app" ? "whatsapp" : "in-app";
-                              if (updateUserPreference) {
-                                await updateUserPreference(nextPref);
-                              }
-                            }}
-                            className={`w-10 h-5 rounded-full p-0.5 transition-colors focus:outline-none flex items-center cursor-pointer ${
-                              currentUser.messagingPreference === "in-app" ? "bg-[#1E88E5]" : "bg-slate-300"
-                            }`}
-                          >
-                            <div
-                              className={`w-4 h-4 rounded-full bg-white shadow-sm transform duration-200 ${
-                                currentUser.messagingPreference === "in-app" ? "translate-x-5" : "translate-x-0"
-                              }`}
-                            />
-                          </button>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* WhatsApp Engine Switch for Admins Only */}
-                    {currentUser?.role === "admin" && (
-                      <div className="px-1.5 py-1">
-                        <div className="px-3 py-2 bg-slate-50/50 border border-slate-100 rounded-2xl mx-1 mb-1 flex items-center justify-between">
-                          <div className="flex flex-col text-left">
-                            <span className="text-[10px] font-bold text-slate-700">WhatsApp Engine</span>
-                            <span className="text-[8px] font-mono font-medium text-slate-500">
-                              {whatsAppEngine === "baileys" ? "Baileys WA Web" : "Meta Official API"}
-                            </span>
-                          </div>
-                          <button
-                            onClick={async () => {
-                              const nextMode = whatsAppEngine === "baileys" ? "official" : "baileys";
-                              setWhatsAppEngine(nextMode);
-                              try {
-                                await fetch("/api/whatsapp/toggle-mode", {
-                                  method: "POST",
-                                  headers: { "Content-Type": "application/json" },
-                                  body: JSON.stringify({ mode: nextMode })
-                                });
-                              } catch (err) {
-                                console.error("Failed to toggle WhatsApp engine:", err);
-                              }
-                            }}
-                            className={`w-10 h-5 rounded-full p-0.5 transition-colors focus:outline-none flex items-center cursor-pointer ${
-                              whatsAppEngine === "baileys" ? "bg-emerald-600" : "bg-blue-600"
-                            }`}
-                            title="Toggle between Meta Official API and Baileys WhatsApp Web Engine"
-                          >
-                            <div
-                              className={`w-4 h-4 rounded-full bg-white shadow-sm transform duration-200 ${
-                                whatsAppEngine === "baileys" ? "translate-x-5" : "translate-x-0"
                               }`}
                             />
                           </button>
@@ -572,7 +488,7 @@ export const Header: React.FC = () => {
                   Valley Reigns is a full-cycle recruitment management workspace designed to unite ambitious talent with forward-thinking organizations.
                 </p>
                 <p className="text-[11px] leading-relaxed font-sans font-semibold text-[#1E88E5]">
-                  Recruitment for everyone — streamlined, collaborative, and secure.
+                  Active Recruitment for everyone — streamlined, collaborative, and secure.
                 </p>
                 <button
                   onClick={() => setShowAboutModal(false)}
@@ -589,14 +505,14 @@ export const Header: React.FC = () => {
   }
 
   return (
-    <header id="app-header" className="sticky top-4 z-40 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
+    <header id="app-header" className="sticky top-4 z-[80] max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
       <div className="bg-white/95 backdrop-blur-md border border-slate-200/60 rounded-[28px] shadow-[0_24px_55px_-10px_rgba(30, 136, 229, 0.12),0_12px_24px_-12px_rgba(30, 136, 229, 0.08)] px-4 sm:px-6 h-16 flex items-center justify-between">
         
         {/* Brand Logo - Designed for high-end aesthetics */}
         <Link 
           to={
             currentUser 
-              ? (currentUser.role === "admin" ? "/admin/dashboard" : currentUser.role === "employer" ? "/employer/dashboard" : "/seeker") 
+              ? (currentUser.role === "admin" ? "/admin/dashboard" : currentUser.role === "employer" ? "/employer/chat" : "/seeker") 
               : "/"
           } 
           className="flex items-center gap-2.5 group"
@@ -732,7 +648,7 @@ export const Header: React.FC = () => {
           ) : (
             <button
               onClick={() => window.dispatchEvent(new CustomEvent("open-auth-modal"))}
-              className="px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 hover:border-slate-300 rounded-xl text-xs font-bold shadow-sm transition-all flex items-center gap-2 cursor-pointer hover:scale-[1.03] active:scale-97"
+              className="px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 hover:border-slate-300 rounded-full text-xs font-bold shadow-sm transition-all flex items-center gap-2 cursor-pointer hover:scale-[1.03] active:scale-97"
             >
               <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24">
                 <path
@@ -780,7 +696,7 @@ export const Header: React.FC = () => {
           <>
             {createPortal(
               <div 
-                className="fixed inset-0 z-30 bg-slate-900/20 backdrop-blur-[4px]" 
+                className="fixed inset-0 z-[70] bg-slate-900/20 backdrop-blur-[4px]" 
                 onClick={() => setMobileMenuOpen(false)}
               />,
               document.body
@@ -789,7 +705,7 @@ export const Header: React.FC = () => {
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: "auto" }}
               exit={{ opacity: 0, height: 0 }}
-              className="md:hidden bg-white/95 backdrop-blur-md border border-slate-200/80 rounded-2xl shadow-lg mt-2 overflow-hidden relative z-40"
+              className="md:hidden bg-white/95 backdrop-blur-md border border-slate-200/80 rounded-2xl shadow-lg mt-2 overflow-hidden relative z-[90]"
             >
             <div className="px-4 pt-2 pb-6 space-y-3">
               {!currentUser && (
